@@ -87,7 +87,7 @@ main .wrap>*,.v{min-width:0}
 .totem{background:var(--grafite);color:#fff;border-radius:16px;padding:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:4px 16px;border-top:6px solid var(--laranja)}
 .totem .t{grid-column:1/-1;font:700 12px var(--f-display);letter-spacing:.12em;text-transform:uppercase;color:#FFB58A;margin-bottom:4px}
 .totem .k{font:500 12px var(--f-body);color:#B7C3CE;text-transform:uppercase;letter-spacing:.06em;margin-top:8px}
-.totem .v{font:600 26px/1.1 var(--f-num);font-variant-numeric:tabular-nums}
+.totem .v{font:600 26px/1.1 var(--f-num);font-variant-numeric:tabular-nums;white-space:nowrap}
 .totem .v small{font-size:15px;color:#B7C3CE;margin-left:2px}
 .sc{overflow-x:auto;background:var(--card);border:1px solid var(--bd);border-radius:12px}
 table{border-collapse:collapse;width:100%;font-size:14px}
@@ -106,6 +106,29 @@ h2{font:700 17px var(--f-display);margin:0}
 .login label{display:grid;gap:4px;font-size:14px;color:var(--mut)}
 .login input{padding:12px;border:1px solid var(--bd);border-radius:10px;background:var(--in);font-size:16px}
 .erro{color:var(--bad);font-size:14px;min-height:1em}
+.pn{padding:14px 16px;display:grid;gap:12px}
+.pn h3{margin:0;font:700 16px var(--f-display);display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+.fc-g{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:14px}
+@media (max-width:720px){.fc-g{grid-template-columns:1fr}}
+.fc-g>*{min-width:0}
+.fc-img{width:100%;max-height:520px;object-fit:contain;border:1px solid var(--bd);border-radius:10px;background:#fff}
+.ff{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.ff label{font-size:12px;color:var(--mut);display:grid;gap:3px;min-width:0}
+.ff input,.ff select{width:100%;min-width:0;padding:8px;border:1px solid var(--bd);border-radius:9px;background:var(--in)}
+.ff input.n{text-align:right;font:600 16px var(--f-num)}
+.chk{font-size:14px;display:grid;gap:3px}
+.visto{display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;background:var(--okb);font-size:15px}
+.visto input{width:22px;height:22px}
+.chip{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--bd);border-radius:20px;padding:4px 10px;margin:0 6px 6px 0;font-size:13px;background:var(--card)}
+.vars input{width:86px;padding:4px 6px;border:1px solid var(--bd);border-radius:7px;background:var(--in);text-align:right}
+.liq{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px 14px;display:grid;gap:8px}
+.liq h3{margin:0;font:700 15px var(--f-display);display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px}
+.b{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:600}
+.b.ok{background:var(--okb);color:var(--ok)}.b.wn{background:var(--wnb);color:var(--wn)}.b.bad{background:var(--badb);color:var(--bad)}
+details.grp{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:6px 12px}
+details.grp summary{cursor:pointer;font-weight:700}
+details.grp div{font-size:14px;margin:4px 0}
+textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px;background:var(--in);font:12px monospace;color:var(--fg)}
 </style>
 </head>
 <body>
@@ -128,14 +151,16 @@ h2{font:700 17px var(--f-display);margin:0}
   <div class="hd-dir"><select id="selEst" aria-label="Estação" hidden></select><span class="quem" id="hQuem"></span><button class="hbtn" id="bSair">Sair</button></div>
 </div></header>
 <nav><div class="wrap">
-  <button data-v="reg" class="on">📝 Registo</button><button data-v="mes">🗓️ Mês</button><button data-v="sai">📦 Saídas</button><button data-v="fun">👥 Funcionários</button><button data-v="his">🕘 Histórico</button>
+  <button data-v="reg" class="on">📝 Registo</button><button data-v="mes">🗓️ Mês</button><button data-v="sai">📦 Saídas</button><button data-v="fun">👥 Funcionários</button><button data-v="rep">🏦 Repsol</button><button data-v="his">🕘 Histórico</button>
 </div></nav>
 <main><div class="wrap">
   <div class="aviso" id="avRO" hidden><p>A sua conta pode consultar mas não alterar. Registar e corrigir é para administradores.</p></div>
 
   <!-- REGISTO -->
   <div id="v-reg" class="v">
-    <div class="bar"><button class="btn" id="dAnt" aria-label="Dia anterior">‹</button><input type="date" id="dDia"><button class="btn" id="dSeg" aria-label="Dia seguinte">›</button><button class="btn" id="dHoje">Hoje</button><span class="st" id="st"></span></div>
+    <div class="bar"><button class="btn" id="dAnt" aria-label="Dia anterior">‹</button><input type="date" id="dDia"><button class="btn" id="dSeg" aria-label="Dia seguinte">›</button><button class="btn" id="dHoje">Hoje</button><button class="btn az adm" id="bXls">📥 Importar do sistema</button><input type="file" id="fXls" accept=".xls" hidden><button class="btn p adm" id="bFecho">📷 Digitalizar fecho</button><input type="file" id="fFecho" accept="image/*" capture="environment" hidden><span class="st" id="st"></span></div>
+    <div id="painel" class="card" hidden style="border:2px solid var(--laranja)"></div>
+    <div id="fechosDia"></div>
     <div class="g2" id="turnos"></div>
     <div class="card"><div class="cb"><div class="res"><span>Total do dia · recebido <b id="dRec">—</b> · vendas <b id="dVen">—</b></span><span>Diferença <b id="dDif">—</b></span></div></div></div>
   </div>
@@ -160,6 +185,15 @@ h2{font:700 17px var(--f-display);margin:0}
     <div class="sc"><table><thead><tr><th>Funcionário</th><th>Turnos</th><th>Vendas</th><th>Diferença</th><th>Maior falta</th></tr></thead><tbody id="fT"></tbody></table></div>
   </div>
 
+  <!-- REPSOL -->
+  <div id="v-rep" class="v" hidden>
+    <div class="bar"><button class="btn" id="rAnt">‹</button><input type="month" id="rMes"><button class="btn" id="rSeg">›</button><button class="btn p adm" id="bPdf">📄 Carregar PDF da Repsol</button><input type="file" id="fPdf" accept="application/pdf" multiple hidden></div>
+    <div id="repProg" hidden class="aviso"></div>
+    <section class="totem" id="mbTotem"></section>
+    <div id="repDocs" style="display:grid;gap:12px"></div>
+    <div id="repChecks" style="display:grid;gap:6px"></div>
+  </div>
+
   <!-- HISTÓRICO -->
   <div id="v-his" class="v" hidden>
     <div class="bar"><input type="date" id="hDia"><span class="mut" style="font-size:14px">Todas as alterações desse dia, com quem e quando. Não se apagam.</span></div>
@@ -170,6 +204,7 @@ h2{font:700 17px var(--f-display);margin:0}
 
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="motor.js"></script>
 <script>
 "use strict";
 /* ---------------- utilidades ---------------- */
@@ -202,7 +237,7 @@ function falhou(e){var m=(e&&(e.message||e.error_description))||String(e);
 var authChain=Promise.resolve();
 var tabLock=function(_n,_t,fn){var run=authChain.then(function(){return fn()});authChain=run.catch(function(){});return run};
 var sb=window.supabase.createClient(MSB_CONFIG.url,MSB_CONFIG.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,lock:tabLock}});
-var EU=null, PERFIL=null, EST=null, ESTS=[], ADMIN=false, NOMES={};
+var EU=null, PERFIL=null, EST=null, ESTS=[], ADMIN=false, NOMES={}, POSES={};
 var DIA=iso(new Date()), MES=DIA.slice(0,7), LINHAS={}, SAIDAS=[];
 
 async function entrar(){
@@ -220,6 +255,8 @@ async function entrar(){
   $("#hQuem").textContent=(PERFIL.display_name||EU.email)+(ADMIN?" · admin":"");
   $("#avRO").hidden=ADMIN;
   var sel=$("#selEst");sel.innerHTML=ESTS.map(function(x){return "<option value='"+x.id+"'>"+esc(x.short_name||x.name)+"</option>"}).join("");sel.value=EST;sel.hidden=ESTS.length<2;
+  var cf=await sb.from("msb_config").select("estacao,pos_mb");POSES={};(cf.data||[]).forEach(function(x){POSES[x.estacao]=x.pos_mb});
+  $$(".adm").forEach(function(b){b.hidden=!ADMIN});
   mostrarEst();irDia(DIA);
 }
 function mostrarEst(){var e=ESTS.find(function(x){return x.id===EST});$("#hEst").textContent=e?(e.name||e.short_name):"—"}
@@ -232,14 +269,14 @@ $("#bSair").onclick=async function(){await sb.auth.signOut();LINHAS={};SAIDAS=[]
 /* ---------------- navegação ---------------- */
 var VISTA="reg";
 function vista(v){VISTA=v;$$("nav button").forEach(function(b){b.classList.toggle("on",b.dataset.v===v)});$$(".v").forEach(function(x){x.hidden=x.id!=="v-"+v});
-  if(v==="mes"){$("#mMes").value=MES;carregarMes()}if(v==="fun"){$("#fMes").value=MES;carregarFun()}if(v==="sai")carregarSaidas();if(v==="his"){$("#hDia").value=DIA;carregarHist()}}
+  if(v==="mes"){$("#mMes").value=MES;carregarMes()}if(v==="fun"){$("#fMes").value=MES;carregarFun()}if(v==="sai")carregarSaidas();if(v==="his"){$("#hDia").value=DIA;carregarHist()}if(v==="rep"){$("#rMes").value=MES;carregarRepsol()}}
 $$("nav button").forEach(function(b){b.onclick=function(){vista(b.dataset.v)}});
 
 /* ---------------- registo do dia ---------------- */
 async function irDia(d){DIA=d;$("#dDia").value=d;$("#st").textContent="";desenharDia(null);
   try{var r=await sb.from("msb_turnos").select("*").eq("estacao",EST).eq("dia",d);if(r.error)throw r.error;
     var s=await sb.from("msb_saidas").select("*").eq("estacao",EST).eq("dia",d).order("criado");if(s.error)throw s.error;
-    if(d!==DIA)return;LINHAS={};(r.data||[]).forEach(function(x){LINHAS[x.turno]=x});SAIDAS=s.data||[];desenharDia(true)}
+    if(d!==DIA)return;LINHAS={};(r.data||[]).forEach(function(x){LINHAS[x.turno]=x});SAIDAS=s.data||[];desenharDia(true);if(window.fechosDoDia)fechosDoDia()}
   catch(e){status(false,"⚠ "+falhou(e))}}
 function desenharDia(pronto){var h="";
   ["t1","t2"].forEach(function(t){var r=LINHAS[t]||{},txt=r.txt||{};
@@ -320,5 +357,6 @@ sb.auth.onAuthStateChange(function(ev){if(ev==="SIGNED_OUT"){EU=null;$("#vApp").
 if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(function(){});
 entrar().catch(function(e){$("#vLogin").hidden=false;$("#lErro").textContent=falhou(e)});
 </script>
+<script src="leitores.js"></script>
 </body>
 </html>
