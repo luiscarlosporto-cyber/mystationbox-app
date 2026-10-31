@@ -79,14 +79,15 @@ function carregarTesseract() {
 }
 function imagem(file) { return new Promise(function (ok, ko) { var im = new Image(); im.onload = function () { ok(im); }; im.onerror = function () { ko(new Error("imagem inválida")); }; im.src = URL.createObjectURL(file); }); }
 /* o mesmo tratamento afinado nos testes: 1600 px, contraste automático, engrossar os pontos da impressão */
-function prepararOCR(im) {
-  var W = 1600, H = Math.round(im.height * W / im.width), c = document.createElement("canvas"); c.width = W; c.height = H;
+function prepararOCR(im, W, raio) {
+  W = W || 1600; raio = raio == null ? 1 : raio;
+  var H = Math.round(im.height * W / im.width), c = document.createElement("canvas"); c.width = W; c.height = H;
   var x = c.getContext("2d"); x.drawImage(im, 0, 0, W, H);
   var d = x.getImageData(0, 0, W, H), p = d.data, n = W * H, g = new Uint8ClampedArray(n), hist = new Array(256).fill(0), i;
   for (i = 0; i < n; i++) { var v = (p[i * 4] * 299 + p[i * 4 + 1] * 587 + p[i * 4 + 2] * 114) / 1000 | 0; g[i] = v; hist[v]++; }
   var lo = 0, hi = 255, acc = 0; while (acc + hist[lo] < n * .01) { acc += hist[lo]; lo++; } acc = 0; while (acc + hist[hi] < n * .01) { acc += hist[hi]; hi--; }
   var k = 255 / Math.max(1, hi - lo), o = new Uint8ClampedArray(n);
-  for (var y = 0; y < H; y++) for (var xx = 0; xx < W; xx++) { var m = 255; for (var dy = -1; dy <= 1; dy++) { var yy = y + dy; if (yy < 0 || yy >= H) continue; for (var dx = -1; dx <= 1; dx++) { var x2 = xx + dx; if (x2 < 0 || x2 >= W) continue; var q = g[yy * W + x2]; if (q < m) m = q; } } o[y * W + xx] = m; }
+  for (var y = 0; y < H; y++) for (var xx = 0; xx < W; xx++) { var m = 255; for (var dy = -raio; dy <= raio; dy++) { var yy = y + dy; if (yy < 0 || yy >= H) continue; for (var dx = -raio; dx <= raio; dx++) { var x2 = xx + dx; if (x2 < 0 || x2 >= W) continue; var q = g[yy * W + x2]; if (q < m) m = q; } } o[y * W + xx] = m; }
   for (i = 0; i < n; i++) { var w = Math.max(0, Math.min(255, (o[i] - lo) * k)); p[i * 4] = p[i * 4 + 1] = p[i * 4 + 2] = w; }
   x.putImageData(d, 0, 0); return c;
 }
@@ -100,10 +101,24 @@ $("#fFecho").onchange = async function () {
   try {
     var im = await imagem(f); FC.foto = await fotoJPEG(im); FC.url = URL.createObjectURL(FC.foto);
     await carregarTesseract();
-    var w = await Tesseract.createWorker("eng", 1, {logger: function (m) { if (m.status === "recognizing text" && $("#fcPr")) $("#fcPr").textContent = "A reconhecer… " + Math.round(m.progress * 100) + "%"; }});
-    await w.setParameters({tessedit_pageseg_mode: "6"});
-    var res = await w.recognize(prepararOCR(im)); await w.terminate();
-    FC.texto = res.data.text; FC.r = MOTOR.lerFecho(FC.texto);
+    var passo = "";
+    var w = await Tesseract.createWorker("eng", 1, {logger: function (m) { if (m.status === "recognizing text" && $("#fcPr")) $("#fcPr").textContent = passo + " · " + Math.round(m.progress * 100) + "%"; }});
+    /* várias leituras com tratamentos diferentes (medidos nas fotografias reais); fica a que tem as contas do talão a bater certo */
+    var VARIANTES = [["1.ª leitura", 1600, 1, "6"], ["2.ª leitura (traço grosso)", 2200, 2, "6"], ["3.ª leitura (por blocos)", 1600, 1, "4"], ["4.ª leitura (sem filtro)", 1600, 0, "6"]];
+    var melhor = null;
+    for (var i = 0; i < VARIANTES.length; i++) {
+      var v = VARIANTES[i]; passo = v[0];
+      await w.setParameters({tessedit_pageseg_mode: v[3]});
+      var res = await w.recognize(prepararOCR(im, v[1], v[2])), r = null;
+      try { r = MOTOR.lerFecho(res.data.text); } catch (e) { r = null; }
+      var pts = MOTOR.pontuarFecho(r);
+      if (!melhor || pts > melhor.p) melhor = {p: pts, r: r, t: res.data.text, n: v[0]};
+      var bom = r && r.verificacoes.filter(function (c) { return c.nivel === "ok"; }).length >= (r.tipo === "MB" ? 1 : 2) && !r.verificacoes.some(function (c) { return c.nivel === "erro"; });
+      if (bom) break;   // contas do talão confirmadas: não é preciso ler outra vez
+    }
+    await w.terminate();
+    FC.texto = melhor.t; FC.r = melhor.r; FC.passagem = melhor.n + " de " + (i < VARIANTES.length ? i + 1 : VARIANTES.length);
+    if (!FC.r) throw new Error("Não reconheci o talão em nenhuma das leituras");
   } catch (e) { FC.erro = e.message || String(e); }
   await desenharFecho();
 };
@@ -116,7 +131,7 @@ async function desenharFecho() {
   h += "<div class='fc-g'><div>" + (FC.url ? "<img class='fc-img' src='" + FC.url + "' alt='talão'>" : "") + "</div><div style='display:grid;gap:10px'>";
   h += "<div class='ff'><label>Tipo<select id='fcT'><option value='MB'" + (tipo === "MB" ? " selected" : "") + ">Multibanco</option><option value='SOLRED'" + (tipo === "SOLRED" ? " selected" : "") + ">Solred</option></select></label><label>Dia<input type='date' id='fcD' value='" + dia + "'></label><label>Turno<select id='fcU'><option value='t1'" + (tr === "t1" ? " selected" : "") + ">☀️ Turno 1</option><option value='t2'" + (tr === "t2" ? " selected" : "") + ">🌙 Turno 2</option></select></label></div>";
   var lido = [r.dia ? "data " + dmy(r.dia) : "", r.hora ? "hora " + r.hora : "", r.tpa ? "TPA " + r.tpa : "", r.periodo ? "período " + r.periodo : "", r.operacao ? "operação " + r.operacao : "", r.desde ? "de " + r.desde + " a " + r.ate : ""].filter(Boolean);
-  if (lido.length) h += "<p class='mut' style='margin:0;font-size:12px'>Lido no talão: " + esc(lido.join(" · ")) + "</p>";
+  if (lido.length) h += "<p class='mut' style='margin:0;font-size:12px'>Lido no talão: " + esc(lido.join(" · ")) + (FC.passagem ? " · " + esc(FC.passagem) : "") + "</p>";
   h += "<b>Valores para o registo</b><div class='ff'>";
   if (tipo === "MB") h += "<label>Compra €<input class='n' id='fcC' inputmode='decimal' value='" + (r.compra == null ? "" : raw2(r.compra)) + "'></label><label>Devolução €<input class='n' id='fcV' inputmode='decimal' value='" + raw2(r.devolucao || 0) + "'></label><label>MB = compra − devolução<input class='n' id='fcM' disabled></label>";
   else h += "<label>Solred €<input class='n' id='fcS' inputmode='decimal' value='" + (r.solred == null ? "" : raw2(r.solred)) + "'></label><label>Solred litros<input class='n' id='fcL' inputmode='decimal' value='" + (r.lit == null ? "" : raw2(r.lit)) + "'></label>";

@@ -489,7 +489,7 @@ function turnoSugerido(dia, hora) {
 function classificarFecho(txt) {
   var T = txt.toUpperCase();
   if (/FECH0? DE TURN|TOTAIS POR TIP|TOTA[IL1]S POR/.test(T) && /S[O0]LRED|TIPO CART/.test(T)) return "SOLRED";
-  if (/TOTA[IL1]S TPA|T0TAIS TPA|VOLUC|PAGAMENT[O0] AUT/.test(T)) return "MB";
+  if (/TOTA[IL1]S TPA|T0TAIS TPA|VOLUC|PAGAMENT[O0] AUT|C[O0]NTRAT[O0]\s+NR|TPA DESAT|M[O0]VIMENTAR/.test(T)) return "MB";
   return "";
 }
 function linhasTxt(txt) { return txt.split(/\r\n|\r|\n|\v|\f|\x1c|\x1d|\x1e|\x85|\u2028|\u2029/); }   // str.splitlines()
@@ -632,7 +632,16 @@ function lerFecho(texto) {
   return r;
 }
 
+/* pontuação de uma leitura de fecho, para escolher entre várias passagens de OCR */
+function pontuarFecho(r) {
+  if (!r) return -99;
+  var p = 0;
+  (r.verificacoes || []).forEach(function (c) { p += c.nivel === "ok" ? 3 : c.nivel === "erro" ? -5 : c.nivel === "aviso" ? -1 : 0; });
+  if (r.tipo === "MB") { if (r.mb != null) p += 2; if (r.total_movimentar != null) p += 1; if (r.dia) p += 1; if (r.periodo) p += 1; }
+  else { if (r.solred != null) p += 2; if (r.lit != null) p += 2; if (r.dia) p += 1; }
+  return p;
+}
 var MOTOR = {num: num, num1: num1, pt: pt, lerTurno: lerTurno, pdfPaginas: pdfPaginas, lerDocumento: lerDocumento, classificarDoc: classificarDoc, verificar: verificar,
-  lerFecho: lerFecho, lerMB: lerMB, lerSolred: lerSolred, verificarMB: verificarMB, verificarSolred: verificarSolred, turnoSugerido: turnoSugerido, classificarFecho: classificarFecho, valores: valores, ratio: ratio};
+  lerFecho: lerFecho, pontuarFecho: pontuarFecho, lerMB: lerMB, lerSolred: lerSolred, verificarMB: verificarMB, verificarSolred: verificarSolred, turnoSugerido: turnoSugerido, classificarFecho: classificarFecho, valores: valores, ratio: ratio};
 if (typeof module !== "undefined" && module.exports) module.exports = MOTOR; else raiz.MOTOR = MOTOR;
 })(typeof window !== "undefined" ? window : globalThis);
