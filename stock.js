@@ -2,10 +2,39 @@
  * Não escreve em nenhuma tabela do Stock Tabaco: contar, dar saídas e aprovar encomendas faz-se na app dele. */
 "use strict";
 var STOCK_APP = "https://luiscarlosporto-cyber.github.io/stock-tabaco-central/";
+/* O NexStock (Stock Tabaco) corre inteiro dentro deste separador, sem cópia do código: está publicado no mesmo
+ * endereço base (luiscarlosporto-cyber.github.io), por isso partilha o login (mesma sessão Supabase no navegador)
+ * e a estação escolhida (localStorage "stc_company"). Esconde-se só o cabeçalho dele, porque o do mystationbox já lá está. */
+var NEX_URL = "/stock-tabaco-central/", TAB_VISTA = "nex", NEX_EST = null;
+function prepararNexStock() {
+  try {
+    localStorage.setItem("stc_company", JSON.stringify(EST));
+    var c = JSON.parse(localStorage.getItem("stc_cloud") || "null");
+    if (!c || !c.url || !c.key) localStorage.setItem("stc_cloud", JSON.stringify({url: MSB_CONFIG.url, key: MSB_CONFIG.key}));
+  } catch (e) { /* sem armazenamento: o NexStock pede o login dentro do separador */ }
+}
+function ajustarNexStock(fr) {
+  try {
+    var d = fr.contentDocument; if (!d || d.getElementById("msb-embed")) return;
+    var st = d.createElement("style"); st.id = "msb-embed";
+    st.textContent = "header{display:none!important}main{padding-top:4px!important}";
+    d.head.appendChild(st);
+  } catch (e) { /* outra origem: fica com o cabeçalho dele */ }
+}
+function mostrarNexStock() {
+  var box = $("#tabCorpo");
+  if (NEX_EST === EST && box.querySelector("iframe")) return;
+  prepararNexStock(); NEX_EST = EST;
+  box.innerHTML = "<iframe id='nexFrame' title='NexStock · tabaco' src='" + NEX_URL + "?msb=" + Date.now() + "' allow='camera; clipboard-write' style='width:100%;height:calc(100dvh - 150px);min-height:520px;border:1px solid var(--bd);border-radius:12px;background:#f2f5f9'></iframe>" +
+    "<p class='mut' style='font-size:12px;margin:0'>NexStock dentro do mystationbox. Se pedir login, use a mesma conta. <a href='" + STOCK_APP + "' target='_blank' rel='noopener'>Abrir em ecrã próprio ↗</a></p>";
+  var fr = $("#nexFrame"); fr.addEventListener("load", function () { ajustarNexStock(fr); });
+}
+function tabaco(v) { TAB_VISTA = v; $$("#tabSub button").forEach(function (b) { b.classList.toggle("on", b.dataset.t === v); }); if (v === "nex") mostrarNexStock(); else { NEX_EST = null; carregarTabacoResumo(); } }
 var TAB = {cat: [], enc: [], mov: [], aberta: null, filtro: ""};
 function estadoEnc(s) { return {enviada: "<span class='b ok'>enviada</span>", pendente: "<span class='b wn'>por aprovar</span>", cancelada: "<span class='b'>cancelada</span>"}[s] || esc(s); }
 function qtd(l) { return l.qty ? l.qty + " " + (l.unit === "volumes" ? "vol." : "un.") : "—"; }
-async function carregarTabaco() {
+function carregarTabaco() { tabaco(TAB_VISTA); }
+async function carregarTabacoResumo() {
   var box = $("#tabCorpo"); box.innerHTML = "<div class='mut'>A carregar…</div>";
   try {
     var r1 = await sb.from("product_company").select("product_id,stock,sales_month,sales_days").eq("company_id", EST); if (r1.error) throw r1.error;
@@ -28,7 +57,7 @@ function desenharTabaco() {
     "<div><div class='k'>Vendas/semana</div><div class='v'>" + Math.round(semanal) + "<small>maços/un.</small></div></div>" +
     "<div><div class='k'>Encomendas enviadas</div><div class='v'>" + enc.filter(function (o) { return o.status === "enviada"; }).length + "</div></div>" +
     "<div><div class='k'>Última encomenda</div><div class='v' style='font-size:20px'>" + (ult ? new Date(ult.created_at).toLocaleDateString("pt-PT") : "—") + "</div></div></section>";
-  h += "<div class='aviso'><p>Contar o stock com a câmara, dar saídas e aprovar encomendas faz-se na app Stock Tabaco (mesma conta). Aqui é só consulta. <a class='btn az' style='display:inline-block;margin-left:6px;text-decoration:none' href='" + STOCK_APP + "' target='_blank' rel='noopener'>Abrir Stock Tabaco ↗</a></p></div>";
+  h += "<div class='aviso'><p>Resumo só de consulta. Para contar, ler códigos, fazer e aprovar encomendas use <b>📦 NexStock</b>, aqui ao lado.</p></div>";
   /* encomendas */
   h += "<h2>Encomendas ao fornecedor</h2>";
   if (!enc.length) h += "<div class='vazio'>Sem encomendas desta estação.</div>";

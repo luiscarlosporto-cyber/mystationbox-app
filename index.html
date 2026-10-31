@@ -55,6 +55,7 @@ main .wrap>*,.v{min-width:0}
 .btn.p{background:var(--laranja);color:#fff}
 .btn.az{background:var(--azul);color:#fff}
 .btn[disabled]{opacity:.5;cursor:default}
+#tabSub .btn.on{background:var(--azul);color:#fff}
 .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .bar input[type=date],.bar input[type=month]{border:1px solid var(--bd);background:var(--card);border-radius:10px;padding:8px}
 .st{margin-left:auto;font-size:13px;color:var(--mut)}
@@ -195,7 +196,7 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
   </div>
 
   <!-- TABACO (consulta da app Stock Tabaco) -->
-  <div id="v-tab" class="v" hidden><div id="tabCorpo" style="display:grid;gap:12px"></div></div>
+  <div id="v-tab" class="v" hidden><div class="bar" id="tabSub"><button class="btn on" data-t="nex">📦 NexStock · contar, ler, encomendas</button><button class="btn" data-t="res">📊 Resumo</button></div><div id="tabCorpo" style="display:grid;gap:12px"></div></div>
 
   <!-- HISTÓRICO -->
   <div id="v-his" class="v" hidden>
@@ -263,7 +264,7 @@ async function entrar(){
   mostrarEst();irDia(DIA);
 }
 function mostrarEst(){var e=ESTS.find(function(x){return x.id===EST});$("#hEst").textContent=e?(e.name||e.short_name):"—"}
-$("#selEst").onchange=function(){EST=this.value;try{localStorage.setItem("msb_est",EST)}catch(e){}mostrarEst();LINHAS={};irDia(DIA);if(VISTA!=="reg")vista(VISTA)};
+$("#selEst").onchange=function(){EST=this.value;if(window.NEX_EST!==undefined)NEX_EST=null;try{localStorage.setItem("msb_est",EST)}catch(e){}mostrarEst();LINHAS={};irDia(DIA);if(VISTA!=="reg")vista(VISTA)};
 $("#fLogin").onsubmit=async function(ev){ev.preventDefault();$("#lErro").textContent="";$("#lBtn").disabled=true;
   try{var r=await sb.auth.signInWithPassword({email:$("#lEmail").value.trim(),password:$("#lPass").value});if(r.error)throw r.error;await entrar()}
   catch(e){$("#lErro").textContent=/Invalid login/i.test(e.message)?"Email ou palavra-passe errados.":falhou(e)}finally{$("#lBtn").disabled=false}};
@@ -362,5 +363,6 @@ entrar().catch(function(e){$("#vLogin").hidden=false;$("#lErro").textContent=fal
 </script>
 <script src="leitores.js"></script>
 <script src="stock.js"></script>
+<script>$$("#tabSub button").forEach(function(b){b.onclick=function(){tabaco(b.dataset.t)}});</script>
 </body>
 </html>
