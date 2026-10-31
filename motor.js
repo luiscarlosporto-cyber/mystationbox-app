@@ -508,19 +508,29 @@ function lerMB(txt) {
     if (/C[O0]MPRA|MPRA\b|WP\s?RA/.test(U) && v.length && r.compra === null) { r.compra = v[v.length - 1]; r.n_compra = nContagem(l); }
     else if (/DEV[O0]?LU|V[O0]LUC|VULUC/.test(U) && v.length && r.devolucao === null) { r.devolucao = v[v.length - 1]; r.n_devolucao = nContagem(l); }
     else if (/C[O0]NTRAT|VAL[O0]R T[O0]TAL/.test(U)) em = true;
-    else if (/M[O0]VIMENT/.test(U)) { r.total_movimentar = v.length ? v[v.length - 1] : null; em = false; }
+    else if (/M[O0]VIMENT/.test(U) || (/^\s*T[O0]TAL\s+A\b/.test(U) && v.length)) { r.total_movimentar = v.length ? v[v.length - 1] : null; em = false; }
     else if (em && v.length >= 2) {
       var sinal = /\d\s?-\s/.test(limpaLinha(l)) ? -1 : 1, nome = /^\s*([A-Za-z][A-Za-z\- ]{0,14}?)\s+[0-9OoQ@]/.exec(l);
       r.contratos.push({contrato: nome ? nome[1].trim() : l.slice(0, 12).trim(), valor: _r(sinal * v[v.length - 2]), desconto: v[v.length - 1]});
     }
   });
+  if (r.compra === null && r.contratos.length && r.total_movimentar !== null) {
+    /* COMPRA não lida: soma dos contratos − soma dos descontos = total a movimentar permite reconstruí-la */
+    var sv = _r(soma(r.contratos, function (c) { return c.valor; })), sd = _r(soma(r.contratos, function (c) { return c.desconto; }));
+    if (Math.abs(sv - sd - r.total_movimentar) <= 0.02) {
+      r.compra = _r(soma(r.contratos.filter(function (c) { return c.valor > 0; }), function (c) { return c.valor; }));
+      r.devolucao = _r(-soma(r.contratos.filter(function (c) { return c.valor < 0; }), function (c) { return c.valor; }));
+      r.deduzido = {contratos: sv, descontos: sd};
+    }
+  }
   if (r.devolucao === null && r.compra !== null) r.devolucao = 0.0;
   r.mb = r.compra !== null ? _r(r.compra - r.devolucao) : null;
   return r;
 }
 function verificarMB(r) {
   var ch = [];
-  if (r.mb === null) ch.push(["erro", "Não consegui ler a linha COMPRA. Escreva os valores a partir da fotografia."]);
+  if (r.mb === null) ch.push(["erro", "Não consegui ler a linha COMPRA. Escreva os valores a partir da fotografia (e, da próxima vez, fotografe o talão inteiro, do cabeçalho até ao TOTAL, direito e bem iluminado)."]);
+  else if (r.deduzido) ch.push(["aviso", "A linha COMPRA não foi lida: compra − devolução deduzida das " + r.contratos.length + " linhas dos contratos (" + pt(r.deduzido.contratos) + " − descontos " + pt(r.deduzido.descontos) + " = total " + pt(r.total_movimentar) + "). Confira com a fotografia."]);
   if (r.tpa && r.tpa.slice(-4) !== lstrip0(POS_MB).slice(-4)) ch.push(["aviso", "Terminal " + r.tpa + " não é o do posto (" + POS_MB + ")."]);
   if (r.mb !== null && r.total_movimentar !== null) {
     var desc = _r(r.mb - r.total_movimentar);

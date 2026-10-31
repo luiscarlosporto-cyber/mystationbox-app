@@ -95,7 +95,7 @@ function fotoJPEG(im) { var W = Math.min(1400, im.width), c = document.createEle
 $("#bFecho").onclick = function () { $("#fFecho").click(); };
 $("#fFecho").onchange = async function () {
   var f = this.files[0]; this.value = ""; if (!f) return;
-  painel("<h3>🧾 A ler o talão…</h3><p class='mut' style='margin:0'>Na primeira vez demora 20 a 40 segundos (descarrega o leitor de texto). Depois é mais rápido.</p><div id='fcPr' class='mut' style='font-size:12px'></div>");
+  painel("<h3>🧾 A ler o talão…</h3><p class='mut' style='margin:0'>Na primeira vez demora 20 a 40 segundos (descarrega o leitor de texto). Depois é mais rápido.</p><p class='mut' style='margin:0;font-size:13px'>📸 Para ler bem: o talão <b>inteiro</b> na fotografia (do cabeçalho ao TOTAL), direito, esticado e com boa luz, sem sombras.</p><div id='fcPr' class='mut' style='font-size:12px'></div>");
   FC = {r: null, foto: null, url: "", texto: ""};
   try {
     var im = await imagem(f); FC.foto = await fotoJPEG(im); FC.url = URL.createObjectURL(FC.foto);
