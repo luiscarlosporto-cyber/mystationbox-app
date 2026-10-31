@@ -11,12 +11,13 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
 <style>
-/* mystationbox na cloud · paleta aprovada a 31/10/2026: laranja #F36C21, azul #003B5C, branco, grafite #202B36 */
+/* mystationbox na cloud · cores do logótipo (31/10/2026): caixa laranja (#FFB27A → #F36C21 → #A93A0B) sobre azul (#00507A → #003B5C → #00253B), branco, grafite #202B36 */
 :root{
-  --laranja:#F36C21; --azul:#003B5C; --grafite:#202B36;
+  --laranja:#F36C21; --laranja-cl:#FF8A3D; --laranja-esc:#C9480F; --azul:#003B5C; --azul-cl:#00507A; --azul-esc:#00253B; --grafite:#202B36;
+  --grad-head:linear-gradient(120deg,#00507A 0%,#003B5C 55%,#00253B 100%); --grad-lar:linear-gradient(120deg,#FF8A3D,#F36C21 55%,#C9480F);
   --bg:#F3F5F7; --card:#FFFFFF; --fg:#202B36; --mut:#5E6B78; --bd:#DDE3E9; --soft:#E9EEF2; --in:#F7F9FA;
   --ok:#11845B; --okb:#E2F4EC; --wn:#B76100; --wnb:#FFF1DF; --bad:#C2341B; --badb:#FCE6E1;
-  --head:#003B5C; --t1:#F59E0B; --t2:#2E6E9E;
+  --head:#003B5C; --t1:#F36C21; --t2:#00507A;
   --f-display:"Archivo","Segoe UI",system-ui,sans-serif;
   --f-body:"Barlow","Segoe UI",system-ui,sans-serif;
   --f-num:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
@@ -32,11 +33,11 @@ body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.45 var(--f-body);
 [hidden]{display:none!important}
 button,input,select{font:inherit;color:inherit}
 .wrap{max-width:980px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-header{background:var(--head);color:#fff}
+header{background:var(--grad-head);color:#fff;border-bottom:3px solid var(--laranja)}
 header .wrap{display:flex;align-items:center;gap:12px;padding-block:10px;flex-wrap:wrap}
 .logo{display:flex;align-items:center;gap:10px}
-.logo img{width:38px;height:38px;border-radius:10px}
-.logo b{font:800 21px/1 var(--f-display);letter-spacing:-.02em}.logo b span{color:#7CE3A0}
+.logo img{width:40px;height:40px;border-radius:11px;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.logo b{font:800 21px/1 var(--f-display);letter-spacing:-.02em}.logo b span{color:var(--laranja-cl)}
 .logo small{display:block;font:500 12px var(--f-body);opacity:.8;margin-top:2px}
 .hd-dir{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .hd-dir select{background:rgba(255,255,255,.12);border:0;border-radius:10px;padding:8px;color:#fff}
@@ -52,7 +53,7 @@ main .wrap>*,.v{min-width:0}
 .v{display:grid;gap:16px}
 :focus-visible{outline:3px solid var(--laranja);outline-offset:2px}
 .btn{background:var(--soft);border:0;border-radius:10px;padding:9px 14px;cursor:pointer;font-weight:600}
-.btn.p{background:var(--laranja);color:#fff}
+.btn.p{background:var(--grad-lar);color:#fff}
 .btn.az{background:var(--azul);color:#fff}
 .btn[disabled]{opacity:.5;cursor:default}
 #tabSub .btn.on{background:var(--azul);color:#fff}
@@ -65,7 +66,7 @@ main .wrap>*,.v{min-width:0}
 .g2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:16px;overflow:hidden}
 .ch{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;color:#fff;font:700 16px var(--f-display)}
-.ch.t1{background:linear-gradient(120deg,#F36C21,#F59E0B)}.ch.t2{background:linear-gradient(120deg,#003B5C,#2E6E9E)}
+.ch.t1{background:var(--grad-lar)}.ch.t2{background:var(--grad-head)}
 .ch .dif{background:rgba(255,255,255,.2);border-radius:999px;padding:3px 10px;font:600 15px var(--f-num)}
 .cb{padding:14px 16px;display:grid;gap:12px}
 .cb>*,.g2>*,.fl label,.fl input{min-width:0}
@@ -85,7 +86,7 @@ main .wrap>*,.v{min-width:0}
 .sai input{border:1px solid var(--bd);border-radius:9px;background:var(--in);padding:8px;min-width:0}
 .sai input.v{width:90px;text-align:right}.sai input.n{flex:1 1 120px}
 .mini{background:var(--soft);border:0;border-radius:8px;padding:5px 9px;cursor:pointer;font-size:13px}
-.totem{background:var(--grafite);color:#fff;border-radius:16px;padding:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:4px 16px;border-top:6px solid var(--laranja)}
+.totem{background:linear-gradient(140deg,#202B36,#00253B);color:#fff;border-radius:16px;padding:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:4px 16px;border-top:6px solid var(--laranja)}
 .totem .t{grid-column:1/-1;font:700 12px var(--f-display);letter-spacing:.12em;text-transform:uppercase;color:#FFB58A;margin-bottom:4px}
 .totem .k{font:500 12px var(--f-body);color:#B7C3CE;text-transform:uppercase;letter-spacing:.06em;margin-top:8px}
 .totem .v{font:600 26px/1.1 var(--f-num);font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -103,7 +104,7 @@ h2{font:700 17px var(--f-display);margin:0}
 .vazio{color:var(--mut);background:var(--card);border:1px dashed var(--bd);border-radius:12px;padding:20px;text-align:center}
 /* login */
 .login{max-width:380px;margin:8vh auto;background:var(--card);border:1px solid var(--bd);border-radius:18px;padding:24px;display:grid;gap:14px;border-top:6px solid var(--laranja)}
-.login h1{margin:0;font:800 26px var(--f-display)}.login h1 span{color:var(--laranja)}
+.login h1{margin:0;font:800 26px var(--f-display);display:flex;align-items:center;gap:10px}.login h1 img{width:48px;height:48px;border-radius:13px}.login h1 span{color:var(--laranja)}
 .login label{display:grid;gap:4px;font-size:14px;color:var(--mut)}
 .login input{padding:12px;border:1px solid var(--bd);border-radius:10px;background:var(--in);font-size:16px}
 .erro{color:var(--bad);font-size:14px;min-height:1em}
@@ -136,7 +137,7 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
 <!-- ecrã de entrada -->
 <section id="vLogin" hidden>
   <div class="wrap"><form class="login" id="fLogin">
-    <h1>mystation<span>box</span></h1>
+    <h1><img src="logo.svg" alt=""><b style="font:inherit">mystation<span>box</span></b></h1>
     <p class="mut" style="margin:0">Entre com a mesma conta do Stock Tabaco.</p>
     <label>Email<input id="lEmail" type="email" autocomplete="username" required></label>
     <label>Palavra-passe<input id="lPass" type="password" autocomplete="current-password" required></label>
@@ -148,7 +149,7 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
 <!-- aplicação -->
 <section id="vApp" hidden>
 <header><div class="wrap">
-  <div class="logo"><img src="icone-64.png" alt=""><div><b>mystation<span>box</span></b><small id="hEst">—</small></div></div>
+  <div class="logo"><img src="logo.svg" alt=""><div><b>mystation<span>box</span></b><small id="hEst">—</small></div></div>
   <div class="hd-dir"><select id="selEst" aria-label="Estação" hidden></select><span class="quem" id="hQuem"></span><button class="hbtn" id="bSair">Sair</button></div>
 </div></header>
 <nav><div class="wrap">
