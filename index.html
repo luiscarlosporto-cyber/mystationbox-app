@@ -184,6 +184,13 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
   <div id="v-fun" class="v" hidden>
     <div class="bar"><button class="btn" id="fAnt">‹</button><input type="month" id="fMes"><button class="btn" id="fSeg">›</button></div>
     <div class="sc"><table><thead><tr><th>Funcionário</th><th>Turnos</th><th>Vendas</th><th>Diferença</th><th>Maior falta</th></tr></thead><tbody id="fT"></tbody></table></div>
+    <section id="equipa" hidden style="display:grid;gap:10px">
+      <div class="bar"><h2 style="margin-right:auto">🔐 Contas de acesso</h2><button class="btn p" id="eqBtnNovo">+ Novo funcionário</button></div>
+      <p class="mut" style="margin:0;font-size:14px">Cada pessoa entra com o seu email e palavra-passe, no mystationbox e no NexStock. <b>Funcionário</b>: consulta e conta tabaco. <b>Administrador</b>: regista, corrige, importa e aprova.</p>
+      <div id="eqNovo" class="card" hidden style="padding:12px"></div>
+      <div id="eqMsg" style="font-size:14px"></div>
+      <div class="sc"><table class="hist"><thead><tr><th>Nome</th><th>Email</th><th>Função</th><th>Estação</th><th>Estado</th><th></th></tr></thead><tbody id="eqLista"></tbody></table></div>
+    </section>
   </div>
 
   <!-- REPSOL -->
@@ -273,7 +280,7 @@ $("#bSair").onclick=async function(){await sb.auth.signOut();LINHAS={};SAIDAS=[]
 /* ---------------- navegação ---------------- */
 var VISTA="reg";
 function vista(v){VISTA=v;$$("nav button").forEach(function(b){b.classList.toggle("on",b.dataset.v===v)});$$(".v").forEach(function(x){x.hidden=x.id!=="v-"+v});
-  if(v==="mes"){$("#mMes").value=MES;carregarMes()}if(v==="fun"){$("#fMes").value=MES;carregarFun()}if(v==="sai")carregarSaidas();if(v==="his"){$("#hDia").value=DIA;carregarHist()}if(v==="rep"){$("#rMes").value=MES;carregarRepsol()}if(v==="tab")carregarTabaco()}
+  if(v==="mes"){$("#mMes").value=MES;carregarMes()}if(v==="fun"){$("#fMes").value=MES;carregarFun();carregarEquipa()}if(v==="sai")carregarSaidas();if(v==="his"){$("#hDia").value=DIA;carregarHist()}if(v==="rep"){$("#rMes").value=MES;carregarRepsol()}if(v==="tab")carregarTabaco()}
 $$("nav button").forEach(function(b){b.onclick=function(){vista(b.dataset.v)}});
 
 /* ---------------- registo do dia ---------------- */
@@ -363,6 +370,7 @@ entrar().catch(function(e){$("#vLogin").hidden=false;$("#lErro").textContent=fal
 </script>
 <script src="leitores.js"></script>
 <script src="stock.js"></script>
-<script>$$("#tabSub button").forEach(function(b){b.onclick=function(){tabaco(b.dataset.t)}});</script>
+<script src="equipa.js"></script>
+<script>$$("#tabSub button").forEach(function(b){b.onclick=function(){tabaco(b.dataset.t)}});$("#eqBtnNovo").onclick=formNovo;</script>
 </body>
 </html>
