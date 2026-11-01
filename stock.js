@@ -41,8 +41,12 @@ async function carregarTabacoResumo() {
     var r2 = await sb.from("products").select("id,name,category,volume_size,repsol_code"); if (r2.error) throw r2.error;
     var r3 = await sb.from("orders").select("id,created_at,created_by,operator,status,lines,count_lines,approved_by,sent_at,sent_to").eq("company_id", EST).order("created_at", {ascending: false}).limit(30); if (r3.error) throw r3.error;
     var r4 = await sb.from("stock_moves").select("created_at,product_name,move_type,quantity,stock_before,stock_after,operator,user_id").eq("company_id", EST).order("created_at", {ascending: false}).limit(50); if (r4.error) throw r4.error;
+    var r5 = ADMIN ? await sb.from("tabaco_precos").select("product_id,pvp_c,custo_c,unidade") : {data: []};   // só administradores
+    var preco = {}; (r5.data || []).forEach(function (x) { preco[x.product_id] = x; });
     var prod = {}; (r2.data || []).forEach(function (p) { prod[p.id] = p; });
-    TAB.cat = (r1.data || []).map(function (pc) { var p = prod[pc.product_id] || {}; return {id: pc.product_id, nome: p.name || pc.product_id, cat: p.category || "Outros", vol: p.volume_size || 10, stock: pc.stock, vm: pc.sales_month, dias: pc.sales_days}; });
+    TAB.cat = (r1.data || []).map(function (pc) { var p = prod[pc.product_id] || {}; var pr = preco[pc.product_id], vol = p.volume_size || 10, mu = pr ? (pr.pvp_c - pr.custo_c) / (pr.unidade === "volume" ? vol : 1) : null;
+      return {id: pc.product_id, nome: p.name || pc.product_id, cat: p.category || "Outros", vol: vol, stock: pc.stock, vm: pc.sales_month, dias: pc.sales_days,
+        pct: pr ? (pr.pvp_c - pr.custo_c) / pr.pvp_c * 100 : null, mu: mu, mmes: mu != null && pc.sales_month && pc.sales_days ? mu * pc.sales_month * 30 / pc.sales_days : null}; });
     TAB.enc = r3.data || []; TAB.mov = r4.data || [];
     desenharTabaco();
   } catch (e) { box.innerHTML = "<div class='bad'>" + esc(falhou(e)) + "</div>"; }
@@ -51,10 +55,12 @@ function desenharTabaco() {
   var h = "", enc = TAB.enc, ult = enc.find(function (o) { return o.status !== "cancelada"; }) || enc[0];
   /* resumo */
   var porCat = {}; TAB.cat.forEach(function (p) { porCat[p.cat] = (porCat[p.cat] || 0) + 1; });
+  var margemMes = TAB.cat.reduce(function (s, p) { return s + (p.mmes || 0); }, 0), comPreco = TAB.cat.filter(function (p) { return p.pct != null; }).length;
   var semanal = TAB.cat.reduce(function (s, p) { return s + (p.vm && p.dias ? p.vm * 7 / p.dias : 0); }, 0);
   h += "<section class='totem'><div class='t'>Tabaco · " + esc(($("#hEst").textContent || "")) + "</div>" +
     "<div><div class='k'>Artigos</div><div class='v'>" + TAB.cat.length + "</div></div>" +
     "<div><div class='k'>Vendas/semana</div><div class='v'>" + Math.round(semanal) + "<small>maços/un.</small></div></div>" +
+    (ADMIN && comPreco ? "<div><div class='k'>Margem estimada/mês</div><div class='v'>" + fmt(Math.round(margemMes)) + "<small>€</small></div></div>" : "") +
     "<div><div class='k'>Encomendas enviadas</div><div class='v'>" + enc.filter(function (o) { return o.status === "enviada"; }).length + "</div></div>" +
     "<div><div class='k'>Última encomenda</div><div class='v' style='font-size:20px'>" + (ult ? new Date(ult.created_at).toLocaleDateString("pt-PT") : "—") + "</div></div></section>";
   h += "<div class='aviso'><p>Resumo só de consulta. Para contar, ler códigos, fazer e aprovar encomendas use <b>📦 NexStock</b>, aqui ao lado.</p></div>";
@@ -76,10 +82,12 @@ function desenharTabaco() {
   /* catálogo */
   h += "<h2>Catálogo e vendas</h2><div class='bar'><input id='tabF' placeholder='Pesquisar artigo…' value='" + esc(TAB.filtro) + "' style='flex:1;min-width:0;border:1px solid var(--bd);border-radius:10px;padding:8px;background:var(--card)'></div>";
   var f = TAB.filtro.toLowerCase(), cats = Object.keys(porCat).sort();
-  h += "<div class='sc'><table><thead><tr><th>Artigo</th><th class='l'>Categoria</th><th>Vendas/mês</th><th>Por semana</th><th>Stock guardado</th></tr></thead><tbody>" +
+  h += "<div class='sc'><table><thead><tr><th>Artigo</th><th class='l'>Categoria</th><th>Vendas/mês</th><th>Por semana</th>" + (ADMIN ? "<th>Margem</th><th>Margem/mês</th>" : "") + "<th>Stock guardado</th></tr></thead><tbody>" +
     TAB.cat.filter(function (p) { return !f || p.nome.toLowerCase().indexOf(f) >= 0 || p.cat.toLowerCase().indexOf(f) >= 0; })
       .sort(function (a, b) { return (b.vm || 0) - (a.vm || 0) || (a.nome < b.nome ? -1 : 1); })
-      .map(function (p) { return "<tr><td>" + esc(p.nome) + "</td><td class='l'>" + esc(p.cat) + "</td><td class='n'>" + (p.vm == null ? "—" : Math.round(p.vm)) + "</td><td class='n'>" + (p.vm && p.dias ? (p.vm * 7 / p.dias).toFixed(1).replace(".", ",") : "—") + "</td><td class='n mut'>" + (p.stock == null ? "—" : p.stock) + "</td></tr>"; }).join("") + "</tbody></table></div>";
+      .map(function (p) { return "<tr><td>" + esc(p.nome) + "</td><td class='l'>" + esc(p.cat) + "</td><td class='n'>" + (p.vm == null ? "—" : Math.round(p.vm)) + "</td><td class='n'>" + (p.vm && p.dias ? (p.vm * 7 / p.dias).toFixed(1).replace(".", ",") : "—") + "</td>" +
+        (ADMIN ? "<td class='n'>" + (p.pct == null ? "<span class='mut'>sem preço</span>" : p.pct.toFixed(1).replace(".", ",") + " %") + "</td><td class='n'>" + (p.mmes == null ? "—" : fmt(Math.round(p.mmes)) + " €") + "</td>" : "") + "<td class='n mut'>" + (p.stock == null ? "—" : p.stock) + "</td></tr>"; }).join("") + "</tbody></table></div>";
+  if (ADMIN) h += "<p class='mut' style='font-size:13px;margin:0'>Margem = PVP − preço de compra das últimas faturas da Adelaide Sousa Ferreira (" + comPreco + " de " + TAB.cat.length + " artigos com preço). Margem/mês = margem por maço ou unidade × vendas de 30 dias.</p>";
   h += "<p class='mut' style='font-size:13px;margin:0'>Vendas a partir do export do software Repsol carregado no Stock Tabaco. O \"stock guardado\" não é atualizado pela contagem de domingo (limitação conhecida da app Stock Tabaco): a contagem real está nas encomendas.</p>";
   /* movimentos */
   if (TAB.mov.length) h += "<h2>Últimos movimentos</h2><div class='sc'><table><thead><tr><th>Quando</th><th class='l'>Artigo</th><th class='l'>Tipo</th><th>Qtd.</th><th>Antes → depois</th><th class='l'>Quem</th></tr></thead><tbody>" +
