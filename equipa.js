@@ -9,6 +9,15 @@ async function equipa(acao, dados) {
   return r.data;
 }
 function senhaSugerida() { var c = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789", a = crypto.getRandomValues(new Uint8Array(10)); return Array.from(a).map(function (x) { return c[x % c.length]; }).join(""); }
+/* As palavras-passe ficam guardadas cifradas (só se verifica, não se lê): ninguém as pode ver depois, nem o administrador.
+ * Por isso mostram-se UMA vez, no momento em que se criam ou se repõem, com botões para copiar ou enviar. */
+function mostrarCredenciais(titulo, nome, email, senha) {
+  var txt = "mystationbox · " + (nome || "") + "\nEndereço: https://luiscarlosporto-cyber.github.io/mystationbox-app/\nEmail: " + email + "\nPalavra-passe: " + senha;
+  $("#eqMsg").innerHTML = "<div class='aviso' style='display:grid;gap:6px'><b>✅ " + esc(titulo) + "</b><div>Email: <b>" + esc(email) + "</b></div><div>Palavra-passe: <b style='font:600 20px var(--f-num);letter-spacing:.04em;user-select:all'>" + esc(senha) + "</b></div>" +
+    "<div class='mut' style='font-size:13px'>Aponte ou envie agora: depois de sair deste ecrã já não é possível ver esta palavra-passe (fica guardada cifrada). Se se perder, crie uma nova.</div>" +
+    "<div class='bar'><button class='btn' id='crCop'>📋 Copiar</button><a class='btn' id='crWa' target='_blank' rel='noopener' href='https://wa.me/?text=" + encodeURIComponent(txt) + "'>💬 Enviar por WhatsApp</a></div></div>";
+  $("#crCop").onclick = function () { var b = this; (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(function () { b.textContent = "✔ Copiado"; }, function () { b.textContent = "Selecione e copie à mão"; }); };
+}
 async function carregarEquipa() {
   var box = $("#equipa"); if (!box) return;
   box.hidden = !ADMIN; if (!ADMIN) return;
@@ -22,16 +31,18 @@ function optsPapel(sel) { return "<option value='staff'" + (sel !== "admin" ? " 
 function desenharEquipa() {
   $("#eqLista").innerHTML = EQ.lista.map(function (p) {
     var eu = p.user_id === EQ.eu;
-    if (EQ.edita === p.user_id) return "<tr><td colspan='6'><div class='ff'><label>Nome<input id='eqN' value='" + esc(p.display_name || "") + "'></label><label>Função<select id='eqP'" + (eu ? " disabled" : "") + ">" + optsPapel(p.role) + "</select></label><label>Estação<select id='eqE'>" + optsEst(p.company_id) + "</select></label><label>Nova palavra-passe (opcional)<input id='eqS' placeholder='deixe vazio para manter' autocomplete='new-password'></label></div><div class='bar' style='margin-top:8px'><button class='btn p' data-ok='" + p.user_id + "'>Guardar</button><button class='btn' data-cancel='1'>Cancelar</button></div></td></tr>";
+    if (EQ.edita === p.user_id) return "<tr><td colspan='6'><div class='ff'><label>Nome<input id='eqN' value='" + esc(p.display_name || "") + "'></label><label>Função<select id='eqP'" + (eu ? " disabled" : "") + ">" + optsPapel(p.role) + "</select></label><label>Estação<select id='eqE'>" + optsEst(p.company_id) + "</select></label><label>Nova palavra-passe (opcional)<span style='display:flex;gap:6px'><input id='eqS' placeholder='vazio = manter a atual' autocomplete='new-password' style='flex:1;min-width:0'><button type='button' class='mini' id='eqGer'>🎲 Gerar</button></span></label></div><div class='bar' style='margin-top:8px'><button class='btn p' data-ok='" + p.user_id + "'>Guardar</button><button class='btn' data-cancel='1'>Cancelar</button></div></td></tr>";
     return "<tr><td>" + esc(p.display_name || "—") + (eu ? " <span class='b ok'>você</span>" : "") + "</td><td class='l'>" + esc(p.email || "") + "</td><td class='l'>" + (p.role === "admin" ? "Administrador" : "Funcionário") + "</td><td class='l'>" + esc(nomeEst(p.company_id)) + "</td><td class='l'>" + (p.banido ? "<span class='b bad'>desativada</span>" : p.ultimo ? "entrou " + new Date(p.ultimo).toLocaleDateString("pt-PT") : "<span class='mut'>nunca entrou</span>") + "</td><td><button class='mini' data-ed='" + p.user_id + "'>Editar</button>" + (eu ? "" : " <button class='mini' data-ban='" + p.user_id + "' data-x='" + (p.banido ? "ativar" : "desativar") + "'>" + (p.banido ? "Reativar" : "Desativar") + "</button>") + "</td></tr>";
   }).join("") || "<tr><td colspan='6' class='mut'>Sem contas.</td></tr>";
+  if ($("#eqGer")) $("#eqGer").onclick = function () { $("#eqS").value = senhaSugerida(); };
   $$("#eqLista [data-ed]").forEach(function (b) { b.onclick = function () { EQ.edita = b.dataset.ed; desenharEquipa(); }; });
   $$("#eqLista [data-cancel]").forEach(function (b) { b.onclick = function () { EQ.edita = null; desenharEquipa(); }; });
   $$("#eqLista [data-ok]").forEach(function (b) { b.onclick = async function () {
     b.disabled = true; var id = b.dataset.ok, s = $("#eqS").value.trim();
     try { await equipa("atualizar", {user_id: id, nome: $("#eqN").value, role: $("#eqP").disabled ? undefined : $("#eqP").value, company_id: $("#eqE").value});
       if (s) await equipa("palavra_passe", {user_id: id, password: s});
-      EQ.edita = null; status(true, "Conta atualizada ✓"); $("#eqMsg").textContent = s ? "Palavra-passe nova: entregue-a pessoalmente." : ""; carregarEquipa(); }
+      var pp = EQ.lista.find(function (x) { return x.user_id === id; }) || {};
+      EQ.edita = null; status(true, "Conta atualizada ✓"); if (s) mostrarCredenciais("Palavra-passe nova de " + (pp.display_name || ""), pp.display_name, pp.email || "", s); else $("#eqMsg").textContent = ""; carregarEquipa(); }
     catch (e) { b.disabled = false; $("#eqMsg").textContent = "⚠ " + e.message; } }; });
   $$("#eqLista [data-ban]").forEach(function (b) { b.onclick = async function () {
     if (b.dataset.conf !== "1") { b.dataset.conf = "1"; b.textContent = b.dataset.x === "desativar" ? "Confirmar: desativar" : "Confirmar: reativar"; return; }
@@ -43,6 +54,6 @@ function formNovo() {
   $("#nvOk").onclick = async function () { var b = this; b.disabled = true; $("#eqMsg").textContent = "";
     try { var s = $("#nvS").value.trim(), m = $("#nvM").value.trim();
       await equipa("criar", {nome: $("#nvN").value, email: m, password: s, role: $("#nvP").value, company_id: $("#nvE").value});
-      $("#eqNovo").hidden = true; $("#eqMsg").innerHTML = "✅ Conta criada. Entregue pessoalmente: <b>" + esc(m) + "</b> · palavra-passe <b>" + esc(s) + "</b> · endereço <b>luiscarlosporto-cyber.github.io/mystationbox-app</b>"; carregarEquipa(); }
+      $("#eqNovo").hidden = true; mostrarCredenciais("Conta criada: " + $("#nvN").value.trim(), $("#nvN").value.trim(), m, s); carregarEquipa(); }
     catch (e) { b.disabled = false; $("#eqMsg").textContent = "⚠ " + e.message; } };
 }
