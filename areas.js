@@ -31,13 +31,15 @@ function areaDe(pg) { return AREAS.find(function (a) { return a.p.some(function 
 
 function montarMenu() {
   if (!$("#equipa").parentElement.matches("#v-ges")) $("#v-ges").appendChild($("#equipa"));
-  $("#areas").innerHTML = areasVisiveis().map(function (a) { return "<button data-a='" + a.id + "'>" + a.n + "</button>"; }).join("");
-  $$("#areas button").forEach(function (b) { b.onclick = function () { var a = AREAS.find(function (x) { return x.id === b.dataset.a; }); ir(a.p[0][0]); }; });
+  var vis = areasVisiveis(), mais = vis.some(function (a) { return AREAS_TEL.indexOf(a.id) < 0; });
+  $("#areas").innerHTML = vis.map(function (a) { var i = a.n.indexOf(" "); return "<button data-a='" + a.id + "'" + (AREAS_TEL.indexOf(a.id) < 0 ? " class='extra'" : "") + "><i>" + a.n.slice(0, i) + "</i><span>" + a.n.slice(i + 1) + "</span></button>"; }).join("") +
+    (mais ? "<button data-a='mais' class='so-tel'><i>☰</i><span>Mais</span></button>" : "");
+  $$("#areas button").forEach(function (b) { b.onclick = function () { if (b.dataset.a === "mais") return abrirMais(); $("#maisMenu").hidden = true; var a = AREAS.find(function (x) { return x.id === b.dataset.a; }); ir(a.p[0][0]); }; });
   ir("ini");
 }
 function marcar(pg) {
   PAGINA = pg; var a = areaDe(pg) || AREAS[0];
-  $$("#areas button").forEach(function (b) { b.classList.toggle("on", b.dataset.a === a.id); });
+  $$("#areas button").forEach(function (b) { b.classList.toggle("on", b.dataset.a === a.id || (b.dataset.a === "mais" && AREAS_TEL.indexOf(a.id) < 0)); });
   $("#subnav").innerHTML = a.p.length > 1 ? a.p.map(function (x) { return "<button data-p='" + x[0] + "'" + (x[0] === pg ? " class='on'" : "") + ">" + x[1] + "</button>"; }).join("") : "";
   $$("#subnav button").forEach(function (b) { b.onclick = function () { ir(b.dataset.p); }; });
 }
@@ -141,4 +143,67 @@ async function carregarInicio() {
     box.innerHTML = h;
     $$("#iniCorpo [data-p]").forEach(function (b) { b.onclick = function () { ir(b.dataset.p); }; });
   } catch (e) { box.innerHTML = "<div class='bad'>" + esc(falhou(e)) + "</div>"; }
+}
+
+/* ---------------- 📥 Carregar ficheiro (um só botão, Fase 3 da proposta) ----------------
+ * Reconhece o ficheiro pelo conteúdo e entrega-o ao leitor que já existia, na página certa:
+ * folha de turno .xls → Caixa · fotografia de talão → Caixa (fecho digitalizado) · PDF Repsol → Conferências ·
+ * fecho mensal TMS .csv → Conferências · relatório de vendas em Excel (.xlsx; CSV recusado: não traz a loja) → pergunta: encomenda (Adelaide/Logista)
+ * ou vendas da máquina. Os leitores continuam a confirmar a loja e a recusar o que não reconhecem. */
+async function tipoFicheiro(f) {
+  var b = new Uint8Array(await f.slice(0, 64).arrayBuffer()), ini = String.fromCharCode.apply(null, b);
+  if (/^image\//.test(f.type) || /\.(jpe?g|png|heic|webp)$/i.test(f.name)) return "foto";
+  if (ini.slice(0, 4) === "%PDF") return "pdf";
+  if (b[0] === 0xD0 && b[1] === 0xCF && b[2] === 0x11 && b[3] === 0xE0) return "xls";
+  if (/^comercio;/i.test(ini.replace(/^﻿/, ""))) return "tms";
+  if (b[0] === 0x50 && b[1] === 0x4B) return "vendas";             // relatório de vendas: só Excel (o CSV não diz a loja)
+  if (/\.csv$/i.test(f.name)) return "csv";
+  return "";
+}
+function esperarNex(prova, ms) {
+  return new Promise(function (ok, ko) {
+    var t0 = Date.now();
+    (function v() { var w = null; try { w = $("#nexFrame") && $("#nexFrame").contentWindow; } catch (e) { /* nada */ }
+      if (w && prova(w)) return ok(w);
+      if (Date.now() - t0 > (ms || 20000)) return ko(new Error("o módulo de stock ainda não abriu; tente de novo"));
+      setTimeout(v, 300); })();
+  });
+}
+function escolherVendas(f) {
+  painel("<h3>📈 Relatório de vendas: " + esc(f.name) + "</h3><p class='mut' style='margin:0'>O que quer fazer com ele?</p>" +
+    "<div class='bar'><button class='btn p' data-v='tabaco'>🛒 Encomenda de tabaco · ADELAIDE</button><button class='btn az' data-v='aquecido'>🛒 Encomenda de aquecido e recargas · LOGISTA</button><button class='btn' data-v='maq'>📈 Só ver as vendas da máquina</button><button class='btn' data-v=''>Cancelar</button></div>");
+  ir("reg");
+  $$("#painel [data-v]").forEach(function (b) { b.onclick = async function () {
+    var o = b.dataset.v; fecharPainel(); if (!o) return;
+    ir(o === "maq" ? "maq" : "nova");
+    try {
+      var w = await esperarNex(function (w) { return o === "maq" ? w.document.getElementById("maqFile") && w.document.getElementById("maqFile").onchange : typeof w.salesChange === "function"; });
+      var ev = {target: {files: [f], value: "", dataset: {sup: o}}};
+      if (o === "maq") w.document.getElementById("maqFile").onchange(ev); else w.salesChange(ev);
+    } catch (e) { status(false, "⚠ " + e.message); }
+  }; });
+}
+async function carregarFicheiros(fs) {
+  var g = {pdf: [], foto: [], xls: [], tms: [], vendas: [], csv: [], "": []};
+  for (var i = 0; i < fs.length; i++) g[await tipoFicheiro(fs[i])].push(fs[i]);
+  if (g[""].length || g.csv.length) ir("reg");      // a mensagem aparece na barra do Registo
+  if (g[""].length) status(false, "⚠ Não reconheço: " + g[""].map(function (f) { return f.name; }).join(", ") + ". Ficheiros aceites: folha de turno (.xls), fotografia do talão, PDF da Repsol, fecho mensal TMS (.csv), relatório de vendas (Excel .xlsx).");
+  if (g.csv.length) status(false, "⚠ " + g.csv.map(function (f) { return f.name; }).join(", ") + ": o relatório de vendas tem de ser em Excel (.xlsx), porque o CSV não diz de que loja é.");
+  if (g.tms.length) { ir("tms"); for (var j = 0; j < g.tms.length; j++) await importarTMS(g.tms[j]); }
+  if (g.pdf.length) { ir("rep"); carregarPdfs(g.pdf); }
+  if (g.xls.length) { ir("reg"); $("#fXls").onchange.call({files: [g.xls[0]], value: ""}); }
+  if (g.foto.length) { ir("reg"); $("#fFecho").onchange.call({files: [g.foto[0]], value: ""}); }
+  if (g.vendas.length) escolherVendas(g.vendas[0]);
+  var varios = g.xls.length + g.foto.length + g.vendas.length > (g.xls.length ? 1 : 0) + (g.foto.length ? 1 : 0) + (g.vendas.length ? 1 : 0);
+  if (varios) status(false, "⚠ Só se lê uma folha de turno, um talão e um relatório de vendas de cada vez: carregue os restantes depois.");
+}
+$("#bCarregar").onclick = function () { $("#fCarregar").click(); };
+$("#fCarregar").onchange = function () { var fs = Array.from(this.files || []); this.value = ""; if (fs.length) carregarFicheiros(fs); };
+
+/* ---------------- telemóvel: barra de áreas em baixo, "Mais" para as restantes ---------------- */
+var AREAS_TEL = ["ini", "cx", "com", "stk"];
+function abrirMais() {
+  var el = $("#maisMenu"); el.hidden = !el.hidden; if (el.hidden) return;
+  el.innerHTML = "<div class='mm'>" + areasVisiveis().filter(function (a) { return AREAS_TEL.indexOf(a.id) < 0; }).map(function (a) { return "<button data-a='" + a.id + "'>" + a.n + "</button>"; }).join("") + "</div>";
+  $$("#maisMenu [data-a]").forEach(function (b) { b.onclick = function () { el.hidden = true; var a = AREAS.find(function (x) { return x.id === b.dataset.a; }); ir(a.p[0][0]); }; });
 }
