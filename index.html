@@ -169,9 +169,10 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
 
   <!-- MÊS -->
   <div id="v-mes" class="v" hidden>
-    <div class="bar"><button class="btn" id="mAnt">‹</button><input type="month" id="mMes"><button class="btn" id="mSeg">›</button></div>
+    <div class="bar"><button class="btn" id="mAnt">‹</button><input type="month" id="mMes"><button class="btn" id="mSeg">›</button><button class="btn p adm" id="bTms">🧾 Fecho mensal TMS</button><input type="file" id="fTms" accept=".csv,text/csv" hidden></div>
     <section class="totem" id="totem"></section>
     <div class="sc"><table><thead><tr><th>Dia</th><th class="l">T1</th><th>Dif. T1</th><th class="l">T2</th><th>Dif. T2</th><th>Vendas</th><th>Recebido</th><th>MB</th><th>Solred</th></tr></thead><tbody id="mT"></tbody><tfoot id="mF"></tfoot></table></div>
+    <div id="tmsBox"></div>
   </div>
 
   <!-- SAÍDAS -->
@@ -334,7 +335,7 @@ async function carregarMes(){MES=$("#mMes").value||MES;$("#mT").innerHTML="<tr><
       h+="<tr data-d='"+k+"'><td>"+dmy(k).slice(0,5)+"</td><td class='l'>"+esc(a&&a.func||"")+"</td><td class='n "+cls(da)+"'>"+sinal(da)+"</td><td class='l'>"+esc(b&&b.func||"")+"</td><td class='n "+cls(db)+"'>"+sinal(db)+"</td><td class='n'>"+fmt(all.reduce(function(s,r){return s+(r.vendas_c||0)},0))+"</td><td class='n'>"+fmt(all.reduce(function(s,r){return s+recebido(r)},0))+"</td><td class='n'>"+fmt(all.reduce(function(s,r){return s+(r.mb_c||0)},0))+"</td><td class='n'>"+fmt(all.reduce(function(s,r){return s+(r.solred_c||0)},0))+"</td></tr>"});
     $("#mT").innerHTML=h||"<tr><td colspan='9' class='l mut'>Sem turnos neste mês.</td></tr>";
     $("#mF").innerHTML=L.length?"<tr><td>Total</td><td></td><td></td><td></td><td class='n'>"+sinal(T.d)+"</td><td class='n'>"+fmt(T.v)+"</td><td class='n'>"+fmt(T.r)+"</td><td class='n'>"+fmt(T.m)+"</td><td class='n'>"+fmt(T.s)+"</td></tr>":"";
-    $$("#mT tr[data-d]").forEach(function(tr){tr.onclick=function(){vista("reg");irDia(tr.dataset.d)}})}
+    $$("#mT tr[data-d]").forEach(function(tr){tr.onclick=function(){vista("reg");irDia(tr.dataset.d)}});carregarTMS()}
   catch(e){$("#mT").innerHTML="<tr><td colspan='9' class='l bad'>"+esc(falhou(e))+"</td></tr>"}}
 $("#mMes").onchange=carregarMes;$("#mAnt").onclick=function(){$("#mMes").value=addMes($("#mMes").value||MES,-1);carregarMes()};$("#mSeg").onclick=function(){$("#mMes").value=addMes($("#mMes").value||MES,1);carregarMes()};
 
@@ -372,6 +373,7 @@ entrar().catch(function(e){$("#vLogin").hidden=false;$("#lErro").textContent=fal
 <script src="leitores.js"></script>
 <script src="stock.js"></script>
 <script src="equipa.js"></script>
+<script src="tms.js"></script>
 <script>$$("#tabSub button").forEach(function(b){b.onclick=function(){tabaco(b.dataset.t)}});$("#eqBtnNovo").onclick=formNovo;</script>
 </body>
 </html>

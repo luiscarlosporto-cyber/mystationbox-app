@@ -641,7 +641,88 @@ function pontuarFecho(r) {
   else { if (r.solred != null) p += 2; if (r.lit != null) p += 2; if (r.dia) p += 1; }
   return p;
 }
+/* ---------------- fecho contabilístico mensal do TMS (tradução de caixa_app/tms.py) ---------------- */
+function tmsErro(m) { var e = new Error(m); e.naoReconhecido = true; return e; }
+function inteiro100(s) {
+  s = String(s == null ? "" : s).trim().replace(/ /g, "");
+  if (!s) return null;
+  var neg = s.charAt(0) === "-"; s = s.replace(/^[+-]+/, "");
+  if (!/^\d*(,\d{0,2})?$/.test(s) || s === "" || s === ",") throw tmsErro("Número inválido no ficheiro do TMS: " + s);
+  var k = s.indexOf(","), i = k < 0 ? s : s.slice(0, k), f = k < 0 ? "" : s.slice(k + 1);
+  var v = parseInt(i || "0", 10) * 100 + parseInt((f + "00").slice(0, 2), 10);
+  return neg ? -v : v;
+}
+function tmsInt(s) { if (!/^\d+$/.test(s || "")) throw tmsErro("Número de operações inválido no ficheiro do TMS: " + s); return parseInt(s, 10); }
+function tmsData(s) { var m = /(\d{2})-(\d{2})-(\d{4})\s+(\d{2}:\d{2}:\d{2})/.exec(s || ""); return m ? m[3] + "-" + m[2] + "-" + m[1] + "T" + m[4] : null; }
+function lerTMS(texto) {
+  var linhas = texto.replace(/\r\n/g, "\n").split("\n");
+  var r = {comercio: "", desde: null, ate: null, remessa: [null, null], operacoes: [], seccoes: []}, sec = null, grupo = null;
+  linhas.forEach(function (bruta) {
+    bruta = bruta.replace(/\r$/, "");
+    if (!bruta.trim()) return;
+    var c = bruta.split(";").map(function (x) { return x.trim(); }), k = c[0].toLowerCase();
+    if (k.indexOf("comercio") === 0) { r.comercio = c.length > 1 ? c[1] : ""; return; }
+    if (k.indexOf("operacoes realizadas desde") === 0) { r.desde = tmsData(c[1] || ""); return; }
+    if (k.indexOf("operacoes realizadas ate") === 0) { r.ate = tmsData(c[1] || ""); return; }
+    if (k.indexOf("remessa desde") === 0) { r.remessa[0] = /^\d+$/.test(c[1] || "") ? parseInt(c[1], 10) : null; return; }
+    if (k.indexOf("remessa ate") === 0) { r.remessa[1] = /^\d+$/.test(c[1] || "") ? parseInt(c[1], 10) : null; return; }
+    if (c[0].indexOf("___") === 0) { sec = {titulo: c.length > 1 ? c[1] : "", grupos: []}; r.seccoes.push(sec); grupo = null; return; }
+    if (c.every(function (x) { return x === ""; })) return;
+    if (k === "operacao" || (c[0] === "" && c.length > 1 && c[1].toUpperCase().charAt(0) === "N")) return;
+    if (!sec) return;
+    if (c.length === 1) { grupo = {nome: c[0], linhas: [], total: null}; sec.grupos.push(grupo); return; }
+    if (sec.titulo.toUpperCase().indexOf("TOTAIS OPERACOES") === 0) { r.operacoes.push({op: c[0], n: tmsInt(c[1]), v: inteiro100(c[2])}); return; }
+    if (!grupo) { grupo = {nome: sec.titulo.toUpperCase().indexOf("DESCONTO") >= 0 ? "POR DESCONTO" : "", linhas: [], total: null}; sec.grupos.push(grupo); }
+    var ln = {nome: c[0], n: tmsInt(c[1]), l: inteiro100(c[2]) || 0, v: inteiro100(c[3]) || 0, dto: c.length > 4 ? inteiro100(c[4]) : null};
+    if (c[0].toUpperCase() === "TOTAL") grupo.total = ln; else grupo.linhas.push(ln);
+  });
+  if (!r.comercio || !r.ate || !r.seccoes.length) throw tmsErro("Não é um fecho contabilístico mensal do TMS (falta o comércio, as datas ou os totais).");
+  r.comercio = r.comercio.replace(/^0+/, "") || "0";
+  r.mes = r.ate.slice(0, 7);
+  r.verificacoes = verificarTMS(r);
+  r.resumo = resumoTMS(r);
+  return r;
+}
+function tmsGrupo(r, titulo, nome) {
+  for (var i = 0; i < r.seccoes.length; i++) { var s = r.seccoes[i]; if (s.titulo.toUpperCase().indexOf(titulo) === 0) for (var j = 0; j < s.grupos.length; j++) if (s.grupos[j].nome.toUpperCase() === nome) return s.grupos[j]; }
+  return null;
+}
+function tmsTot(g, campo) { if (!g) return 0; if (g.total) return g.total[campo] || 0; return g.linhas.reduce(function (a, l) { return a + (l[campo] || 0); }, 0); }
+function tmsFmt(c) { var s = (Math.abs(c) / 100).toFixed(2).split("."); return (c < 0 ? "-" : "") + s[0].replace(/\B(?=(\d{3})+$)/g, " ") + "," + s[1]; }
+function capitalizar(s) { return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase(); }
+function tmsSomas(ls) { var o = {n: 0, l: 0, v: 0, dto: 0}; ls.forEach(function (l) { ["n", "l", "v", "dto"].forEach(function (k) { o[k] += l[k] || 0; }); }); return o; }
+function verificarTMS(r) {
+  var v = [];
+  r.seccoes.forEach(function (s) { s.grupos.forEach(function (g) {
+    if (!g.total || !g.linhas.length) return;
+    var soma = tmsSomas(g.linhas), dif = ["n", "l", "v", "dto"].filter(function (k) { return soma[k] !== (g.total[k] || 0); });
+    var nome = (capitalizar(s.titulo) + " · " + g.nome).replace(/^[ ·]+|[ ·]+$/g, "");
+    v.push(dif.length ? {nivel: "erro", msg: nome + ": a soma dos produtos não dá o TOTAL (" + dif.join(", ") + ")."} :
+      {nivel: "ok", msg: nome + ": produtos somam o TOTAL (" + g.total.n + " op. · " + tmsFmt(g.total.v) + " €)."});
+  }); });
+  ["TOTAIS DE DESCONTO UNITARIO", "TOTAIS REEMBOLSO DE DESCONTO UNITARIO"].forEach(function (titulo) {
+    var a = tmsGrupo(r, titulo, "POR DESCONTO"), b = tmsGrupo(r, titulo, "TOTAIS DESCONTO");
+    if (!(a && b && b.total)) return;
+    var soma = tmsSomas(a.linhas), dif = ["n", "l", "v", "dto"].filter(function (k) { return soma[k] !== (b.total[k] || 0); }), nome = capitalizar(titulo);
+    v.push(dif.length ? {nivel: "erro", msg: nome + ": por desconto ≠ por produto (" + dif.join(", ") + ")."} :
+      {nivel: "ok", msg: nome + ": por desconto = por produto (" + tmsFmt(b.total.dto || 0) + " € de desconto)."});
+  });
+  return v;
+}
+function resumoTMS(r) {
+  var T = "TOTAIS POR TIPO CARTAO", outros = {};
+  r.seccoes.forEach(function (s) { if (s.titulo.toUpperCase().indexOf("TOTAIS OUTROS") === 0) s.grupos.forEach(function (g) { g.linhas.forEach(function (l) { outros[l.nome.toUpperCase()] = l; }); }); });
+  function o(n, k) { return (outros[n] || {})[k] || 0; }
+  var sol = tmsGrupo(r, T, "SOLRED"), dsol = tmsGrupo(r, T, "DEVOLUCION SOLRED"), pres = tmsGrupo(r, T, "SOLRED PRESENTE"), dpres = tmsGrupo(r, T, "DEVOLUCION SOLRED PRESENTE");
+  var desc = tmsGrupo(r, "TOTAIS DE DESCONTO UNITARIO", "TOTAIS DESCONTO"), rdesc = tmsGrupo(r, "TOTAIS REEMBOLSO DE DESCONTO UNITARIO", "TOTAIS DESCONTO");
+  var myr = tmsGrupo(r, "TOTAIS MY REPSOL", "MY REPSOL"), dmyr = tmsGrupo(r, "TOTAIS DEVOLUCAO DE MY REPSOL", "DEVOLUCION MY REPSOL");
+  return {solred_c: tmsTot(sol, "v") - tmsTot(dsol, "v"), solred_cl: tmsTot(sol, "l") - tmsTot(dsol, "l"), pres_c: tmsTot(pres, "v") - tmsTot(dpres, "v"),
+    mb_c: o("BANCARIAS", "v") - o("DEVOLUCION BANCARIA", "v"), num_c: o("EFECTIVO", "v") - o("DEVOLUCION EFECTIVO", "v"),
+    desconto_c: tmsTot(desc, "dto") - tmsTot(rdesc, "dto"), desconto_cl: tmsTot(desc, "l") - tmsTot(rdesc, "l"), myrepsol_c: tmsTot(myr, "v") - tmsTot(dmyr, "v")};
+}
+function lerTMSBytes(u8) { return lerTMS(new TextDecoder("windows-1252").decode(u8)); }
 var MOTOR = {num: num, num1: num1, pt: pt, lerTurno: lerTurno, pdfPaginas: pdfPaginas, lerDocumento: lerDocumento, classificarDoc: classificarDoc, verificar: verificar,
-  lerFecho: lerFecho, pontuarFecho: pontuarFecho, lerMB: lerMB, lerSolred: lerSolred, verificarMB: verificarMB, verificarSolred: verificarSolred, turnoSugerido: turnoSugerido, classificarFecho: classificarFecho, valores: valores, ratio: ratio};
+  lerFecho: lerFecho, pontuarFecho: pontuarFecho, lerMB: lerMB, lerSolred: lerSolred, verificarMB: verificarMB, verificarSolred: verificarSolred, turnoSugerido: turnoSugerido, classificarFecho: classificarFecho, valores: valores, ratio: ratio,
+  lerTMS: lerTMS, lerTMSBytes: lerTMSBytes, inteiro100: inteiro100};
 if (typeof module !== "undefined" && module.exports) module.exports = MOTOR; else raiz.MOTOR = MOTOR;
 })(typeof window !== "undefined" ? window : globalThis);
