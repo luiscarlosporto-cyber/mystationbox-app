@@ -106,7 +106,8 @@ async function aprovarEncomenda(id) {
   ir("enc");
   try {
     var w = await esperarNex(function (w) { return typeof w.msbAbrirEncomenda === "function"; });
-    await w.msbAbrirEncomenda(id);
+    window.scrollTo(0, 0);
+    await w.msbAbrirEncomenda(id, true);
   } catch (e) { alertaTab("⚠ " + e.message); }
 }
 function alertaTab(m) { var box = NEXP[PAGINA] ? $("#nexBox") : $("#tabCorpo"); if (box) box.insertAdjacentHTML("afterbegin", "<div class='card msgErr' style='padding:12px'>" + esc(m) + "</div>"); }

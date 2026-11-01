@@ -75,6 +75,15 @@ function prepararNexStock() {
     if (!c || !c.url || !c.key) localStorage.setItem("stc_cloud", JSON.stringify({url: MSB_CONFIG.url, key: MSB_CONFIG.key}));
   } catch (e) { /* sem armazenamento: o módulo pede o login lá dentro */ }
 }
+/* mensagens do módulo de stock (dentro do iframe ficavam escondidas atrás da barra de baixo) */
+window.msbAviso = function (t) {
+  var e = $("#msbAviso"); if (!e) { e = document.createElement("div"); e.id = "msbAviso"; document.body.appendChild(e); }
+  var mau = /erro|não |falh|vazia|sem /i.test(t);
+  e.className = mau ? "msgErr" : "msgOk"; e.textContent = (mau ? "⚠ " : "✓ ") + t;
+  e.style.cssText = "position:fixed;left:12px;right:12px;top:12px;z-index:100;padding:12px 14px;border-radius:12px;font-weight:600;box-shadow:0 6px 24px rgba(0,0,0,.25)";
+  clearTimeout(window.msbAviso.t); window.msbAviso.t = setTimeout(function () { e.remove(); }, mau ? 8000 : 4000);
+  e.onclick = function () { e.remove(); };
+};
 function nexDoc() { try { var f = $("#nexFrame"); return f && f.contentDocument; } catch (e) { return null; } }
 function nexAjustar() {
   var d = nexDoc(); if (!d || !d.head || d.getElementById("msb-embed")) return;
