@@ -43,23 +43,33 @@ async function carregarTMS() {
     var q = await sb.from("msb_tms").select("chave,mes,comercio,desde,ate,dados,original,criado").eq("estacao", EST).eq("mes", m).order("ate", {ascending: false});
     if (q.error) throw q.error;
     if (!q.data.length) { box.innerHTML = "<div class='mut' style='font-size:14px'>Sem fecho mensal do TMS importado para este mês." + (ADMIN ? " Use <b>🧾 Fecho mensal TMS</b> para o carregar (.csv que chega no fim do mês)." : "") + "</div>"; return; }
-    var t = q.data[0], L = await linhasMes(m);
+    var t = q.data[0], r = t.dados;
+    if (!r.turnos) r.turnos = {de: r.desde ? MOTOR.turnoSeguinte(MOTOR.turnoDoFecho(r.desde)) : {dia: m + "-01", turno: "t1"}, ate: MOTOR.turnoDoFecho(r.ate)};   // importados antes de 01/11
+    var L = await turnosDoPeriodo(r.turnos);
     box.innerHTML = desenharTMS(t, L, m);
     var b = $("#tmsOrig"); if (b) b.onclick = function () { abrirOriginal(t.original); };
   } catch (e) { box.innerHTML = "<div class='bad'>" + esc(falhou(e)) + "</div>"; }
 }
 
-/* Dias do mês sem os dois turnos registados: explicam diferenças que não são erros do TMS. */
-function turnosEmFalta(m, L) {
-  var p = m.split("-"), n = new Date(+p[0], +p[1], 0).getDate(), tem = {}, falta = [];
-  L.forEach(function (r) { tem[r.dia + r.turno] = 1; });
-  for (var d = 1; d <= n; d++) { var k = m + "-" + String(d).padStart(2, "0"); ["t1", "t2"].forEach(function (t) { if (!tem[k + t]) falta.push(dmy(k).slice(0, 5) + " " + t.toUpperCase()); }); }
-  return falta;
+/* O período do TMS começa e acaba num fecho de operador: entram os turnos depois do fecho inicial até ao fecho final
+ * (ex.: fecho a 29/09 às 23:05 → começa no T1 de 30/09). */
+function chaveTurno(t) { return t.dia + (t.turno === "t1" ? "1" : "2"); }
+async function turnosDoPeriodo(P) {
+  var q = await sb.from("msb_turnos").select("dia,turno,func,vendas_c,mb_c,solred_c,pres_c,num_c,forn_c,chq_c,lit_cl").eq("estacao", EST).gte("dia", P.de.dia).lte("dia", P.ate.dia).order("dia");
+  if (q.error) throw q.error;
+  var a = chaveTurno(P.de), b = chaveTurno(P.ate);
+  return (q.data || []).filter(function (x) { var k = chaveTurno(x); return k >= a && k <= b; });
+}
+function listaTurnos(P) { var out = [], t = P.de, fim = chaveTurno(P.ate); while (chaveTurno(t) <= fim && out.length < 200) { out.push(t); t = MOTOR.turnoSeguinte(t); } return out; }
+/* Turnos do período sem registo: explicam diferenças que não são erros do TMS. */
+function turnosEmFalta(P, L) {
+  var tem = {}; L.forEach(function (r) { tem[chaveTurno(r)] = 1; });
+  return listaTurnos(P).filter(function (t) { return !tem[chaveTurno(t)]; }).map(function (t) { return dmy(t.dia).slice(0, 5) + " " + t.turno.toUpperCase(); });
 }
 
 function desenharTMS(t, L, m) {
   var r = t.dados, s = r.resumo, soma = function (k) { return L.reduce(function (a, x) { return a + (x[k] || 0); }, 0); };
-  var falta = turnosEmFalta(m, L);
+  var P = r.turnos, falta = turnosEmFalta(P, L), nT = listaTurnos(P).length;
   function estado(d, info) {
     if (info) return "<span class='b'>ℹ️ só informação</span>";
     if (falta.length) return Math.abs(d) <= 100 ? "<span class='b ok'>✅ confere</span>" : "<span class='b wn'>⚠ registo incompleto</span>";
@@ -74,14 +84,14 @@ function desenharTMS(t, L, m) {
   ];
   var h = "<div class='card' style='padding:12px;display:grid;gap:10px;border-top:4px solid var(--laranja)'>" +
     "<div class='bar' style='justify-content:space-between'><h2 style='margin:0'>🧾 Fecho mensal do TMS · comércio " + esc(r.comercio) + "</h2>" + (t.original ? "<button class='mini' id='tmsOrig'>Ver ficheiro original</button>" : "") + "</div>" +
-    "<div class='mut' style='font-size:13px'>Operações de " + dataHora(r.desde) + " a " + dataHora(r.ate) + " · remessas " + (r.remessa[0] || "?") + "–" + (r.remessa[1] || "?") + " · " + L.length + " turnos registados no mês</div>";
-  if (falta.length) h += "<div class='aviso'><p>⚠ Faltam <b>" + falta.length + " turnos</b> no registo deste mês, por isso as somas ainda não podem bater certo: " + esc(falta.slice(0, 12).join(", ")) + (falta.length > 12 ? "…" : "") + "</p></div>";
+    "<div class='mut' style='font-size:13px'>Fechos de operador de " + dataHora(r.desde) + " a " + dataHora(r.ate) + " → turnos de <b>" + dmy(P.de.dia).slice(0, 5) + " " + P.de.turno.toUpperCase() + "</b> a <b>" + dmy(P.ate.dia).slice(0, 5) + " " + P.ate.turno.toUpperCase() + "</b> (" + nT + " turnos; " + L.length + " registados) · remessas " + (r.remessa[0] || "?") + "–" + (r.remessa[1] || "?") + "</div>";
+  if (falta.length) h += "<div class='aviso'><p>⚠ Faltam <b>" + falta.length + " turnos</b> no registo deste período, por isso as somas ainda não podem bater certo: " + esc(falta.slice(0, 12).join(", ")) + (falta.length > 12 ? "…" : "") + "</p></div>";
   h += "<div class='sc'><table><thead><tr><th class='l'>O quê</th><th>TMS</th><th>Registos diários</th><th>Diferença</th><th class='l'>Estado</th></tr></thead><tbody>" +
     linhas.map(function (x) { var d = x[3] - x[2]; return "<tr><td class='l'><b>" + x[0] + "</b><div class='mut' style='font-size:12px'>" + x[1] + "</div></td><td class='n'>" + x[4](x[2]) + "</td><td class='n'>" + x[4](x[3]) + "</td><td class='n'>" + sinal(d) + "</td><td class='l'>" + estado(d, x[5]) + "</td></tr>"; }).join("") +
     "<tr><td class='l'><b>🏷️ Desconto imediato</b><div class='mut' style='font-size:12px'>descontos − reembolsos · " + litros(s.desconto_cl) + "</div></td><td class='n'>" + fmt(s.desconto_c) + "</td><td class='n mut'>não se regista por turno</td><td></td><td class='l'><span class='b'>ℹ️ só informação</span></td></tr>" +
     "<tr><td class='l'><b>📱 My Repsol</b><div class='mut' style='font-size:12px'>pagamentos com saldo My Repsol − devoluções</div></td><td class='n'>" + fmt(s.myrepsol_c) + "</td><td class='n mut'>—</td><td></td><td class='l'><span class='b'>ℹ️ só informação</span></td></tr>" +
     "</tbody></table></div>" +
-    "<p class='mut' style='font-size:12px;margin:0'>O período do TMS vai do fecho do último dia do mês anterior ao fecho do último dia deste mês (por volta das 22–23 h). Diferenças só se resolvem com decisão humana: a app mostra, não corrige. O numerário fica só como informação até se confirmar que o TMS regista todo o dinheiro do posto.</p>";
+    "<p class='mut' style='font-size:12px;margin:0'>O período do TMS acompanha os fechos do operador no fim do turno, por isso compara-se com esses turnos exatos (pode incluir o último dia do mês anterior). Diferenças só se resolvem com decisão humana: a app mostra, não corrige. O numerário fica só como informação até se confirmar que o TMS regista todo o dinheiro do posto.</p>";
   h += "<details class='grp'><summary>✅ Contas do próprio ficheiro (" + r.verificacoes.length + ")</summary>" + r.verificacoes.map(linhaVerif).join("") + "</details>";
   r.seccoes.forEach(function (sec) {
     sec.grupos.forEach(function (g) {

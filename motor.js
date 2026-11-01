@@ -654,6 +654,9 @@ function inteiro100(s) {
 }
 function tmsInt(s) { if (!/^\d+$/.test(s || "")) throw tmsErro("Número de operações inválido no ficheiro do TMS: " + s); return parseInt(s, 10); }
 function tmsData(s) { var m = /(\d{2})-(\d{2})-(\d{4})\s+(\d{2}:\d{2}:\d{2})/.exec(s || ""); return m ? m[3] + "-" + m[2] + "-" + m[1] + "T" + m[4] : null; }
+function tmsDia(iso, n) { var p = iso.split("-"), d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2] + n)); return d.toISOString().slice(0, 10); }
+function turnoDoFecho(iso) { var dia = iso.slice(0, 10), h = parseInt(iso.slice(11, 13), 10); if (h < 5) return {dia: tmsDia(dia, -1), turno: "t2"}; return {dia: dia, turno: h < 18 ? "t1" : "t2"}; }
+function turnoSeguinte(t) { return t.turno === "t1" ? {dia: t.dia, turno: "t2"} : {dia: tmsDia(t.dia, 1), turno: "t1"}; }
 function lerTMS(texto) {
   var linhas = texto.replace(/\r\n/g, "\n").split("\n");
   var r = {comercio: "", desde: null, ate: null, remessa: [null, null], operacoes: [], seccoes: []}, sec = null, grupo = null;
@@ -679,6 +682,7 @@ function lerTMS(texto) {
   if (!r.comercio || !r.ate || !r.seccoes.length) throw tmsErro("Não é um fecho contabilístico mensal do TMS (falta o comércio, as datas ou os totais).");
   r.comercio = r.comercio.replace(/^0+/, "") || "0";
   r.mes = r.ate.slice(0, 7);
+  r.turnos = {de: r.desde ? turnoSeguinte(turnoDoFecho(r.desde)) : {dia: r.mes + "-01", turno: "t1"}, ate: turnoDoFecho(r.ate)};
   r.verificacoes = verificarTMS(r);
   r.resumo = resumoTMS(r);
   return r;
@@ -723,6 +727,6 @@ function resumoTMS(r) {
 function lerTMSBytes(u8) { return lerTMS(new TextDecoder("windows-1252").decode(u8)); }
 var MOTOR = {num: num, num1: num1, pt: pt, lerTurno: lerTurno, pdfPaginas: pdfPaginas, lerDocumento: lerDocumento, classificarDoc: classificarDoc, verificar: verificar,
   lerFecho: lerFecho, pontuarFecho: pontuarFecho, lerMB: lerMB, lerSolred: lerSolred, verificarMB: verificarMB, verificarSolred: verificarSolred, turnoSugerido: turnoSugerido, classificarFecho: classificarFecho, valores: valores, ratio: ratio,
-  lerTMS: lerTMS, lerTMSBytes: lerTMSBytes, inteiro100: inteiro100};
+  lerTMS: lerTMS, lerTMSBytes: lerTMSBytes, inteiro100: inteiro100, turnoDoFecho: turnoDoFecho, turnoSeguinte: turnoSeguinte};
 if (typeof module !== "undefined" && module.exports) module.exports = MOTOR; else raiz.MOTOR = MOTOR;
 })(typeof window !== "undefined" ? window : globalThis);
