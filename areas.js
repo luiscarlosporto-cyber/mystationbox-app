@@ -13,10 +13,11 @@ var AREAS = [
   {id: "rel", n: "📊 Relatórios", adm: 1, p: [["luc", "Lucro"], ["mes", "Mês"], ["fun", "Por funcionário"]]},
   {id: "ges", n: "⚙️ Gestão", adm: 1, p: [["mrg", "Margens e custos"], ["eq", "Equipa e acessos"], ["prod", "Produtos e códigos"], ["cfg", "Configuração do stock"]]}
 ];
-/* páginas do módulo de stock: separador e cartões (pelo título) a mostrar ou esconder */
+/* páginas do módulo de stock: separador e cartões (pelo título, ou "#id" do cartão) a mostrar ou esconder.
+   O cartão da encomenda muda de título ("Encomenda LOGISTA · Penafiel · por validar"), por isso vai pelo id. */
 var NEXP = {
-  contar: {tab: "count", hide: ["Encomenda para validar"]},
-  enc: {tab: "count", only: ["Encomenda para validar"], vazio: "Não há encomendas por aprovar nesta loja. Faça uma em Compras → Nova encomenda."},
+  contar: {tab: "count", hide: ["Encomenda para validar", "#ordCard"]},
+  enc: {tab: "count", only: ["Encomenda para validar", "#ordCard"], vazio: "Não há encomendas por aprovar nesta loja. Faça uma em Compras → Nova encomenda."},
   ler: {tab: "scan"}, stock: {tab: "stock"}, inv: {tab: "inventory"},
   nova: {tab: "settings", only: ["Encomenda a partir das vendas", "Encomenda manual"]},
   ent: {tab: "settings", only: ["Entrada de mercadoria"]},
@@ -111,8 +112,8 @@ function nexAplicar(pg) {
   var sec = d.getElementById("tab-" + cfg.tab);
   if (sec) Array.prototype.forEach.call(sec.querySelectorAll(".card"), function (c) {
     if (c.parentElement !== sec) return;
-    var h = c.querySelector("h2"), t = h ? h.textContent.trim() : "";
-    c.style.display = (cfg.only ? cfg.only.indexOf(t) >= 0 : !(cfg.hide && cfg.hide.indexOf(t) >= 0)) ? "" : "none";
+    var h = c.querySelector("h2"), t = h ? h.textContent.trim() : "", em = function (l) { return !!l && (l.indexOf(t) >= 0 || (c.id && l.indexOf("#" + c.id) >= 0)); };
+    c.style.display = (cfg.only ? em(cfg.only) : !em(cfg.hide)) ? "" : "none";
   });
   /* as encomendas chegam do servidor depois: vigiar os cartões e decidir o "vazio" só quando já carregou */
   if (NEX_OBS) NEX_OBS.disconnect();
