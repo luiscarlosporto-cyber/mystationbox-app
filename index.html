@@ -48,6 +48,15 @@ nav{background:var(--card);border-bottom:1px solid var(--bd);position:sticky;top
 nav .wrap{display:flex;gap:4px;overflow-x:auto;padding-block:6px}
 nav button{background:none;border:0;border-radius:10px;padding:8px 12px;cursor:pointer;white-space:nowrap;font-weight:600;color:var(--mut)}
 nav button.on{background:var(--azul);color:#fff}
+nav .sub{padding-block:0 8px;gap:6px}nav .sub:empty{display:none}
+nav .sub button{font-weight:600;font-size:14px;padding:6px 12px;border:1px solid var(--bd);border-radius:999px;color:var(--fg);background:var(--card)}
+nav .sub button.on{background:var(--laranja);border-color:var(--laranja);color:#fff}
+.ini{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.ini .c{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;display:grid;gap:6px;text-align:left;font:inherit;color:inherit;cursor:pointer;min-width:0}
+.ini .c:hover{border-color:var(--laranja)}.ini .c h3{margin:0;font:700 13px var(--f-display);letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
+.ini .c .g{font:600 26px/1.1 var(--f-num);font-variant-numeric:tabular-nums}.ini .c .g small{font-size:15px;color:var(--mut)}
+.ini .c.al{border-left:5px solid var(--wn)}.ini .c.ok{border-left:5px solid var(--ok)}.ini .c.bad{border-left:5px solid var(--bad)}
+.ini .c p{margin:0;font-size:14px;color:var(--mut)}
 main .wrap{padding-block:16px 48px;display:grid;gap:16px}
 main .wrap>*,.v{min-width:0}
 .v{display:grid;gap:16px}
@@ -152,11 +161,24 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
   <div class="logo"><img src="logo.svg" alt=""><div><b>mystation<span>box</span></b><small id="hEst">—</small></div></div>
   <div class="hd-dir"><select id="selEst" aria-label="Estação" hidden></select><span class="quem" id="hQuem"></span><button class="hbtn" id="bSair">Sair</button></div>
 </div></header>
-<nav><div class="wrap">
-  <button data-v="reg" class="on">📝 Registo</button><button data-v="mes">🗓️ Mês</button><button data-v="sai">📦 Saídas</button><button data-v="fun">👥 Funcionários</button><button data-v="rep">🏦 Repsol</button><button data-v="tab">🚬 Tabaco</button><button data-v="his">🕘 Histórico</button>
-</div></nav>
+<nav><div class="wrap" id="areas"></div><div class="wrap sub" id="subnav"></div></nav>
 <main><div class="wrap">
   <div class="aviso" id="avRO" hidden><p>A sua conta pode consultar mas não alterar. Registar e corrigir é para administradores.</p></div>
+
+  <!-- INÍCIO -->
+  <div id="v-ini" class="v" hidden><div id="iniCorpo" class="ini"></div></div>
+
+  <!-- STOCK, COMPRAS E VENDAS DO TABACO (módulo de stock embutido) -->
+  <div id="v-nex" class="v" hidden><div id="nexBox"></div></div>
+
+  <!-- FECHO MENSAL TMS -->
+  <div id="v-tms" class="v" hidden>
+    <div class="bar"><button class="btn" id="tAnt">‹</button><input type="month" id="tMes"><button class="btn" id="tSeg">›</button><button class="btn p adm" id="bTms">🧾 Carregar fecho mensal TMS</button><input type="file" id="fTms" accept=".csv,text/csv" hidden></div>
+    <div id="tmsBox"></div>
+  </div>
+
+  <!-- GESTÃO: EQUIPA -->
+  <div id="v-ges" class="v" hidden></div>
 
   <!-- REGISTO -->
   <div id="v-reg" class="v">
@@ -169,10 +191,9 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
 
   <!-- MÊS -->
   <div id="v-mes" class="v" hidden>
-    <div class="bar"><button class="btn" id="mAnt">‹</button><input type="month" id="mMes"><button class="btn" id="mSeg">›</button><button class="btn p adm" id="bTms">🧾 Fecho mensal TMS</button><input type="file" id="fTms" accept=".csv,text/csv" hidden></div>
+    <div class="bar"><button class="btn" id="mAnt">‹</button><input type="month" id="mMes"><button class="btn" id="mSeg">›</button></div>
     <section class="totem" id="totem"></section>
     <div class="sc"><table><thead><tr><th>Dia</th><th class="l">T1</th><th>Dif. T1</th><th class="l">T2</th><th>Dif. T2</th><th>Vendas</th><th>Recebido</th><th>MB</th><th>Solred</th></tr></thead><tbody id="mT"></tbody><tfoot id="mF"></tfoot></table></div>
-    <div id="tmsBox"></div>
   </div>
 
   <!-- SAÍDAS -->
@@ -188,7 +209,7 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
     <div class="sc"><table><thead><tr><th>Funcionário</th><th>Turnos</th><th>Vendas</th><th>Diferença</th><th>Maior falta</th></tr></thead><tbody id="fT"></tbody></table></div>
     <section id="equipa" hidden style="display:grid;gap:10px">
       <div class="bar"><h2 style="margin-right:auto">🔐 Contas de acesso</h2><button class="btn p" id="eqBtnNovo">+ Novo funcionário</button></div>
-      <p class="mut" style="margin:0;font-size:14px">Cada pessoa entra com o seu email e palavra-passe, no mystationbox e no NexStock. <b>Funcionário</b>: consulta e conta tabaco. <b>Administrador</b>: regista, corrige, importa e aprova.</p>
+      <p class="mut" style="margin:0;font-size:14px">Cada pessoa entra com o seu email e palavra-passe, no mystationbox (caixa, stock e encomendas). <b>Funcionário</b>: consulta e conta tabaco. <b>Administrador</b>: regista, corrige, importa e aprova.</p>
       <div id="eqNovo" class="card" hidden style="padding:12px"></div>
       <div id="eqMsg" style="font-size:14px"></div>
       <div class="sc"><table class="hist"><thead><tr><th>Nome</th><th>Email</th><th>Função</th><th>Estação</th><th>Estado</th><th></th></tr></thead><tbody id="eqLista"></tbody></table></div>
@@ -205,7 +226,7 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
   </div>
 
   <!-- TABACO (consulta da app Stock Tabaco) -->
-  <div id="v-tab" class="v" hidden><div class="bar" id="tabSub"><button class="btn on" data-t="nex">📦 NexStock · contar, ler, encomendas</button><button class="btn" data-t="res">📊 Resumo</button></div><div id="tabCorpo" style="display:grid;gap:12px"></div></div>
+  <div id="v-tab" class="v" hidden><div id="tabCorpo" style="display:grid;gap:12px"></div></div>
 
   <!-- HISTÓRICO -->
   <div id="v-his" class="v" hidden>
@@ -270,10 +291,10 @@ async function entrar(){
   var sel=$("#selEst");sel.innerHTML=ESTS.map(function(x){return "<option value='"+x.id+"'>"+esc(x.short_name||x.name)+"</option>"}).join("");sel.value=EST;sel.hidden=ESTS.length<2;
   var cf=await sb.from("msb_config").select("estacao,pos_mb");POSES={};(cf.data||[]).forEach(function(x){POSES[x.estacao]=x.pos_mb});
   $$(".adm").forEach(function(b){b.hidden=!ADMIN});
-  mostrarEst();irDia(DIA);
+  mostrarEst();irDia(DIA);if(window.montarMenu)montarMenu();
 }
 function mostrarEst(){var e=ESTS.find(function(x){return x.id===EST});$("#hEst").textContent=e?(e.name||e.short_name):"—"}
-$("#selEst").onchange=function(){EST=this.value;if(window.NEX_EST!==undefined)NEX_EST=null;try{localStorage.setItem("msb_est",EST)}catch(e){}mostrarEst();LINHAS={};irDia(DIA);if(VISTA!=="reg")vista(VISTA)};
+$("#selEst").onchange=function(){EST=this.value;if(window.NEX_EST!==undefined)NEX_EST=null;try{localStorage.setItem("msb_est",EST)}catch(e){}mostrarEst();LINHAS={};irDia(DIA);if(window.msbIr)msbIr(PAGINA);else if(VISTA!=="reg")vista(VISTA)};
 $("#fLogin").onsubmit=async function(ev){ev.preventDefault();$("#lErro").textContent="";$("#lBtn").disabled=true;
   try{var r=await sb.auth.signInWithPassword({email:$("#lEmail").value.trim(),password:$("#lPass").value});if(r.error)throw r.error;await entrar()}
   catch(e){$("#lErro").textContent=/Invalid login/i.test(e.message)?"Email ou palavra-passe errados.":falhou(e)}finally{$("#lBtn").disabled=false}};
@@ -282,7 +303,7 @@ $("#bSair").onclick=async function(){await sb.auth.signOut();LINHAS={};SAIDAS=[]
 /* ---------------- navegação ---------------- */
 var VISTA="reg";
 function vista(v){VISTA=v;$$("nav button").forEach(function(b){b.classList.toggle("on",b.dataset.v===v)});$$(".v").forEach(function(x){x.hidden=x.id!=="v-"+v});
-  if(v==="mes"){$("#mMes").value=MES;carregarMes()}if(v==="fun"){$("#fMes").value=MES;carregarFun();carregarEquipa()}if(v==="sai")carregarSaidas();if(v==="his"){$("#hDia").value=DIA;carregarHist()}if(v==="rep"){$("#rMes").value=MES;carregarRepsol()}if(v==="tab")carregarTabaco()}
+  if(v==="mes"){$("#mMes").value=MES;carregarMes()}if(v==="fun"){$("#fMes").value=MES;carregarFun();carregarEquipa()}if(v==="sai")carregarSaidas();if(v==="his"){$("#hDia").value=DIA;carregarHist()}if(v==="rep"){$("#rMes").value=MES;carregarRepsol()}if(v==="tab")carregarTabaco();if(window.depoisVista)depoisVista(v)}
 $$("nav button").forEach(function(b){b.onclick=function(){vista(b.dataset.v)}});
 
 /* ---------------- registo do dia ---------------- */
@@ -335,7 +356,7 @@ async function carregarMes(){MES=$("#mMes").value||MES;$("#mT").innerHTML="<tr><
       h+="<tr data-d='"+k+"'><td>"+dmy(k).slice(0,5)+"</td><td class='l'>"+esc(a&&a.func||"")+"</td><td class='n "+cls(da)+"'>"+sinal(da)+"</td><td class='l'>"+esc(b&&b.func||"")+"</td><td class='n "+cls(db)+"'>"+sinal(db)+"</td><td class='n'>"+fmt(all.reduce(function(s,r){return s+(r.vendas_c||0)},0))+"</td><td class='n'>"+fmt(all.reduce(function(s,r){return s+recebido(r)},0))+"</td><td class='n'>"+fmt(all.reduce(function(s,r){return s+(r.mb_c||0)},0))+"</td><td class='n'>"+fmt(all.reduce(function(s,r){return s+(r.solred_c||0)},0))+"</td></tr>"});
     $("#mT").innerHTML=h||"<tr><td colspan='9' class='l mut'>Sem turnos neste mês.</td></tr>";
     $("#mF").innerHTML=L.length?"<tr><td>Total</td><td></td><td></td><td></td><td class='n'>"+sinal(T.d)+"</td><td class='n'>"+fmt(T.v)+"</td><td class='n'>"+fmt(T.r)+"</td><td class='n'>"+fmt(T.m)+"</td><td class='n'>"+fmt(T.s)+"</td></tr>":"";
-    $$("#mT tr[data-d]").forEach(function(tr){tr.onclick=function(){vista("reg");irDia(tr.dataset.d)}});carregarTMS()}
+    $$("#mT tr[data-d]").forEach(function(tr){tr.onclick=function(){vista("reg");irDia(tr.dataset.d)}})}
   catch(e){$("#mT").innerHTML="<tr><td colspan='9' class='l bad'>"+esc(falhou(e))+"</td></tr>"}}
 $("#mMes").onchange=carregarMes;$("#mAnt").onclick=function(){$("#mMes").value=addMes($("#mMes").value||MES,-1);carregarMes()};$("#mSeg").onclick=function(){$("#mMes").value=addMes($("#mMes").value||MES,1);carregarMes()};
 
@@ -374,6 +395,7 @@ entrar().catch(function(e){$("#vLogin").hidden=false;$("#lErro").textContent=fal
 <script src="stock.js"></script>
 <script src="equipa.js"></script>
 <script src="tms.js"></script>
+<script src="areas.js"></script>
 <script>$$("#tabSub button").forEach(function(b){b.onclick=function(){tabaco(b.dataset.t)}});$("#eqBtnNovo").onclick=formNovo;</script>
 </body>
 </html>

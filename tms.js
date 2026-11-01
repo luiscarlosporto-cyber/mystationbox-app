@@ -33,12 +33,12 @@ async function importarTMS(f) {
     var g = await sb.from("msb_tms").upsert({estacao: EST, chave: chave, mes: r.mes, comercio: r.comercio, desde: r.desde, ate: r.ate, dados: r, original: caminho}, {onConflict: "estacao,chave"});
     if (g.error) throw g.error;
     status(true, "Fecho TMS de " + r.mes + " importado ✓");
-    if ($("#mMes").value !== r.mes) { $("#mMes").value = r.mes; carregarMes(); } else carregarTMS();
+    $("#tMes").value = r.mes; carregarTMS();
   } catch (e) { box.innerHTML = "<div class='card bad' style='padding:12px'>⚠ " + esc(falhou(e)) + "</div>"; }
 }
 
 async function carregarTMS() {
-  var box = $("#tmsBox"), m = $("#mMes").value || MES; box.innerHTML = "";
+  var box = $("#tmsBox"), m = $("#tMes").value || MES; $("#tMes").value = m; box.innerHTML = "";
   try {
     var q = await sb.from("msb_tms").select("chave,mes,comercio,desde,ate,dados,original,criado").eq("estacao", EST).eq("mes", m).order("ate", {ascending: false});
     if (q.error) throw q.error;
@@ -104,5 +104,8 @@ function desenharTMS(t, L, m) {
   return h + "</div>";
 }
 
+$("#tMes").onchange = carregarTMS;
+$("#tAnt").onclick = function () { $("#tMes").value = addMes($("#tMes").value || MES, -1); carregarTMS(); };
+$("#tSeg").onclick = function () { $("#tMes").value = addMes($("#tMes").value || MES, 1); carregarTMS(); };
 $("#bTms").onclick = function () { $("#fTms").click(); };
 $("#fTms").onchange = function () { var f = this.files[0]; this.value = ""; if (f) importarTMS(f); };
