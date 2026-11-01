@@ -4,7 +4,7 @@
 /* Partes deste ecrã (01/11/2026): "ven" = Vendas e margens · "comh" = Compras → encomendas feitas · "mov" = Stock → movimentos. */
 var TAB_PARTE = "ven";
 function tabaco(parte) { TAB_PARTE = parte || TAB_PARTE; carregarTabacoResumo(); }
-var TAB = {cat: [], enc: [], mov: [], aberta: null, filtro: ""};
+var TAB = {cat: [], enc: [], mov: [], aberta: null, filtro: "", sel: {}, canceladas: false};
 function estadoEnc(s) { return {enviada: "<span class='b ok'>enviada</span>", pendente: "<span class='b wn'>por aprovar</span>", cancelada: "<span class='b'>cancelada</span>"}[s] || esc(s); }
 function qtd(l) { return l.qty ? l.qty + " " + (l.unit === "volumes" ? "vol." : "un.") : "—"; }
 function carregarTabaco() { carregarTabacoResumo(); }
@@ -42,14 +42,20 @@ function desenharTabaco() {
   /* encomendas */
   if (so("comh")) {
   h += "<h2>Encomendas feitas ao fornecedor</h2>";
+  var pend = enc.filter(function (o) { return o.status === "pendente"; }), nCanc = enc.filter(function (o) { return o.status === "cancelada"; }).length, nSel = pend.filter(function (o) { return TAB.sel[o.id]; }).length;
+  if (ADMIN && pend.length) h += "<div class='bar' style='background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:8px 10px'><label style='display:flex;gap:6px;align-items:center;font-weight:600'><input type='checkbox' id='encTodas'" + (nSel === pend.length ? " checked" : "") + "> Selecionar todas por aprovar (" + pend.length + ")</label>" +
+    "<button class='btn' id='encElim'" + (nSel ? "" : " disabled") + ">🗑 Eliminar selecionadas (" + nSel + ")</button><span class='mut' style='font-size:12px'>Eliminar = cancelar: não segue nada para o fornecedor e fica no histórico.</span></div>";
+  if (nCanc) h += "<div><button class='mini' id='encCanc'>" + (TAB.canceladas ? "Esconder" : "Mostrar") + " canceladas (" + nCanc + ")</button></div>";
   if (!enc.length) h += "<div class='vazio'>Sem encomendas desta estação.</div>";
-  enc.forEach(function (o) {
+  enc.filter(function (o) { return TAB.canceladas || o.status !== "cancelada"; }).forEach(function (o) {
     var L = Array.isArray(o.lines) ? o.lines : [], pedidos = L.filter(function (l) { return l.qty > 0; });
     var vol = pedidos.filter(function (l) { return l.unit === "volumes"; }).reduce(function (s, l) { return s + l.qty; }, 0), un = pedidos.filter(function (l) { return l.unit !== "volumes"; }).reduce(function (s, l) { return s + l.qty; }, 0);
     var aberta = TAB.aberta === o.id;
-    h += "<div class='liq'><h3><span>" + new Date(o.created_at).toLocaleString("pt-PT", {day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit"}) + " · " + estadoEnc(o.status) + "</span><span class='mut' style='font-weight:400;font-size:13px'>" +
+    var pe = ADMIN && o.status === "pendente";
+    h += "<div class='liq'" + (pe && TAB.sel[o.id] ? " style='border-color:var(--laranja)'" : "") + "><h3><span>" + (pe ? "<input type='checkbox' data-sel='" + o.id + "'" + (TAB.sel[o.id] ? " checked" : "") + " aria-label='Selecionar' style='width:20px;height:20px;vertical-align:middle;margin-right:6px'>" : "") + new Date(o.created_at).toLocaleString("pt-PT", {day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit"}) + " · " + estadoEnc(o.status) + "</span><span class='mut' style='font-weight:400;font-size:13px'>" +
       pedidos.length + " artigos · " + vol + " vol. + " + un + " un." + (o.sent_to ? " · para " + esc(o.sent_to) : "") + (o.operator ? " · contou " + esc(o.operator) : "") + "</span></h3>" +
-      "<div><button class='mini' data-enc='" + o.id + "'>" + (aberta ? "Esconder" : "Ver linhas") + "</button></div>";
+      "<div class='bar'><button class='mini' data-enc='" + o.id + "'>" + (aberta ? "Esconder" : "Ver linhas") + "</button>" +
+      (pe ? "<button class='btn p' data-apr='" + o.id + "'>✓ Aprovar (ver PDF)</button><button class='btn' data-del='" + o.id + "'>🗑 Eliminar</button>" : "") + "</div>";
     if (aberta) h += "<div class='sc'><table><thead><tr><th>Artigo</th><th class='l'>Categoria</th><th>Contado</th><th>Sugerido</th><th>Encomendado</th></tr></thead><tbody>" +
       L.slice().sort(function (a, b) { return (b.qty || 0) - (a.qty || 0) || (a.name < b.name ? -1 : 1); }).map(function (l) {
         return "<tr><td>" + esc(l.name) + (l.top ? " <span class='b ok'>top</span>" : "") + (l.manual ? " <span class='b wn'>ajustado</span>" : "") + "</td><td class='l'>" + esc(l.category || "") + "</td><td class='n'>" + (l.counted == null ? "—" : l.counted) + "</td><td class='n'>" + (l.suggested == null ? "—" : l.suggested) + "</td><td class='n'><b>" + qtd(l) + "</b></td></tr>"; }).join("") + "</tbody></table></div>";
@@ -73,6 +79,34 @@ function desenharTabaco() {
   if (so("mov") && TAB.mov.length) h += "<h2>Últimos movimentos</h2><div class='sc'><table><thead><tr><th>Quando</th><th class='l'>Artigo</th><th class='l'>Tipo</th><th>Qtd.</th><th>Antes → depois</th><th class='l'>Quem</th></tr></thead><tbody>" +
     TAB.mov.map(function (m) { return "<tr><td>" + new Date(m.created_at).toLocaleString("pt-PT", {day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"}) + "</td><td class='l'>" + esc(m.product_name) + "</td><td class='l'>" + esc(m.move_type) + "</td><td class='n'>" + m.quantity + "</td><td class='n'>" + m.stock_before + " → " + m.stock_after + "</td><td class='l'>" + esc(NOMES[m.user_id] || m.operator || "") + "</td></tr>"; }).join("") + "</tbody></table></div>";
   $("#tabCorpo").innerHTML = h;
+  $$("#tabCorpo [data-sel]").forEach(function (c) { c.onchange = function () { if (c.checked) TAB.sel[c.dataset.sel] = 1; else delete TAB.sel[c.dataset.sel]; desenharTabaco(); }; });
+  if ($("#encTodas")) $("#encTodas").onchange = function () { var on = this.checked; TAB.sel = {}; if (on) TAB.enc.forEach(function (o) { if (o.status === "pendente") TAB.sel[o.id] = 1; }); desenharTabaco(); };
+  if ($("#encCanc")) $("#encCanc").onclick = function () { TAB.canceladas = !TAB.canceladas; desenharTabaco(); };
+  if ($("#encElim")) $("#encElim").onclick = function () { var ids = Object.keys(TAB.sel); if (ids.length) eliminarEncomendas(ids, this); };
+  $$("#tabCorpo [data-del]").forEach(function (b) { b.onclick = function () { eliminarEncomendas([b.dataset.del], b); }; });
+  $$("#tabCorpo [data-apr]").forEach(function (b) { b.onclick = function () { aprovarEncomenda(b.dataset.apr); }; });
   $$("#tabCorpo [data-enc]").forEach(function (b) { b.onclick = function () { TAB.aberta = TAB.aberta === b.dataset.enc ? null : b.dataset.enc; desenharTabaco(); }; });
   var inp = $("#tabF"); if (inp) inp.oninput = function () { TAB.filtro = inp.value; var pos = inp.selectionStart; desenharTabaco(); var n = $("#tabF"); n.focus(); n.setSelectionRange(pos, pos); };
 }
+
+/* Eliminar = cancelar (status "cancelada"): nada segue para o fornecedor e a encomenda fica no histórico.
+ * Pede um segundo toque para confirmar. Só encomendas ainda por aprovar. */
+async function eliminarEncomendas(ids, b) {
+  if (b.dataset.conf !== "1") { b.dataset.conf = "1"; b.textContent = "Confirmar: eliminar " + (ids.length > 1 ? ids.length + " encomendas" : "esta encomenda"); b.classList.add("p"); return; }
+  b.disabled = true;
+  try {
+    var r = await sb.from("orders").update({status: "cancelada"}).in("id", ids).eq("status", "pendente").select("id");
+    if (r.error) throw r.error;
+    TAB.sel = {}; status(true, (r.data || []).length + " encomenda(s) eliminada(s)");
+    await carregarTabacoResumo();
+  } catch (e) { b.disabled = false; alertaTab("⚠ Não foi possível eliminar: " + falhou(e)); }
+}
+/* Aprovar abre a encomenda em Compras → Por aprovar, com o PDF para ver antes de enviar. */
+async function aprovarEncomenda(id) {
+  ir("enc");
+  try {
+    var w = await esperarNex(function (w) { return typeof w.msbAbrirEncomenda === "function"; });
+    await w.msbAbrirEncomenda(id);
+  } catch (e) { alertaTab("⚠ " + e.message); }
+}
+function alertaTab(m) { var box = NEXP[PAGINA] ? $("#nexBox") : $("#tabCorpo"); if (box) box.insertAdjacentHTML("afterbegin", "<div class='card msgErr' style='padding:12px'>" + esc(m) + "</div>"); }
