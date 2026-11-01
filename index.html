@@ -187,6 +187,15 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
     <div id="tmsBox"></div>
   </div>
 
+  <!-- RELATÓRIOS: LUCRO -->
+  <div id="v-luc" class="v" hidden>
+    <div class="bar"><button class="btn" id="lAnt">‹</button><input type="month" id="lMes"><button class="btn" id="lSeg">›</button><button class="btn p adm" id="bCbos">📄 Carregar relatório de vendas do mês</button><input type="file" id="fCbos" accept="application/pdf,.pdf" hidden></div>
+    <div id="lucCorpo" style="display:grid;gap:12px"></div>
+  </div>
+
+  <!-- GESTÃO: MARGENS E CUSTOS -->
+  <div id="v-mrg" class="v" hidden><div id="mrgCorpo" style="display:grid;gap:12px"></div></div>
+
   <!-- GESTÃO: EQUIPA -->
   <div id="v-ges" class="v" hidden></div>
 
@@ -290,7 +299,7 @@ async function entrar(){
   var p=await sb.from("profiles").select("user_id,display_name,role,company_id,other_companies").eq("user_id",EU.id).maybeSingle();
   if(p.error||!p.data){$("#lErro").textContent="A conta não tem perfil. Peça ao administrador para a criar.";await sb.auth.signOut();$("#vLogin").hidden=false;return}
   PERFIL=p.data;ADMIN=PERFIL.role==="admin";
-  var c=await sb.from("companies").select("id,name,short_name").order("sort");
+  var c=await sb.from("companies").select("id,name,short_name,posto_repsol").order("sort");
   ESTS=(c.data||[]).filter(function(x){return ADMIN||x.id===PERFIL.company_id||(PERFIL.other_companies||[]).indexOf(x.id)>=0});
   var guard=null;try{guard=localStorage.getItem("msb_est")}catch(e){}
   EST=(ESTS.find(function(x){return x.id===guard})||ESTS.find(function(x){return x.id===PERFIL.company_id})||ESTS[0]||{}).id;
@@ -405,6 +414,7 @@ entrar().catch(function(e){$("#vLogin").hidden=false;$("#lErro").textContent=fal
 <script src="stock.js"></script>
 <script src="equipa.js"></script>
 <script src="tms.js"></script>
+<script src="lucro.js"></script>
 <script src="areas.js"></script>
 <script>$$("#tabSub button").forEach(function(b){b.onclick=function(){tabaco(b.dataset.t)}});$("#eqBtnNovo").onclick=formNovo;</script>
 </body>

@@ -725,8 +725,70 @@ function resumoTMS(r) {
     desconto_c: tmsTot(desc, "dto") - tmsTot(rdesc, "dto"), desconto_cl: tmsTot(desc, "l") - tmsTot(rdesc, "l"), myrepsol_c: tmsTot(myr, "v") - tmsTot(dmyr, "v")};
 }
 function lerTMSBytes(u8) { return lerTMS(new TextDecoder("windows-1252").decode(u8)); }
+/* ---------------- relatório "Turno por formas de cobrança" (CBOS) (tradução de caixa_app/vendas_cbos.py) ---------------- */
+function cbosNum(t) { return inteiro100(t.replace(/\./g, "").replace(/€/g, "").replace(/%/g, "").trim()); }
+function cbosCols(linha) {
+  var out = []; linha.trim().split(/\s{2,}/).forEach(function (c) { if ((c === "€" || c === "%") && out.length) out[out.length - 1] += c; else if (c) out.push(c); });
+  return out;
+}
+function cbosENum(t) { return /^-?[\d.]*\d(,\d+)?\s*[€%]?$/.test(t.trim()); }
+function cbosData(t) { var m = /(\d{2})\/(\d{2})\/(\d{4})/.exec(t || ""); return m ? m[3] + "-" + m[2] + "-" + m[1] : null; }
+function lerVendasCBOS(linhas) {
+  var r = {posto: "", nome_posto: "", de: null, ate: null, comb: {}, loja: [], verificacoes: []}, sec = null, forma = null, fam = null, subC = {}, subF = {}, tot = {};
+  linhas.forEach(function (bruta) {
+    var ln = bruta.trim(); if (!ln) return;
+    var m = /Lojas:\s*(E\d{3,5})\s*-\s*(.+?)(?:\s{2,}|$)/.exec(ln);
+    if (m) { r.posto = m[1]; r.nome_posto = m[2].trim(); }
+    if (ln.indexOf("Desde:") === 0) { r.de = cbosData(ln.slice(0, 40)); m = /Até:\s*(\d{2}\/\d{2}\/\d{4})/.exec(ln); if (m) r.ate = cbosData(m[1]); return; }
+    if (ln === "Vendas de combustível") { sec = "comb"; forma = null; return; }
+    if (ln === "Vendas loja por família") { sec = "loja"; fam = null; return; }
+    if (ln.indexOf("Vendas ") === 0 || ln.indexOf("Análises") === 0 || ln.indexOf("Movimentos") === 0) { if (ln.indexOf("Análises") !== 0) sec = null; return; }
+    var c = cbosCols(ln);
+    if (!c.length || c[0] === "Forma de pagamento" || c[0] === "Família") return;
+    if (sec === "comb") {
+      if (c[0].indexOf("Subtotal ") === 0) { subC[c[0].slice(9).trim()] = [cbosNum(c[1]), cbosNum(c[2])]; return; }
+      if (c[0] === "Total") { tot.comb = [cbosNum(c[1]), cbosNum(c[2])]; return; }
+      if (c.length === 9 && !cbosENum(c[0])) { forma = c[0].toLowerCase(); c = c.slice(1); }
+      if (c.length === 8 && forma && !cbosENum(c[0])) (r.comb[forma] = r.comb[forma] || {})[c[0].toUpperCase()] = [cbosNum(c[1]), cbosNum(c[2]), cbosNum(c[5])];
+      return;
+    }
+    if (sec === "loja") {
+      if (c[0].indexOf("Subtotal ") === 0) { subF[c[0].slice(9).trim()] = [cbosNum(c[1]), cbosNum(c[2])]; return; }
+      if (c[0] === "Total") { tot.loja = [cbosNum(c[1]), cbosNum(c[2])]; sec = null; return; }
+      if (c.length === 9 && !cbosENum(c[0]) && !cbosENum(c[1])) { fam = c[0].toUpperCase(); c = c.slice(1); }
+      if (c.length === 8 && fam && !cbosENum(c[0])) r.loja.push([fam, c[0].toUpperCase(), cbosNum(c[1]), cbosNum(c[2]), cbosNum(c[5])]);
+    }
+  });
+  if (!r.posto || !r.de || !r.ate || !Object.keys(r.comb).length || !r.loja.length)
+    throw tmsErro("Não é o relatório \"Turno por formas de cobrança\" com texto (falta o posto, o período ou as tabelas de vendas). Se foi impresso com \"Microsoft Print to PDF\", imprima de novo com \"Guardar como PDF\".");
+  r.mes = r.ate.slice(0, 7);
+  r.verificacoes = verificarCBOS(r, subC, subF, tot);
+  return r;
+}
+function verificarCBOS(r, subC, subF, tot) {
+  var v = [], somaP = function (o, i) { return Object.keys(o).reduce(function (a, k) { return a + o[k][i]; }, 0); };
+  Object.keys(r.comb).forEach(function (f) {
+    var P = r.comb[f], s = [somaP(P, 0), somaP(P, 1)], esp = subC[f.toUpperCase()], F = f.toUpperCase();
+    if (!esp) v.push({nivel: "aviso", msg: "Combustível " + F + ": sem subtotal no relatório para conferir."});
+    else if (s[0] !== esp[0] || Math.abs(s[1] - esp[1]) > 5) v.push({nivel: "erro", msg: "Combustível " + F + ": produtos não dão o subtotal (" + tmsFmt(esp[0]) + " L / " + tmsFmt(esp[1]) + " €)."});
+    else v.push({nivel: "ok", msg: "Combustível " + F + ": produtos = subtotal (" + tmsFmt(s[0]) + " L · " + tmsFmt(s[1]) + " €)."});
+  });
+  if (tot.comb) {
+    var s = [0, 0]; Object.keys(r.comb).forEach(function (f) { s[0] += somaP(r.comb[f], 0); s[1] += somaP(r.comb[f], 1); });
+    v.push(s[0] === tot.comb[0] && Math.abs(s[1] - tot.comb[1]) <= 5 ? {nivel: "ok", msg: "Combustível: total " + tmsFmt(s[0]) + " L · " + tmsFmt(s[1]) + " € sem IVA."} : {nivel: "erro", msg: "Combustível: a soma não dá o total do relatório."});
+  }
+  Object.keys(subF).forEach(function (fm) {
+    var esp = subF[fm], L = r.loja.filter(function (l) { return l[0] === fm.toUpperCase(); }), s = [L.reduce(function (a, l) { return a + l[2]; }, 0), L.reduce(function (a, l) { return a + l[3]; }, 0)];
+    if (s[0] !== esp[0] || Math.abs(s[1] - esp[1]) > 5) v.push({nivel: "erro", msg: "Loja " + fm + ": subfamílias não dão o subtotal."});
+  });
+  if (tot.loja) {
+    var t = [r.loja.reduce(function (a, l) { return a + l[2]; }, 0), r.loja.reduce(function (a, l) { return a + l[3]; }, 0)];
+    v.push(t[0] === tot.loja[0] && Math.abs(t[1] - tot.loja[1]) <= 5 ? {nivel: "ok", msg: "Loja: " + Object.keys(subF).length + " famílias, total " + tmsFmt(t[1]) + " € sem IVA, subtotais conferidos."} : {nivel: "erro", msg: "Loja: a soma das famílias não dá o total do relatório."});
+  } else v.push({nivel: "erro", msg: "Loja: sem total no relatório para conferir."});
+  return v;
+}
 var MOTOR = {num: num, num1: num1, pt: pt, lerTurno: lerTurno, pdfPaginas: pdfPaginas, lerDocumento: lerDocumento, classificarDoc: classificarDoc, verificar: verificar,
   lerFecho: lerFecho, pontuarFecho: pontuarFecho, lerMB: lerMB, lerSolred: lerSolred, verificarMB: verificarMB, verificarSolred: verificarSolred, turnoSugerido: turnoSugerido, classificarFecho: classificarFecho, valores: valores, ratio: ratio,
-  lerTMS: lerTMS, lerTMSBytes: lerTMSBytes, inteiro100: inteiro100, turnoDoFecho: turnoDoFecho, turnoSeguinte: turnoSeguinte};
+  lerTMS: lerTMS, lerTMSBytes: lerTMSBytes, inteiro100: inteiro100, turnoDoFecho: turnoDoFecho, turnoSeguinte: turnoSeguinte, lerVendasCBOS: lerVendasCBOS};
 if (typeof module !== "undefined" && module.exports) module.exports = MOTOR; else raiz.MOTOR = MOTOR;
 })(typeof window !== "undefined" ? window : globalThis);

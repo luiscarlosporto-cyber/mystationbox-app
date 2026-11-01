@@ -10,8 +10,8 @@ var AREAS = [
   {id: "com", n: "🛒 Compras", adm: 1, p: [["enc", "Por aprovar"], ["nova", "Nova encomenda"], ["comh", "Encomendas feitas"], ["ent", "Entrada de mercadoria"]]},
   {id: "stk", n: "📦 Stock", p: [["contar", "Contar"], ["ler", "Ler código"], ["stock", "Stock atual"], ["inv", "Inventário"], ["mov", "Movimentos"]]},
   {id: "conf", n: "🏦 Conferências", adm: 1, p: [["rep", "Repsol e Multibanco"], ["tms", "Fecho mensal TMS"]]},
-  {id: "rel", n: "📊 Relatórios", adm: 1, p: [["mes", "Mês"], ["fun", "Por funcionário"]]},
-  {id: "ges", n: "⚙️ Gestão", adm: 1, p: [["eq", "Equipa e acessos"], ["prod", "Produtos e códigos"], ["cfg", "Configuração do stock"]]}
+  {id: "rel", n: "📊 Relatórios", adm: 1, p: [["luc", "Lucro"], ["mes", "Mês"], ["fun", "Por funcionário"]]},
+  {id: "ges", n: "⚙️ Gestão", adm: 1, p: [["mrg", "Margens e custos"], ["eq", "Equipa e acessos"], ["prod", "Produtos e códigos"], ["cfg", "Configuração do stock"]]}
 ];
 /* páginas do módulo de stock: separador e cartões (pelo título) a mostrar ou esconder */
 var NEXP = {
@@ -24,7 +24,7 @@ var NEXP = {
   prod: {tab: "settings", only: ["Gestão de produtos"]},
   cfg: {tab: "settings", only: ["Configuração da base de dados central", "Importante"]}
 };
-var VISTA_DA = {ini: "ini", reg: "reg", sai: "sai", his: "his", ven: "tab", comh: "tab", mov: "tab", rep: "rep", tms: "tms", mes: "mes", fun: "fun", eq: "ges"};
+var VISTA_DA = {ini: "ini", reg: "reg", sai: "sai", his: "his", ven: "tab", comh: "tab", mov: "tab", rep: "rep", tms: "tms", mes: "mes", fun: "fun", eq: "ges", luc: "luc", mrg: "mrg"};
 var PAGINA = "ini";
 function areasVisiveis() { return AREAS.filter(function (a) { return ADMIN || !a.adm; }); }
 function areaDe(pg) { return AREAS.find(function (a) { return a.p.some(function (x) { return x[0] === pg; }); }); }
@@ -62,6 +62,8 @@ window.depoisVista = function (v) {
   if (v === "ini") carregarInicio();
   if (v === "tms") carregarTMS();
   if (v === "ges") carregarEquipa();
+  if (v === "luc") carregarLucro();
+  if (v === "mrg") carregarMargens();
 };
 
 /* ---------------- módulo de stock embutido ---------------- */
@@ -90,23 +92,33 @@ function nexMostrar(pg) {
   NEX_PEND = pg;
   if (NEX_PRONTO) nexAplicar(pg);
 }
+var NEX_OBS = null, NEX_T0 = 0;
 function nexAplicar(pg) {
   var cfg = NEXP[pg], d = nexDoc(); if (!cfg || !d) return;
   nexAjustar();
   var b = d.querySelector("nav button[data-tab='" + cfg.tab + "']");
   if (!b) { setTimeout(function () { if (PAGINA === pg) nexAplicar(pg); }, 400); return; }   // ainda a entrar
-  b.click();
-  var sec = d.getElementById("tab-" + cfg.tab), vis = 0;
+  b.click(); NEX_T0 = Date.now();
+  var sec = d.getElementById("tab-" + cfg.tab);
   if (sec) Array.prototype.forEach.call(sec.querySelectorAll(".card"), function (c) {
     if (c.parentElement !== sec) return;
     var h = c.querySelector("h2"), t = h ? h.textContent.trim() : "";
-    var ver = cfg.only ? cfg.only.indexOf(t) >= 0 : !(cfg.hide && cfg.hide.indexOf(t) >= 0);
-    c.style.display = ver ? "" : "none";
-    if (ver && !c.classList.contains("hidden")) vis++;
+    c.style.display = (cfg.only ? cfg.only.indexOf(t) >= 0 : !(cfg.hide && cfg.hide.indexOf(t) >= 0)) ? "" : "none";
   });
-  var vz = $("#nexVazio"); vz.hidden = !(cfg.vazio && !vis); vz.textContent = cfg.vazio || "";
-  $("#nexFrame").style.display = vz.hidden ? "" : "none";
+  /* as encomendas chegam do servidor depois: vigiar os cartões e decidir o "vazio" só quando já carregou */
+  if (NEX_OBS) NEX_OBS.disconnect();
+  try { NEX_OBS = new d.defaultView.MutationObserver(function () { if (NEXP[PAGINA]) nexVis(PAGINA); }); NEX_OBS.observe(d.body, {subtree: true, attributes: true, attributeFilter: ["class"], childList: true}); } catch (e) { NEX_OBS = null; }
+  nexVis(pg);
   try { d.defaultView.scrollTo(0, 0); } catch (e) { /* nada */ }
+}
+function nexVis(pg) {
+  var cfg = NEXP[pg], d = nexDoc(); if (!cfg || !d) return;
+  var sec = d.getElementById("tab-" + cfg.tab), vis = 0;
+  if (sec) Array.prototype.forEach.call(sec.querySelectorAll(".card"), function (c) { if (c.parentElement === sec && c.style.display !== "none" && !c.classList.contains("hidden")) vis++; });
+  var vz = $("#nexVazio"), espera = cfg.vazio && !vis && Date.now() - NEX_T0 < 6000;
+  vz.hidden = !(cfg.vazio && !vis); vz.textContent = espera ? "A carregar…" : (cfg.vazio || "");
+  $("#nexFrame").style.display = vz.hidden ? "" : "none";
+  if (espera) setTimeout(function () { if (PAGINA === pg) nexVis(pg); }, 1000);
 }
 
 /* ---------------- Início ---------------- */
@@ -153,7 +165,10 @@ async function carregarInicio() {
 async function tipoFicheiro(f) {
   var b = new Uint8Array(await f.slice(0, 64).arrayBuffer()), ini = String.fromCharCode.apply(null, b);
   if (/^image\//.test(f.type) || /\.(jpe?g|png|heic|webp)$/i.test(f.name)) return "foto";
-  if (ini.slice(0, 4) === "%PDF") return "pdf";
+  if (ini.slice(0, 4) === "%PDF") {   // relatório de vendas do CBOS (título "CBOS | Resultado turno…") ou documento Repsol
+    var txt = new TextDecoder("latin1").decode(new Uint8Array(await f.slice(0, 200000).arrayBuffer()));
+    return /00430042004F0053|CBOS/i.test(txt) ? "cbos" : "pdf";
+  }
   if (b[0] === 0xD0 && b[1] === 0xCF && b[2] === 0x11 && b[3] === 0xE0) return "xls";
   if (/^comercio;/i.test(ini.replace(/^﻿/, ""))) return "tms";
   if (b[0] === 0x50 && b[1] === 0x4B) return "vendas";             // relatório de vendas: só Excel (o CSV não diz a loja)
@@ -184,13 +199,14 @@ function escolherVendas(f) {
   }; });
 }
 async function carregarFicheiros(fs) {
-  var g = {pdf: [], foto: [], xls: [], tms: [], vendas: [], csv: [], "": []};
+  var g = {pdf: [], cbos: [], foto: [], xls: [], tms: [], vendas: [], csv: [], "": []};
   for (var i = 0; i < fs.length; i++) g[await tipoFicheiro(fs[i])].push(fs[i]);
   if (g[""].length || g.csv.length) ir("reg");      // a mensagem aparece na barra do Registo
-  if (g[""].length) status(false, "⚠ Não reconheço: " + g[""].map(function (f) { return f.name; }).join(", ") + ". Ficheiros aceites: folha de turno (.xls), fotografia do talão, PDF da Repsol, fecho mensal TMS (.csv), relatório de vendas (Excel .xlsx).");
+  if (g[""].length) status(false, "⚠ Não reconheço: " + g[""].map(function (f) { return f.name; }).join(", ") + ". Ficheiros aceites: folha de turno (.xls), fotografia do talão, PDF da Repsol, fecho mensal TMS (.csv), relatório de vendas de tabaco (Excel .xlsx), relatório «Turno por formas de cobrança» (PDF feito com «Guardar como PDF»).");
   if (g.csv.length) status(false, "⚠ " + g.csv.map(function (f) { return f.name; }).join(", ") + ": o relatório de vendas tem de ser em Excel (.xlsx), porque o CSV não diz de que loja é.");
   if (g.tms.length) { ir("tms"); for (var j = 0; j < g.tms.length; j++) await importarTMS(g.tms[j]); }
   if (g.pdf.length) { ir("rep"); carregarPdfs(g.pdf); }
+  if (g.cbos.length) await importarVendasCBOS(g.cbos[0]);
   if (g.xls.length) { ir("reg"); $("#fXls").onchange.call({files: [g.xls[0]], value: ""}); }
   if (g.foto.length) { ir("reg"); $("#fFecho").onchange.call({files: [g.foto[0]], value: ""}); }
   if (g.vendas.length) escolherVendas(g.vendas[0]);
