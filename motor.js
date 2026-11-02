@@ -728,13 +728,27 @@ function lerTMSBytes(u8) { return lerTMS(new TextDecoder("windows-1252").decode(
 /* ---------------- relatório "Turno por formas de cobrança" (CBOS) (tradução de caixa_app/vendas_cbos.py) ---------------- */
 function cbosNum(t) { return inteiro100(t.replace(/\./g, "").replace(/€/g, "").replace(/%/g, "").trim()); }
 function cbosCols(linha) {
-  var out = []; linha.trim().split(/\s{2,}/).forEach(function (c) { if ((c === "€" || c === "%") && out.length) out[out.length - 1] += c; else if (c) out.push(c); });
+  var out = [];
+  linha.trim().split(/\s{2,}/).forEach(function (c) {
+    var m;
+    if ((c === "€" || c === "%") && out.length) out[out.length - 1] += c;
+    else if (c && /^-?[\d.]*\d(?:,\d+)?[€%]?(?: -?[\d.]*\d(?:,\d+)?[€%]?)+$/.test(c)) c.split(" ").forEach(function (x) { out.push(x); });
+    else if (c && /^.*\D(?: -?[\d.]*\d,\d+[€%]?){2,}$/.test(c) && (m = /^(.*?)((?: -?[\d.]*\d,\d+[€%]?){2,})$/.exec(c))) { out.push(m[1].trim()); m[2].trim().split(/\s+/).forEach(function (x) { out.push(x); }); }
+    else if (c) out.push(c);
+  });
   return out;
+}
+/* Nome da subfamília (igual a _sem_familia em vendas_cbos.py) */
+function cbosSemFamilia(txt, fam, partido) {
+  var T = txt.toUpperCase().split(/\s+/).filter(Boolean).join(" "), F = fam.toUpperCase().split(/\s+/).filter(Boolean).join(" ");
+  if (!partido) return (T === F || T.indexOf(F + " ") === 0) ? (T.slice(F.length).trim() || F) : T;
+  var t = T.split(" "); F.split(" ").forEach(function (w) { var i = t.indexOf(w); if (i >= 0) t.splice(i, 1); });
+  return t.join(" ") || F;
 }
 function cbosENum(t) { return /^-?[\d.]*\d(,\d+)?\s*[€%]?$/.test(t.trim()); }
 function cbosData(t) { var m = /(\d{2})\/(\d{2})\/(\d{4})/.exec(t || ""); return m ? m[3] + "-" + m[2] + "-" + m[1] : null; }
 function lerVendasCBOS(linhas) {
-  var r = {posto: "", nome_posto: "", de: null, ate: null, comb: {}, loja: [], verificacoes: []}, sec = null, forma = null, fam = null, subC = {}, subF = {}, tot = {};
+  var r = {posto: "", nome_posto: "", de: null, ate: null, comb: {}, loja: [], verificacoes: []}, sec = null, forma = null, fam = null, subC = {}, subF = {}, tot = {}, buf = [], pend = [];
   linhas.forEach(function (bruta) {
     var ln = bruta.trim(); if (!ln) return;
     var m = /Lojas:\s*(E\d{3,5})\s*-\s*(.+?)(?:\s{2,}|$)/.exec(ln);
@@ -753,10 +767,18 @@ function lerVendasCBOS(linhas) {
       return;
     }
     if (sec === "loja") {
-      if (c[0].indexOf("Subtotal ") === 0) { if (c.length < 3) return; subF[c[0].slice(9).trim()] = [cbosNum(c[1]), cbosNum(c[2])]; return; }
-      if (c[0] === "Total") { if (c.length < 3) return; tot.loja = [cbosNum(c[1]), cbosNum(c[2])]; sec = null; return; }
-      if (c.length === 9 && !cbosENum(c[0]) && !cbosENum(c[1])) { fam = c[0].toUpperCase(); c = c.slice(1); }
-      if (c.length === 8 && fam && !cbosENum(c[0])) r.loja.push([fam, c[0].toUpperCase(), cbosNum(c[1]), cbosNum(c[2]), cbosNum(c[5])]);
+      /* nomes partidos em várias linhas: guardam-se as linhas até ao "Subtotal <família>" (igual ao Python) */
+      if (c[0].indexOf("Subtotal ") === 0 && c.length >= 3) { var f = c[0].slice(9).trim(); subF[f] = [cbosNum(c[1]), cbosNum(c[2])];
+        buf.forEach(function (b) { r.loja.push([f.toUpperCase(), cbosSemFamilia(b.txt, f, b.partido), b.n[0], b.n[1], b.n[4]]); }); buf = []; pend = []; return; }
+      if (c[0] === "Total" && c.length >= 3) { tot.loja = [cbosNum(c[1]), cbosNum(c[2])]; sec = null; return; }
+      var k = 0; while (k < c.length && !cbosENum(c[k])) k++;
+      if (k === c.length) {
+        if (ln === "Total" || ln === "% Sobre") return;
+        var u = buf[buf.length - 1];
+        if (u && u.partido && !u.fechado) { u.txt += " " + ln; u.fechado = true; } else pend.push(ln);
+        return;
+      }
+      if (c.length - k === 7) { buf.push({txt: pend.concat(c.slice(0, k)).join(" "), n: c.slice(k).map(cbosNum), partido: pend.length > 0, fechado: false}); pend = []; }
     }
   });
   if (!r.posto || !r.de || !r.ate || !Object.keys(r.comb).length || !r.loja.length)
@@ -770,12 +792,12 @@ function verificarCBOS(r, subC, subF, tot) {
   Object.keys(r.comb).forEach(function (f) {
     var P = r.comb[f], s = [somaP(P, 0), somaP(P, 1)], esp = subC[f.toUpperCase()], F = f.toUpperCase();
     if (!esp) v.push({nivel: "aviso", msg: "Combustível " + F + ": sem subtotal no relatório para conferir."});
-    else if (s[0] !== esp[0] || Math.abs(s[1] - esp[1]) > 5) v.push({nivel: "erro", msg: "Combustível " + F + ": produtos não dão o subtotal (" + tmsFmt(esp[0]) + " L / " + tmsFmt(esp[1]) + " €)."});
+    else if (Math.abs(s[0] - esp[0]) > 5 || Math.abs(s[1] - esp[1]) > 5) v.push({nivel: "erro", msg: "Combustível " + F + ": produtos não dão o subtotal (" + tmsFmt(esp[0]) + " L / " + tmsFmt(esp[1]) + " €)."});
     else v.push({nivel: "ok", msg: "Combustível " + F + ": produtos = subtotal (" + tmsFmt(s[0]) + " L · " + tmsFmt(s[1]) + " €)."});
   });
   if (tot.comb) {
     var s = [0, 0]; Object.keys(r.comb).forEach(function (f) { s[0] += somaP(r.comb[f], 0); s[1] += somaP(r.comb[f], 1); });
-    v.push(s[0] === tot.comb[0] && Math.abs(s[1] - tot.comb[1]) <= 5 ? {nivel: "ok", msg: "Combustível: total " + tmsFmt(s[0]) + " L · " + tmsFmt(s[1]) + " € sem IVA."} : {nivel: "erro", msg: "Combustível: a soma não dá o total do relatório."});
+    v.push(Math.abs(s[0] - tot.comb[0]) <= 5 && Math.abs(s[1] - tot.comb[1]) <= 5 ? {nivel: "ok", msg: "Combustível: total " + tmsFmt(s[0]) + " L · " + tmsFmt(s[1]) + " € sem IVA."} : {nivel: "erro", msg: "Combustível: a soma não dá o total do relatório."});
   }
   Object.keys(subF).forEach(function (fm) {
     var esp = subF[fm], L = r.loja.filter(function (l) { return l[0] === fm.toUpperCase(); }), s = [L.reduce(function (a, l) { return a + l[2]; }, 0), L.reduce(function (a, l) { return a + l[3]; }, 0)];
