@@ -28,8 +28,9 @@ function mesHoje() { var d = new Date(); return d.getFullYear() + "-" + String(d
 function falhouComb(e) { var m = falhou(e); return /msb_comb|msb_ense|does not exist|schema cache/.test(m) ? "As tabelas dos combustíveis ainda não estão ativas no servidor." : m; }
 
 /* ---------------- Entrada de combustível ---------------- */
+var ED = null;   // guia a ser editada (null = guia nova)
 async function carregarEntradasComb() {
-  var box = $("#combCorpo"), M = $("#cMes").value || mesHoje(); $("#cMes").value = M;
+  ED = null; var box = $("#combCorpo"), M = $("#cMes").value || mesHoje(); $("#cMes").value = M;
   box.innerHTML = "<div class='mut'>A carregar…</div>";
   try {
     var c = await cfgENSE(), fim = addMes(M, 1) + "-01";
@@ -39,7 +40,7 @@ async function carregarEntradasComb() {
     var totKg = {}; L.forEach(function (x) { tot[x.produto] = (tot[x.produto] || 0) + x.qtd; if (x.kg != null) totKg[x.produto] = (totKg[x.produto] || 0) + x.kg; });
     /* uma guia de remessa = uma entrada com todos os produtos descarregados (cada produto fica numa linha da tabela, com a mesma guia) */
     var liq = c.produtos.filter(function (p) { return ENSE_PROD[p].u === "L"; });
-    var h = ADMIN ? "<div class='card'><div class='cb' style='display:grid;gap:10px'><h3 style='margin:0'>⛽ Registar guia de remessa</h3>" +
+    var h = ADMIN ? "<div class='card'><div class='cb' style='display:grid;gap:10px'><h3 style='margin:0' id='ceTit'>⛽ Registar guia de remessa</h3>" +
       "<div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px'>" +
       "<label>Data<input type='date' id='ceDia' value='" + (M === mesHoje() ? hojeISO(0) : M + "-01") + "'></label>" +
       "<label>Nº da guia de remessa<input id='ceGuia' maxlength='40' placeholder='ex.: GR 123456'></label>" +
@@ -47,7 +48,7 @@ async function carregarEntradasComb() {
       "<div class='sc'><table><thead><tr><th class='l'>Produto</th><th>Quantidade recebida</th><th class='l'>Unidade</th></tr></thead><tbody>" +
       liq.map(function (p) { return "<tr><td class='l'>" + esc(ENSE_PROD[p].n) + "</td><td class='n'><input class='enseIn ceQ' data-p='" + p + "' inputmode='decimal' placeholder='0'>" + (ENSE_PROD[p].kg ? "<br><small class='mut ceConv' data-p='" + p + "'></small>" : "") + "</td><td class='l'>" + (ENSE_PROD[p].kg ? "kg" : "litros") + "</td></tr>"; }).join("") +
       "</tbody></table></div><div class='mut' style='font-size:13px'>Preencha só os produtos desta guia; os outros ficam em branco." + (liq.some(function (p) { return ENSE_PROD[p].kg; }) ? " GPL: escreva os kg; 1 kg = " + String(c.gpl_kg_litros).replace(".", ",") + " L." : "") + "</div>" +
-      "<div class='bar'><button class='btn p' id='ceGravar'>✔ Registar guia</button><span id='ceMsg'></span></div></div></div>" +
+      "<div class='bar'><button class='btn p' id='ceGravar'>✔ Registar guia</button><button class='btn' id='ceCancelar' hidden>Cancelar edição</button><span id='ceMsg'></span></div></div></div>" +
       "<div class='card'><div class='cb' style='display:grid;gap:8px'><h3 style='margin:0'>📥 Carregar do sistema Repsol</h3><p class='mut' style='margin:0;font-size:13px'>Ficheiro Excel «Histórico de movimentos de carburante» (receções). A app mostra as guias antes de gravar e não repete as que já estão registadas.</p>" +
       "<div class='bar'><button class='btn' id='ceHist'>📥 Carregar histórico de movimentos (Excel)</button><input type='file' id='fCeHist' accept='.xlsx,.xls' hidden></div><div id='ceHistMsg'></div></div></div>" : "";
     h += "<div class='card'><div class='cb'><h3 style='margin:0 0 8px'>Totais recebidos · " + esc(nomeMes(M)) + "</h3><div class='sc'><table><thead><tr><th class='l'>Produto</th><th>Recebido</th><th class='l'>Unidade</th></tr></thead><tbody>" +
@@ -57,7 +58,7 @@ async function carregarEntradasComb() {
     h += "<div class='card'><div class='cb'><h3 style='margin:0 0 8px'>Guias registadas (" + G.length + ")</h3>" + (G.length ? "<div class='sc'><table><thead><tr><th>Data</th><th class='l'>Guia</th><th class='l'>Produtos</th><th>Total</th><th class='l'>Nota</th>" + (ADMIN ? "<th></th>" : "") + "</tr></thead><tbody>" +
       G.map(function (g) { var t = g.it.reduce(function (a, x) { return a + x.qtd; }, 0);
         return "<tr><td>" + dmy(g.dia) + "</td><td class='l'><b>" + (esc(g.guia) || "<span class='mut'>sem nº</span>") + "</b></td><td class='l'>" + g.it.map(function (x) { return esc((ENSE_PROD[x.produto] || {n: x.produto}).n) + ": <b>" + q100(x.qtd) + " L</b>" + (x.kg != null ? " <small class='mut'>(" + q100(x.kg) + " kg)</small>" : ""); }).join("<br>") + "</td><td class='n'><b>" + q100(t) + " L</b></td><td class='l'>" + esc(g.nota || "") + "</td>" +
-          (ADMIN ? "<td><button class='btn' data-apagar='" + g.it.map(function (x) { return x.id; }).join(",") + "' title='Apagar esta guia'>🗑</button></td>" : "") + "</tr>"; }).join("") + "</tbody></table></div>" : "<p class='mut' style='margin:0'>Ainda não há guias neste mês.</p>") + "</div></div>";
+          (ADMIN ? "<td style='white-space:nowrap'><button class='btn' data-editar='" + G.indexOf(g) + "' title='Editar esta guia'>✏️</button> <button class='btn' data-apagar='" + g.it.map(function (x) { return x.id; }).join(",") + "' title='Apagar esta guia'>🗑</button></td>" : "") + "</tr>"; }).join("") + "</tbody></table></div>" : "<p class='mut' style='margin:0'>Ainda não há guias neste mês.</p>") + "</div></div>";
     box.innerHTML = h;
     if (ADMIN) {
       $$("#combCorpo .ceQ").forEach(function (el) { el.oninput = function () { var p = el.dataset.p, x = $("#combCorpo .ceConv[data-p='" + p + "']"), v = num(el.value);
@@ -73,11 +74,28 @@ async function carregarEntradasComb() {
         if (mau) { msg.innerHTML = "<span class='bad'>Quantidade inválida em " + esc(mau) + ".</span>"; return; }
         if (!linhas.length) { msg.innerHTML = "<span class='bad'>Escreva a quantidade de pelo menos um produto.</span>"; return; }
         b.disabled = true;
-        try { var g = await sb.from("msb_comb_entradas").insert(linhas); if (g.error) throw g.error;
+        try {
+          if (ED) {   /* editar a guia: atualiza as linhas que ficam, acrescenta as novas e apaga as que ficaram em branco (tudo fica no histórico) */
+            var porP = {}; ED.it.forEach(function (x) { porP[x.produto] = x; });
+            for (var i = 0; i < linhas.length; i++) { var l = linhas[i], ant = porP[l.produto];
+              if (ant) { var u = await sb.from("msb_comb_entradas").update({dia: l.dia, qtd: l.qtd, kg: l.kg, guia: l.guia, nota: l.nota}).eq("id", ant.id); if (u.error) throw u.error; delete porP[l.produto]; }
+              else { var n = await sb.from("msb_comb_entradas").insert(l); if (n.error) throw n.error; } }
+            var sobra = Object.keys(porP).map(function (k) { return porP[k].id; });
+            if (sobra.length) { var d = await sb.from("msb_comb_entradas").delete().in("id", sobra); if (d.error) throw d.error; }
+          } else { var g = await sb.from("msb_comb_entradas").insert(linhas); if (g.error) throw g.error; }
           if (dia.slice(0, 7) !== $("#cMes").value) $("#cMes").value = dia.slice(0, 7);
-          await carregarEntradasComb(); $("#ceMsg").innerHTML = "<span class='ok'>✔ Guia " + esc(guia || "sem nº") + " registada: " + linhas.length + " produto(s).</span>"; }
+          var era = ED; ED = null;
+          await carregarEntradasComb(); $("#ceMsg").innerHTML = "<span class='ok'>✔ Guia " + esc(guia || "sem nº") + (era ? " alterada" : " registada") + ": " + linhas.length + " produto(s).</span>"; }
         catch (e) { b.disabled = false; msg.innerHTML = "<span class='bad'>✖ " + esc(falhouComb(e)) + "</span>"; }
       };
+      $$("#combCorpo [data-editar]").forEach(function (b) { b.onclick = function () {
+        var g = G[+b.dataset.editar]; ED = g;
+        $("#ceDia").value = g.dia; $("#ceGuia").value = g.guia || ""; $("#ceNota").value = g.nota || "";
+        $$("#combCorpo .ceQ").forEach(function (el) { var x = g.it.find(function (y) { return y.produto === el.dataset.p; }); var v = x ? (ENSE_PROD[x.produto].kg && x.kg != null ? x.kg : x.qtd) : null; el.value = v == null ? "" : String(v / 100).replace(".", ","); if (el.oninput) el.oninput(); });
+        $("#ceTit").textContent = "✏️ Editar guia " + (g.guia || "sem nº") + " de " + dmy(g.dia);
+        $("#ceGravar").textContent = "✔ Guardar alterações"; $("#ceCancelar").hidden = false; $("#ceMsg").innerHTML = "";
+        $("#ceTit").scrollIntoView({behavior: "smooth", block: "center"}); }; });
+      $("#ceCancelar").onclick = function () { ED = null; carregarEntradasComb(); };
       $$("#combCorpo [data-apagar]").forEach(function (b) { b.onclick = async function () {
         if (!b.dataset.conf) { b.dataset.conf = 1; b.textContent = "Apagar?"; return; }
         b.disabled = true; var g = await sb.from("msb_comb_entradas").delete().in("id", b.dataset.apagar.split(",").map(Number));
