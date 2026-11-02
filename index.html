@@ -332,10 +332,19 @@ async function irDia(d){DIA=d;$("#dDia").value=d;$("#st").textContent="";desenha
     var s=await sb.from("msb_saidas").select("*").eq("estacao",EST).eq("dia",d).order("criado");if(s.error)throw s.error;
     if(d!==DIA)return;LINHAS={};(r.data||[]).forEach(function(x){LINHAS[x.turno]=x});SAIDAS=s.data||[];desenharDia(true);if(window.fechosDoDia)fechosDoDia()}
   catch(e){status(false,"⚠ "+falhou(e))}}
-function desenharDia(pronto){var h="";
+/* nomes dos funcionários da estação aberta, para escolher no registo: contas da equipa desta estação (primeiro nome, como nos turnos) + nomes usados nos turnos dos últimos 120 dias */
+var FUNC_EST={};
+async function carregarFuncionarios(){var e=EST;if(FUNC_EST[e])return mostrarFuncionarios();
+  try{var n={},desde=addDia(iso(new Date()),-120);
+    var pr=await sb.from("profiles").select("display_name,company_id,other_companies");(pr.data||[]).forEach(function(x){var nm=(x.display_name||"").trim().split(/\s+/)[0];if(nm&&!/^administrador$/i.test(nm)&&(x.company_id===e||(x.other_companies||[]).indexOf(e)>=0))n[nm]=1});
+    var tr=await sb.from("msb_turnos").select("func").eq("estacao",e).gte("dia",desde);(tr.data||[]).forEach(function(x){var f=(x.func||"").trim();if(f)n[f]=1});
+    FUNC_EST[e]=Object.keys(n).sort(function(a,b){return a.localeCompare(b,"pt")});}catch(err){FUNC_EST[e]=[]}
+  if(e===EST)mostrarFuncionarios()}
+function mostrarFuncionarios(){var l=$("#lFunc");if(!l){l=document.createElement("datalist");l.id="lFunc";document.body.appendChild(l)}l.innerHTML=(FUNC_EST[EST]||[]).map(function(x){return "<option value='"+esc(x)+"'>"}).join("")}
+function desenharDia(pronto){var h="";if(pronto)carregarFuncionarios();
   ["t1","t2"].forEach(function(t){var r=LINHAS[t]||{},txt=r.txt||{};
     h+="<div class='card'><div class='ch "+t+"'><span>"+(t==="t1"?"☀️ Turno 1":"🌙 Turno 2")+"</span><span class='dif' id='df-"+t+"'>—</span></div><div class='cb'><div class='fl'>";
-    h+="<label class='w'>👤 Funcionário<input data-t='"+t+"' data-k='func' value='"+esc(r.func||"")+"' placeholder='Nome'"+(ADMIN&&pronto?"":" disabled")+"></label>";
+    h+="<label class='w'>👤 Funcionário<input data-t='"+t+"' data-k='func' list='lFunc' autocomplete='off' value='"+esc(r.func||"")+"' placeholder='Escolher ou escrever o nome'"+(ADMIN&&pronto?"":" disabled")+"></label>";
     CAMPOS.forEach(function(c){var v=r[c[1]];h+="<label>"+c[2]+"<input inputmode='decimal' data-t='"+t+"' data-k='"+c[0]+"' value='"+(v==null?"":fmt(v))+"' placeholder='0,00'"+(txt[c[0]]&&/[-+]/.test(String(txt[c[0]]).slice(1))?" title='Escrito como "+esc(txt[c[0]])+"'":"")+(ADMIN&&pronto?"":" disabled")+"></label>"});
     h+="</div><div class='sai' id='sai-"+t+"'></div><div class='res'><span>Recebido <b id='rc-"+t+"'>—</b></span><span>Diferença <b id='dd-"+t+"'>—</b></span></div></div></div>"});
   $("#turnos").innerHTML=h;
