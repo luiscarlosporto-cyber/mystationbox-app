@@ -11,7 +11,7 @@ var AREAS = [
   {id: "stk", n: "📦 Stock", p: [["contar", "Contar"], ["ler", "Ler código"], ["stock", "Stock atual"], ["inv", "Inventário"], ["mov", "Movimentos"]]},
   {id: "conf", n: "🏦 Conferências", adm: 1, p: [["rep", "Repsol e Multibanco"], ["tms", "Fecho mensal TMS"]]},
   {id: "rel", n: "📊 Relatórios", adm: 1, p: [["luc", "Lucro"], ["mes", "Mês"], ["fun", "Por funcionário"], ["ense", "ENSE mensal"]]},
-  {id: "ges", n: "⚙️ Gestão", adm: 1, p: [["mrg", "Margens e custos"], ["eq", "Equipa e acessos"], ["prod", "Produtos e códigos"], ["cfg", "Configuração do stock"]]}
+  {id: "ges", n: "⚙️ Gestão", adm: 1, p: [["mrg", "Margens e custos"], ["kms", "Mapa de kms do gerente"], ["eq", "Equipa e acessos"], ["prod", "Produtos e códigos"], ["cfg", "Configuração do stock"]]}
 ];
 /* páginas do módulo de stock: separador e cartões (pelo título, ou "#id" do cartão) a mostrar ou esconder.
    O cartão da encomenda muda de título ("Encomenda LOGISTA · Penafiel · por validar"), por isso vai pelo id. */
@@ -25,7 +25,7 @@ var NEXP = {
   prod: {tab: "settings", only: ["Gestão de produtos"]},
   cfg: {tab: "settings", only: ["Configuração da base de dados central", "Importante"]}
 };
-var VISTA_DA = {ini: "ini", reg: "reg", sai: "sai", his: "his", ven: "tab", comh: "tab", mov: "tab", rep: "rep", tms: "tms", mes: "mes", fun: "fun", eq: "ges", luc: "luc", mrg: "mrg", comb: "comb", ense: "ense", va: "va"};
+var VISTA_DA = {ini: "ini", reg: "reg", sai: "sai", his: "his", ven: "tab", comh: "tab", mov: "tab", rep: "rep", tms: "tms", mes: "mes", fun: "fun", eq: "ges", luc: "luc", mrg: "mrg", comb: "comb", ense: "ense", va: "va", kms: "kms"};
 var PAGINA = "ini";
 function areasVisiveis() { return AREAS.filter(function (a) { return ADMIN || !a.adm; }); }
 function areaDe(pg) { return AREAS.find(function (a) { return a.p.some(function (x) { return x[0] === pg; }); }); }
@@ -68,6 +68,7 @@ window.depoisVista = function (v) {
   if (v === "comb") carregarEntradasComb();
   if (v === "ense") carregarENSE();
   if (v === "va") carregarVendasArtigos();
+  if (v === "kms") carregarKms();
 };
 
 /* ---------------- módulo de stock embutido ---------------- */

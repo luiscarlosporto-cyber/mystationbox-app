@@ -210,6 +210,11 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
     <div class="bar"><button class="btn" id="cAnt">‹</button><input type="month" id="cMes"><button class="btn" id="cSeg">›</button></div>
     <div id="combCorpo" style="display:grid;gap:12px"></div>
   </div>
+  <!-- GESTÃO: MAPA DE KMS DO GERENTE -->
+  <div id="v-kms" class="v" hidden>
+    <div class="bar"><button class="btn" id="kAnt">‹</button><input type="month" id="kMes"><button class="btn" id="kSeg">›</button></div>
+    <div id="kmsCorpo" style="display:grid;gap:12px"></div>
+  </div>
   <!-- RELATÓRIOS: ENSE MENSAL -->
   <div id="v-ense" class="v" hidden>
     <div class="bar"><button class="btn" id="eAnt">‹</button><input type="month" id="eMes"><button class="btn" id="eSeg">›</button><button class="btn p" id="bEnsePdf">📄 Gerar PDF para a ENSE</button></div>
@@ -462,6 +467,8 @@ entrar().catch(function(e){$("#vLogin").hidden=false;$("#lErro").textContent=fal
 <script src="vendas_excel.js"></script>
 <script src="combustivel.js"></script>
 <script src="transferencias.js"></script>
+<script src="mbpdf.js"></script>
+<script src="kms.js"></script>
 <script src="areas.js"></script>
 <script>$$("#tabSub button").forEach(function(b){b.onclick=function(){tabaco(b.dataset.t)}});$("#eqBtnNovo").onclick=formNovo;</script>
 </body>
