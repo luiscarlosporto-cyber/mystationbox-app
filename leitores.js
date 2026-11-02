@@ -313,9 +313,13 @@ function desenharRepsol(M, docs, ligados, turnos, checks) {
   /* verificações dos documentos deste mês */
   var vis = checks.filter(function (c) { if (!liqs.length && !outros.length) return false; var m = c.grupo.match(/\d{6,}/g); if (m) return m.some(function (n) { return nums[n]; }); if (/fecho \d+ \(/.test(c.grupo)) return !!c.ref && c.ref.slice(0, 7) === M; return true; });
   var g = {}, ord = []; vis.forEach(function (c) { if (!g[c.grupo]) { g[c.grupo] = []; ord.push(c.grupo); } g[c.grupo].push(c); });
+  /* data de emissão do documento ao lado do número, e grupos por ordem de data */
+  var emis = {}; docs.forEach(function (d) { if (d.emissao) emis[d.numero] = d.emissao; });
+  var dataGrupo = function (k) { var m = k.match(/\d{6,}/); return m && emis[m[0]] || ""; };
+  ord.sort(function (a, b) { var x = dataGrupo(a) || "9", y = dataGrupo(b) || "9"; return x < y ? -1 : x > y ? 1 : 0; });
   var ne = vis.filter(function (c) { return c.nivel === "erro"; }).length;
   $("#repChecks").innerHTML = vis.length ? "<h2>🔎 Verificações · " + esc(nm) + " <span class='b " + (ne ? "bad" : "ok") + "'>" + (ne ? ne + " erro(s)" : "tudo certo") + "</span></h2>" + ord.map(function (k) { var l = g[k], bad = l.some(function (c) { return c.nivel === "erro"; }), w = l.some(function (c) { return c.nivel === "aviso"; });
-    return "<details class='grp'" + (bad || w ? " open" : "") + "><summary>" + (bad ? "❌ " : w ? "⚠️ " : "✅ ") + esc(k) + " <small class='mut' style='font-weight:400'>(" + l.length + ")</small></summary>" + l.map(linhaVerif).join("") + "</details>"; }).join("") : "";
+    return "<details class='grp'" + (bad || w ? " open" : "") + "><summary>" + (bad ? "❌ " : w ? "⚠️ " : "✅ ") + esc(k) + (dataGrupo(k) ? " <span style='font-weight:400'>· " + dmy(dataGrupo(k)) + "</span>" : "") + " <small class='mut' style='font-weight:400'>(" + l.length + ")</small></summary>" + l.map(linhaVerif).join("") + "</details>"; }).join("") : "";
   $$("#repDocs [data-pdf]").forEach(function (a) { a.onclick = function (ev) { ev.preventDefault(); abrirOriginal(a.dataset.pdf); }; });
   var so = $("#mbSoNao"); if (so) so.onchange = function () { $$("#mbConf tbody tr").forEach(function (tr) { tr.hidden = so.checked && tr.dataset.ok === "1"; }); };
   $$("#repDocs tr[data-ir]").forEach(function (tr) { tr.style.cursor = "pointer"; tr.onclick = function () { vista("reg"); irDia(tr.dataset.ir); }; });
