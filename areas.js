@@ -219,6 +219,8 @@ function escolherVendas(f) {
 async function carregarFicheiros(fs) {
   var g = {pdf: [], cbos: [], folha: [], foto: [], xls: [], tms: [], vendas: [], csv: [], "": []};
   for (var i = 0; i < fs.length; i++) g[await tipoFicheiro(fs[i])].push(fs[i]);
+  /* Excel de créditos MB/Solred por transferência: reconhece-se pelo cabeçalho (N.º doc. · Mont. em MI) */
+  var trf = []; for (var k = g.vendas.length - 1; k >= 0; k--) if (await ehTransferencias(g.vendas[k])) trf.push(g.vendas.splice(k, 1)[0]);
   if (g[""].length || g.csv.length) ir("reg");      // a mensagem aparece na barra do Registo
   if (g[""].length) status(false, "⚠ Não reconheço: " + g[""].map(function (f) { return f.name; }).join(", ") + ". Ficheiros aceites: folha de turno (.xls), fotografia do talão, PDF da Repsol, fecho mensal TMS (.csv), relatório de vendas de tabaco (Excel .xlsx), relatório «Turno por formas de cobrança» (PDF feito com «Guardar como PDF»).");
   if (g.csv.length) status(false, "⚠ " + g.csv.map(function (f) { return f.name; }).join(", ") + ": o relatório de vendas tem de ser em Excel (.xlsx), porque o CSV não diz de que loja é.");
@@ -228,6 +230,7 @@ async function carregarFicheiros(fs) {
   if (g.folha.length) await importarFolhaFecho(g.folha[0]);
   if (g.xls.length) { ir("reg"); $("#fXls").onchange.call({files: [g.xls[0]], value: ""}); }
   if (g.foto.length) { ir("reg"); $("#fFecho").onchange.call({files: [g.foto[0]], value: ""}); }
+  if (trf.length) await importarTransferencias(trf[0]);
   if (g.vendas.length) escolherVendas(g.vendas[0]);
   var varios = g.xls.length + g.foto.length + g.vendas.length > (g.xls.length ? 1 : 0) + (g.foto.length ? 1 : 0) + (g.vendas.length ? 1 : 0);
   if (varios) status(false, "⚠ Só se lê uma folha de turno, um talão e um relatório de vendas de cada vez: carregue os restantes depois.");

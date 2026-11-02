@@ -266,17 +266,24 @@ async function carregarRepsol() {
   try {
     var rd = await sb.from("msb_docs").select("chave,tipo,numero,emissao,dados,pdf").eq("estacao", EST); if (rd.error) throw rd.error;
     var rc = await sb.from("msb_creditos_mb").select("*").eq("estacao", EST); if (rc.error) throw rc.error;
+    var rx = await sb.from("msb_transferencias").select("*").eq("estacao", EST); if (rx.error) throw rx.error;
     var docs = rd.data || [], cred = rc.data || [];
-    var datas = cred.map(function (c) { return c.data; }).concat(docs.map(function (d) { return d.emissao; }).filter(Boolean)).concat([M + "-01", addMes(M, 1) + "-01"]).sort();
+    var trs = (rx.data || []).map(function (t) { return {chave: "TR|" + t.chave, doc: t.chave, numdoc: t.chave, data: t.dia, valor_c: t.valor_c, pos: "", fecho: "", transf: true, ttipo: t.tipo}; });
+    var datas = cred.map(function (c) { return c.data; }).concat(trs.map(function (t) { return addDia(t.data, -11); })).concat(docs.map(function (d) { return d.emissao; }).filter(Boolean)).concat([M + "-01", addMes(M, 1) + "-01"]).sort();
     var ini = addDia(datas[0], -2), fim = addDia(datas[datas.length - 1], 2);
     var rt = await sb.from("msb_turnos").select("dia,turno,func,mb_c,solred_c,lit_cl").eq("estacao", EST).gte("dia", ini).lte("dia", fim); if (rt.error) throw rt.error;
     var turnos = rt.data || [], dias = {};
     turnos.forEach(function (t) { var o = (dias[t.dia] = dias[t.dia] || {t1: {}, t2: {}})[t.turno]; if (t.lit_cl != null) o.lit = (t.lit_cl / 100).toFixed(2).replace(".", ","); if (t.solred_c != null) o.solred = (t.solred_c / 100).toFixed(2).replace(".", ","); });
-    var ligados = ligarCreditos(cred, turnos);
-    desenharRepsol(M, docs, ligados, turnos, MOTOR.verificar(docs.map(function (d) { return d.dados; }), {pos: posEst() || "36613", dias: dias}));
+    var ligados = ligarCreditos(cred, turnos), usados = {};
+    ligados.forEach(function (l) { if (l.t) usados[l.t.dia + l.t.turno] = 1; });
+    /* créditos pagos por transferência (transferencias.js): MB entram na conferência como os da liquidação */
+    var ligMB = ligarTransf(trs.filter(function (t) { return t.ttipo === "MB"; }), turnos, "mb_c", usados);
+    var ligSol = ligarTransf(trs.filter(function (t) { return t.ttipo === "SOLRED"; }), turnos, "solred_c", {});
+    ligados = ligados.concat(ligMB);
+    desenharRepsol(M, docs, ligados, turnos, MOTOR.verificar(docs.map(function (d) { return d.dados; }), {pos: posEst() || "36613", dias: dias}), ligMB, ligSol);
   } catch (e) { docsBox.innerHTML = "<div class='bad'>" + esc(falhou(e)) + "</div>"; }
 }
-function desenharRepsol(M, docs, ligados, turnos, checks) {
+function desenharRepsol(M, docs, ligados, turnos, checks, ligMB, ligSol) {
   var liqs = docs.filter(function (d) { return d.tipo === "LIQ" && (d.emissao || "").slice(0, 7) === M; }).sort(function (a, b) { return a.emissao < b.emissao ? 1 : -1; });
   var nums = {}; liqs.forEach(function (d) { nums[d.numero] = 1; });
   var outros = docs.filter(function (d) { return d.tipo !== "LIQ" && ((d.emissao || "").slice(0, 7) === M || nums[d.dados.liq]); });
@@ -292,10 +299,10 @@ function desenharRepsol(M, docs, ligados, turnos, checks) {
   var nm = new Date(M + "-15").toLocaleDateString("pt-PT", {month: "long", year: "numeric"});
   $("#mbTotem").innerHTML = "<div class='t'>Multibanco · " + esc(nm) + "</div>" + [["Registado", reg], ["Creditado ✔", creditado], ["Em falta", falta.reduce(function (s, x) { return s + x.t.mb_c; }, 0)], ["Ainda não liquidado", pend.reduce(function (s, t) { return s + t.mb_c; }, 0)], ["Sem verificação", semv.reduce(function (s, t) { return s + t.mb_c; }, 0)]]
     .map(function (x) { return "<div><div class='k'>" + x[0] + "</div><div class='v'>" + fmt(x[1]) + "<small>€</small></div></div>"; }).join("");
-  var h = conferenciaMB(nm, tm, ligTurno, primeira, ultima);
+  var h = conferenciaMB(nm, tm, ligTurno, primeira, ultima) + seccaoTransf(M, nm, ligMB || [], ligSol || []);
   if (falta.length) h += "<div class='liq'><h3>⚠️ MB por creditar (" + falta.length + ")<span class='mut' style='font-weight:400;font-size:13px'>turnos com MB sem crédito igual nos documentos carregados</span></h3><div class='sc'><table><thead><tr><th>Dia</th><th class='l'>Turno</th><th>MB registado</th><th class='l'>Crédito mais próximo</th></tr></thead><tbody>" +
     falta.map(function (x) { return "<tr><td>" + dmy(x.t.dia) + "</td><td class='l'>" + (x.t.turno === "t1" ? "☀️ T1" : "🌙 T2") + " " + esc(x.t.func || "") + "</td><td class='n'>" + fmt(x.t.mb_c) + "</td><td class='l'>" + (x.l ? "fecho " + esc(x.l.c.fecho) + " · " + fmt(x.l.c.valor_c) + " <span class='b wn'>dif. " + fmt(x.l.c.valor_c - x.t.mb_c) + "</span>" : "<span class='mut'>nenhum</span>") + "</td></tr>"; }).join("") + "</tbody></table></div></div>";
-  if (!liqs.length && !outros.length) h += "<div class='vazio'>Sem documentos da Repsol emitidos em " + esc(nm) + "." + (ADMIN ? " Carregue os PDF com o botão laranja (pode escolher vários)." : "") + "</div>";
+  if (!liqs.length && !outros.length && !h) h += "<div class='vazio'>Sem documentos da Repsol emitidos em " + esc(nm) + "." + (ADMIN ? " Carregue os PDF com o botão laranja (pode escolher vários)." : "") + "</div>";
   liqs.forEach(function (L) {
     var d = L.dados, mine = ligados.filter(function (l) { return l.c.doc === L.numero; });
     h += "<div class='liq'><h3><span>📄 Liquidação " + esc(L.numero) + "</span><span class='mut' style='font-weight:400'>emitida " + dmy(L.emissao) + (d.venc ? " · vence " + dmy(d.venc) : "") + "</span></h3>";
@@ -322,7 +329,7 @@ function desenharRepsol(M, docs, ligados, turnos, checks) {
     return "<details class='grp'" + (bad || w ? " open" : "") + "><summary>" + (bad ? "❌ " : w ? "⚠️ " : "✅ ") + esc(k) + (dataGrupo(k) ? " <span style='font-weight:400'>· " + dmy(dataGrupo(k)) + "</span>" : "") + " <small class='mut' style='font-weight:400'>(" + l.length + ")</small></summary>" + l.map(linhaVerif).join("") + "</details>"; }).join("") : "";
   $$("#repDocs [data-pdf]").forEach(function (a) { a.onclick = function (ev) { ev.preventDefault(); abrirOriginal(a.dataset.pdf); }; });
   var so = $("#mbSoNao"); if (so) so.onchange = function () { $$("#mbConf tbody tr").forEach(function (tr) { tr.hidden = so.checked && tr.dataset.ok === "1"; }); };
-  $$("#repDocs tr[data-ir]").forEach(function (tr) { tr.style.cursor = "pointer"; tr.onclick = function () { vista("reg"); irDia(tr.dataset.ir); }; });
+  $$("#repDocs tr[data-ir], #trConf tr[data-ir]").forEach(function (tr) { tr.style.cursor = "pointer"; tr.onclick = function () { vista("reg"); irDia(tr.dataset.ir); }; });
 }
 /* Conferência turno a turno: MB registado na caixa × MB creditado nos documentos de liquidação.
    Verde = creditado com o mesmo valor; laranja = ainda não creditado (em falta, por liquidar, com diferença ou sem verificação). */
@@ -336,7 +343,7 @@ function conferenciaMB(nm, tm, ligTurno, primeira, ultima) {
     else if (t.dia <= addDia(ultima, -1)) est = "✖ em falta nos documentos";
     else est = "⏳ ainda não liquidado";
     T.r += t.mb_c; if (cred != null) { T.c += cred; T.d += cred - t.mb_c; } if (ok) T.n++; else T.nc += t.mb_c;
-    return "<tr class='" + (ok ? "lin-ok" : "lin-wn") + "' data-ir='" + t.dia + "' data-ok='" + (ok ? 1 : 0) + "'><td>" + dmy(t.dia).slice(0, 5) + "</td><td class='l'>" + (t.turno === "t1" ? "☀️ T1" : "🌙 T2") + " " + esc(t.func || "") + "</td><td class='n'>" + fmt(t.mb_c) + "</td><td class='n'>" + (cred == null ? "—" : fmt(cred)) + "</td><td class='l'>" + (l && l.c ? "Liq. " + esc(l.c.doc) + " <small class='mut'>fecho #" + esc(l.c.fecho) + " · " + dmy(l.c.data).slice(0, 5) + "</small>" : "—") + "</td><td class='n'>" + (cred == null ? "—" : sinal(cred - t.mb_c)) + "</td><td class='l'><b>" + est + "</b></td></tr>";
+    return "<tr class='" + (ok ? "lin-ok" : "lin-wn") + "' data-ir='" + t.dia + "' data-ok='" + (ok ? 1 : 0) + "'><td>" + dmy(t.dia).slice(0, 5) + "</td><td class='l'>" + (t.turno === "t1" ? "☀️ T1" : "🌙 T2") + " " + esc(t.func || "") + "</td><td class='n'>" + fmt(t.mb_c) + "</td><td class='n'>" + (cred == null ? "—" : fmt(cred)) + "</td><td class='l'>" + (l && l.c ? (l.c.transf ? "🏦 Transf. " + esc(l.c.doc) + " <small class='mut'>" + dmy(l.c.data).slice(0, 5) + "</small>" : "Liq. " + esc(l.c.doc) + " <small class='mut'>fecho #" + esc(l.c.fecho) + " · " + dmy(l.c.data).slice(0, 5) + "</small>") : "—") + "</td><td class='n'>" + (cred == null ? "—" : sinal(cred - t.mb_c)) + "</td><td class='l'><b>" + est + "</b></td></tr>";
   });
   return "<div class='liq'><h3>💳 MB registado × creditado · " + esc(nm) + "<span class='mut' style='font-weight:400;font-size:13px'>" + T.n + " de " + tm.length + " turnos creditados · por creditar " + fmt(T.nc) + " €</span></h3>" +
     "<label class='mut' style='font-size:13px;display:flex;gap:6px;align-items:center;margin:0 0 6px'><input type='checkbox' id='mbSoNao'> Mostrar só os não creditados</label>" +
