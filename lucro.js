@@ -49,22 +49,25 @@ async function carregarMargens() {
       linhas.map(function (l) { var k = chaveLoja(l[0], l[1]); return "<tr><td class='l'>" + esc(l[0]) + (l[1] ? " · <span class='mut'>" + esc(l[1]) + "</span>" : "") + "</td><td class='n'><input class='mg' data-k='" + esc(k) + "' data-u='pct' inputmode='decimal' value='" + num4(M[k]) + "' style='width:80px;text-align:right'> %</td></tr>"; }).join("") +
       "</tbody></table></div></div>";
     h += "<div class='card' style='padding:14px;display:grid;gap:10px'><h2 style='margin:0'>🧾 Custos fixos por mês</h2>" +
-      "<p class='mut' style='margin:0;font-size:13px'>Salários, renda, luz, água, comunicações, seguros, contabilidade… Valores aproximados chegam.</p>" +
-      "<div id='custosLista' style='display:grid;gap:6px'>" + C.map(function (c) { return linhaCusto(c.nome, c.valor_c / 100); }).join("") + "</div>" +
+      "<p class='mut' style='margin:0;font-size:13px'>Valor por mês; valores aproximados chegam. Os que deixar em branco não contam. Para outros (manutenção, combustível próprio, limpeza…), use «+ Acrescentar custo».</p>" +
+      "<div id='custosLista' style='display:grid;gap:6px'>" + CUSTOS_BASE.map(function (n) { var c = C.find(function (x) { return x.nome.toLowerCase() === n.toLowerCase(); }); return linhaCusto(n, c ? c.valor_c / 100 : null, true); }).join("") +
+        C.filter(function (c) { return !CUSTOS_BASE.some(function (n) { return n.toLowerCase() === c.nome.toLowerCase(); }); }).map(function (c) { return linhaCusto(c.nome, c.valor_c / 100); }).join("") + "</div>" +
       "<div class='bar'><button class='btn' id='custoMais'>+ Acrescentar custo</button></div></div>";
     h += "<div class='bar'><button class='btn p' id='mrgGravar'>Gravar margens e custos</button><span class='st' id='mrgSt'></span></div>";
     box.innerHTML = h;
-    $("#custoMais").onclick = function () { $("#custosLista").insertAdjacentHTML("beforeend", linhaCusto("", null)); };
+    $("#custoMais").onclick = function () { $("#custosLista").insertAdjacentHTML("beforeend", linhaCusto("", null)); var u = $$("#custosLista .cn"); u[u.length - 1].focus(); };
     $("#mrgGravar").onclick = gravarMargens;
   } catch (e) { box.innerHTML = "<div class='bad'>" + esc(falhouLucro(e)) + "</div>"; }
 }
-function linhaCusto(nome, v) { return "<div class='bar custo'><input class='cn' placeholder='Ex.: Salários' value='" + esc(nome || "") + "' style='flex:1;min-width:0'><input class='cv' inputmode='decimal' placeholder='0,00' value='" + (v == null ? "" : num4(v.toFixed(2))) + "' style='width:110px;text-align:right'> €<button class='mini' onclick='this.parentElement.remove()'>✕</button></div>"; }
+/* custos fixos sempre à vista (02/11/2026, pedido do utilizador); os que ficarem sem valor não contam. Outros acrescentam-se com "+ Acrescentar custo". */
+var CUSTOS_BASE = ["Salários", "Renda", "Luz", "Água", "Comunicações", "Seguros", "Contabilidade"];
+function linhaCusto(nome, v, base) { return "<div class='bar custo" + (base ? " base" : "") + "'><input class='cn' placeholder='Nome do custo' value='" + esc(nome || "") + "'" + (base ? " readonly tabindex='-1' style='flex:1;min-width:0;border-color:transparent;background:transparent;font-weight:600'" : " style='flex:1;min-width:0'") + "><input class='cv' inputmode='decimal' placeholder='0,00' value='" + (v == null ? "" : num4(v.toFixed(2))) + "' style='width:110px;text-align:right'> €" + (base ? "<span style='width:34px'></span>" : "<button class='mini' onclick='this.parentElement.remove()'>✕</button>") + "</div>"; }
 async function gravarMargens() {
   var st = $("#mrgSt"), b = $("#mrgGravar"); st.className = "st"; st.textContent = "";
   try {
     var up = [], del = [], erro = "";
     $$("#mrgCorpo input.mg").forEach(function (i) { var v = lerNum(i.value); if (v === null) del.push(i.dataset.k); else if (isNaN(v) || v < 0 || (i.dataset.u === "pct" && v >= 1000)) erro = "Valor inválido: " + i.value; else up.push({estacao: EST, chave: i.dataset.k, valor: v, unidade: i.dataset.u, atualizado: new Date().toISOString()}); });
-    var custos = []; $$("#custosLista .custo").forEach(function (d) { var n = d.querySelector(".cn").value.trim(), v = lerNum(d.querySelector(".cv").value); if (!n && v === null) return; if (!n || v === null || isNaN(v) || v < 0) erro = "Custo incompleto: " + (n || "sem nome"); else custos.push({estacao: EST, nome: n.slice(0, 80), valor_c: Math.round(v * 100)}); });
+    var custos = []; $$("#custosLista .custo").forEach(function (d) { var n = d.querySelector(".cn").value.trim(), v = lerNum(d.querySelector(".cv").value); if ((!n || d.classList.contains("base")) && v === null) return; if (!n || v === null || isNaN(v) || v < 0) erro = "Custo incompleto: " + (n || "sem nome"); else custos.push({estacao: EST, nome: n.slice(0, 80), valor_c: Math.round(v * 100)}); });
     if (erro) throw new Error(erro);
     b.disabled = true;
     if (up.length) { var r1 = await sb.from("msb_margens").upsert(up, {onConflict: "estacao,chave"}); if (r1.error) throw r1.error; }
