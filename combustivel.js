@@ -225,38 +225,66 @@ function carregarPdfLib() {
   pdfLibP = new Promise(function (ok, ko) { var s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"; s.onload = ok; s.onerror = function () { pdfLibP = null; ko(new Error("Não foi possível carregar o gerador de PDF (sem internet?)")); }; document.head.appendChild(s); });
   return pdfLibP;
 }
+/* PDF numa só página A4 (deitada): uma tabela com uma linha por produto e as três partes do formulário da ENSE em colunas
+   (recebidos · total de vendas em quantidade e € · cartão frotista). Combustíveis primeiro, depois garrafas de gás. */
 async function fazerPdfENSE(D, inst) {
   var P = window.PDFLib, doc = await P.PDFDocument.create(), F = await doc.embedFont(P.StandardFonts.Helvetica), B = await doc.embedFont(P.StandardFonts.HelveticaBold);
-  var mm = function (v) { return v * 72 / 25.4; }, pg = doc.addPage([mm(210), mm(297)]), y = 18, cfg = D.c;
+  var mm = function (v) { return v * 72 / 25.4; }, W = 297, H = 210, pg = doc.addPage([mm(W), mm(H)]), cfg = D.c;
+  var azul = P.rgb(0, 0.231, 0.361), lar = P.rgb(0.953, 0.424, 0.129), cinz = P.rgb(0.42, 0.45, 0.5), esc0 = P.rgb(0.1, 0.13, 0.17), claro = P.rgb(0.953, 0.957, 0.965);
+  var limpa = function (t) { return String(t).replace(/[  ]/g, " ").replace(/[^\x20-\x7E\xA0-\xFF€]/g, ""); };
+  var txt = function (s, x, y, o) { o = o || {}; var f = o.b ? B : F, t = o.t || 9, w = f.widthOfTextAtSize(limpa(s), t);
+    pg.drawText(limpa(s), {x: mm(x) - (o.dir ? w : o.mid ? w / 2 : 0), y: mm(H - y), size: t, font: f, color: o.c || esc0}); };
+  var ret = function (x, y, w, h, cor) { pg.drawRectangle({x: mm(x), y: mm(H - y - h), width: mm(w), height: mm(h), color: cor}); };
   var val = function (p, k) { return D.man[p] && D.man[p][k] != null ? D.man[p][k] : D.auto[p][k]; };
-  var txt = function (s, x, yy, o) { o = o || {}; var f = o.b ? B : F, t = o.t || 9, w = f.widthOfTextAtSize(String(s), t);
-    pg.drawText(String(s), {x: mm(x) - (o.dir ? w : 0), y: mm(297 - yy), size: t, font: f, color: o.cor || P.rgb(0.1, 0.13, 0.17)}); };
-  var partir = function (s, larg, t) { var ws = s.split(" "), out = [], l = ""; ws.forEach(function (w) { var n = l ? l + " " + w : w; if (F.widthOfTextAtSize(n, t) > mm(larg) && l) { out.push(l); l = w; } else l = n; }); if (l) out.push(l); return out; };
-  var quebra = function (h) { if (y + h > 280) { pg = doc.addPage([mm(210), mm(297)]); y = 18; } };
-  txt("Reporte mensal à ENSE", 14, y, {b: 1, t: 15}); y += 8;
-  txt("Entidade: " + (cfg.entidade || "Porto João & Nunes LDA."), 14, y, {t: 10}); y += 5;
-  txt("Instalação: " + inst, 14, y, {t: 10}); y += 5;
-  txt("Período: " + nomeMes(D.M), 14, y, {t: 10}); y += 5;
-  txt("Vendas de combustível: " + (D.ff ? "Folha de fecho turno mensal, " + dmy(D.ff.de) + " a " + dmy(D.ff.ate) : D.fonte ? "Turno por formas de cobrança mensal, " + dmy(D.fonte.de) + " a " + dmy(D.fonte.ate) : "sem relatório") + ". Cartão frotista: " + (D.fonte ? "Turno por formas de cobrança mensal (Solred)" : "sem relatório") + ". Recebidos: entradas registadas na app.", 14, y, {t: 8}); y += 4.5;
-  txt("Garrafas de gás: " + (D.va ? "vendas por artigo (Excel), " + dmy(D.va.de) + " a " + dmy(D.va.ate) + "; recebidas = vendidas." : "sem relatório de vendas por artigo."), 14, y, {t: 8}); y += 9;
-  var secao = function (titulo, cols) {
-    quebra(30);
-    pg.drawRectangle({x: mm(14), y: mm(297 - y - 2.5), width: mm(182), height: mm(7), color: P.rgb(0, 0.231, 0.361)});
-    txt(titulo, 16, y + 2, {b: 1, t: 11, cor: P.rgb(1, 1, 1)}); y += 9;
-    cfg.produtos.forEach(function (p, i) {
-      var nome = partir(ENSE_PROD[p].n, cols[0].x - 52, 9), alt = Math.max(5.4, nome.length * 3.6 + 1.8);
-      quebra(alt);
-      if (i % 2) pg.drawRectangle({x: mm(14), y: mm(297 - y - alt + 3.8), width: mm(182), height: mm(alt), color: P.rgb(0.95, 0.956, 0.965)});
-      nome.forEach(function (l, k) { txt(l, 16, y + k * 3.6); });
-      cols.forEach(function (cc) { var v = val(p, cc.k); txt(v == null ? "-" : cc.euro ? fmt(v) : q100(v), cc.x, y, {b: 1, dir: 1}); txt(cc.euro ? "(€)" : "(" + unid(p) + (ENSE_PROD[p].kg && v != null ? " = " + q100(kgENSE(D, p, cc.k)) + " kg" : "") + ")", cc.x + 2, y); });
-      y += alt;
+  var curto = {gas95ad: "Gasolina I.O. 95 com aditivação suplementar", gas98ad: "Gasolina I.O. 98 com aditivação suplementar", gasoleoad: "Gasóleo rodoviário com aditivação suplementar"};
+  /* cabeçalho */
+  ret(0, 0, W, 22, azul); ret(0, 22, W, 1.2, lar);
+  txt("Reporte mensal à ENSE", 14, 10, {b: 1, t: 16, c: P.rgb(1, 1, 1)});
+  txt(nomeMes(D.M).replace(/^./, function (c) { return c.toUpperCase(); }), 14, 17.5, {t: 10.5, c: P.rgb(1, 0.78, 0.6)});
+  txt("Entidade: " + (cfg.entidade || "Porto João & Nunes LDA."), W - 14, 10, {dir: 1, t: 10, c: P.rgb(1, 1, 1)});
+  txt("Instalação: " + inst, W - 14, 17.5, {dir: 1, t: 10, c: P.rgb(1, 1, 1)});
+  /* colunas */
+  var X = {prod: 14, un: 112, rec: 160, vq: 196, ve: 232, fr: 270}, y = 32;
+  ret(14, y - 5, W - 28, 13, claro);
+  txt("Produto", X.prod + 2, y + 2.3, {b: 1, t: 8.5, c: cinz}); txt("Unidade", X.un, y + 2.3, {b: 1, t: 8.5, c: cinz});
+  txt("Produtos recebidos", X.rec, y, {b: 1, t: 8.5, c: azul, dir: 1}); txt("quantidade", X.rec, y + 4.5, {t: 7.5, c: cinz, dir: 1});
+  txt("Total de vendas", (X.vq + X.ve) / 2 - 8, y, {b: 1, t: 8.5, c: azul, mid: 1}); txt("quantidade", X.vq, y + 4.5, {t: 7.5, c: cinz, dir: 1}); txt("€ (com IVA)", X.ve, y + 4.5, {t: 7.5, c: cinz, dir: 1});
+  txt("Vendas cartão frotista", X.fr, y, {b: 1, t: 8.5, c: azul, dir: 1}); txt("quantidade", X.fr, y + 4.5, {t: 7.5, c: cinz, dir: 1});
+  y += 13;
+  var linha = function (p, i) {
+    var gpl = ENSE_PROD[p].kg, alt = gpl ? 9 : 6.4;
+    if (i % 2) ret(14, y - 4.3, W - 28, alt, claro);
+    txt(curto[p] || ENSE_PROD[p].n, X.prod + 2, y, {t: 9});
+    txt(ENSE_PROD[p].u === "L" ? "litros" : "unidades", X.un, y, {t: 8.5, c: cinz});
+    [["recebidos", X.rec], ["vendas_qtd", X.vq], ["vendas_valor", X.ve, 1], ["frota_qtd", X.fr]].forEach(function (k) {
+      var v = val(p, k[0]); txt(v == null ? "-" : k[2] ? fmt(v) : q100(v), k[1], y, {b: 1, t: 9.5, dir: 1});
+      if (gpl && !k[2] && v != null) txt("= " + q100(kgENSE(D, p, k[0])) + " kg", k[1], y + 3.7, {t: 7, c: cinz, dir: 1});
     });
-    y += 3;
+    y += alt;
   };
-  secao("Produtos recebidos", [{k: "recebidos", x: 160}]);
-  secao("Total de vendas", [{k: "vendas_qtd", x: 128}, {k: "vendas_valor", x: 176, euro: true}]);
-  secao("Vendas - cartão frotista", [{k: "frota_qtd", x: 160}]);
-  txt((cfg.produtos.indexOf("gplauto") >= 0 ? "GPL auto: 1 kg = " + String(cfg.gpl_kg_litros).replace(".", ",") + " litros. " : "") + "Valores de venda com IVA. Gerado pelo mystationbox em " + new Date().toLocaleString("pt-PT") + ".", 14, 290, {t: 7, cor: P.rgb(0.45, 0.45, 0.45)});
+  var grupo = function (titulo, ps) {
+    if (!ps.length) return;
+    txt(titulo, X.prod, y + 1, {b: 1, t: 9.5, c: lar}); y += 6.5;
+    ps.forEach(linha);
+    if (ps[0] && ENSE_PROD[ps[0]].u === "L") { /* total de litros dos combustíveis */
+      pg.drawLine({start: {x: mm(14), y: mm(H - y + 3.6)}, end: {x: mm(W - 14), y: mm(H - y + 3.6)}, thickness: 0.6, color: cinz});
+      txt("Total combustíveis", X.prod + 2, y + 0.5, {b: 1, t: 9}); txt("litros", X.un, y + 0.5, {t: 8.5, c: cinz});
+      [["recebidos", X.rec], ["vendas_qtd", X.vq], ["vendas_valor", X.ve, 1], ["frota_qtd", X.fr]].forEach(function (k) {
+        var t = ps.reduce(function (a, p) { return a + (val(p, k[0]) || 0); }, 0); txt(k[2] ? fmt(t) : q100(t), k[1], y + 0.5, {b: 1, t: 9.5, dir: 1}); });
+      y += 7;
+    }
+    y += 2;
+  };
+  grupo("Combustíveis", cfg.produtos.filter(function (p) { return ENSE_PROD[p].u === "L"; }));
+  grupo("Garrafas de gás (GPL)", cfg.produtos.filter(function (p) { return ENSE_PROD[p].u !== "L"; }));
+  /* fontes e notas */
+  y = Math.max(y + 2, H - 22);
+  pg.drawLine({start: {x: mm(14), y: mm(H - y + 4)}, end: {x: mm(W - 14), y: mm(H - y + 4)}, thickness: 0.4, color: claro});
+  txt("Fontes: vendas de combustível: Folha de fecho turno mensal" + (D.ff ? " (" + dmy(D.ff.de) + " a " + dmy(D.ff.ate) + ")" : " (em falta)") +
+      "; cartão frotista: Turno por formas de cobrança mensal, Solred" + (D.fonte ? " (" + dmy(D.fonte.de) + " a " + dmy(D.fonte.ate) + ")" : " (em falta)") + ".", 14, y + 1, {t: 7.5, c: cinz});
+  txt("Recebidos: guias de remessa registadas na app. Garrafas de gás: relatório de vendas por artigo" + (D.va ? " (" + dmy(D.va.de) + " a " + dmy(D.va.ate) + ")" : " (em falta)") + "; recebidas = vendidas." +
+      (cfg.produtos.indexOf("gplauto") >= 0 ? " GPL: 1 kg = " + String(cfg.gpl_kg_litros).replace(".", ",") + " litros." : "") + " Valores de venda com IVA.", 14, y + 5, {t: 7.5, c: cinz});
+  txt("mystationbox · gerado em " + new Date().toLocaleString("pt-PT"), W - 14, H - 6, {t: 7, c: cinz, dir: 1});
   return doc.save();
 }
 async function pdfENSE() {
