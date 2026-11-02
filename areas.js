@@ -6,11 +6,11 @@
 var AREAS = [
   {id: "ini", n: "🏠 Início", p: [["ini", "Resumo"]]},
   {id: "cx", n: "📝 Caixa", p: [["reg", "Registo do dia"], ["sai", "Saídas de caixa"], ["his", "Histórico"]]},
-  {id: "ven", n: "📈 Vendas", adm: 1, p: [["ven", "Vendas e margens"], ["maq", "Máquina de tabaco"]]},
-  {id: "com", n: "🛒 Compras", adm: 1, p: [["enc", "Por aprovar"], ["nova", "Nova encomenda"], ["comh", "Encomendas feitas"], ["ent", "Entrada de mercadoria"]]},
+  {id: "ven", n: "📈 Vendas", adm: 1, p: [["ven", "Vendas e margens"], ["va", "Relatório de vendas (Excel)"], ["maq", "Máquina de tabaco"]]},
+  {id: "com", n: "🛒 Compras", adm: 1, p: [["enc", "Por aprovar"], ["nova", "Nova encomenda"], ["comh", "Encomendas feitas"], ["ent", "Entrada de mercadoria"], ["comb", "Entrada de combustível"]]},
   {id: "stk", n: "📦 Stock", p: [["contar", "Contar"], ["ler", "Ler código"], ["stock", "Stock atual"], ["inv", "Inventário"], ["mov", "Movimentos"]]},
   {id: "conf", n: "🏦 Conferências", adm: 1, p: [["rep", "Repsol e Multibanco"], ["tms", "Fecho mensal TMS"]]},
-  {id: "rel", n: "📊 Relatórios", adm: 1, p: [["luc", "Lucro"], ["mes", "Mês"], ["fun", "Por funcionário"]]},
+  {id: "rel", n: "📊 Relatórios", adm: 1, p: [["luc", "Lucro"], ["mes", "Mês"], ["fun", "Por funcionário"], ["ense", "ENSE mensal"]]},
   {id: "ges", n: "⚙️ Gestão", adm: 1, p: [["mrg", "Margens e custos"], ["eq", "Equipa e acessos"], ["prod", "Produtos e códigos"], ["cfg", "Configuração do stock"]]}
 ];
 /* páginas do módulo de stock: separador e cartões (pelo título, ou "#id" do cartão) a mostrar ou esconder.
@@ -25,7 +25,7 @@ var NEXP = {
   prod: {tab: "settings", only: ["Gestão de produtos"]},
   cfg: {tab: "settings", only: ["Configuração da base de dados central", "Importante"]}
 };
-var VISTA_DA = {ini: "ini", reg: "reg", sai: "sai", his: "his", ven: "tab", comh: "tab", mov: "tab", rep: "rep", tms: "tms", mes: "mes", fun: "fun", eq: "ges", luc: "luc", mrg: "mrg"};
+var VISTA_DA = {ini: "ini", reg: "reg", sai: "sai", his: "his", ven: "tab", comh: "tab", mov: "tab", rep: "rep", tms: "tms", mes: "mes", fun: "fun", eq: "ges", luc: "luc", mrg: "mrg", comb: "comb", ense: "ense", va: "va"};
 var PAGINA = "ini";
 function areasVisiveis() { return AREAS.filter(function (a) { return ADMIN || !a.adm; }); }
 function areaDe(pg) { return AREAS.find(function (a) { return a.p.some(function (x) { return x[0] === pg; }); }); }
@@ -65,6 +65,9 @@ window.depoisVista = function (v) {
   if (v === "ges") carregarEquipa();
   if (v === "luc") carregarLucro();
   if (v === "mrg") carregarMargens();
+  if (v === "comb") carregarEntradasComb();
+  if (v === "ense") carregarENSE();
+  if (v === "va") carregarVendasArtigos();
 };
 
 /* ---------------- módulo de stock embutido ---------------- */
@@ -195,11 +198,15 @@ function esperarNex(prova, ms) {
   });
 }
 function escolherVendas(f) {
-  painel("<h3>📈 Relatório de vendas: " + esc(f.name) + "</h3><p class='mut' style='margin:0'>O que quer fazer com ele?</p>" +
-    "<div class='bar'><button class='btn p' data-v='tabaco'>🛒 Encomenda de tabaco · ADELAIDE</button><button class='btn az' data-v='aquecido'>🛒 Encomenda de aquecido e recargas · LOGISTA</button><button class='btn' data-v='maq'>📈 Só ver as vendas da máquina</button><button class='btn' data-v=''>Cancelar</button></div>");
+  painel("<h3>📈 Relatório de vendas: " + esc(f.name) + "</h3><p id='vaGuardado' class='mut' style='margin:0'>A guardar o relatório…</p><p class='mut' style='margin:0'>O que quer fazer com ele?</p>" +
+    "<div class='bar'><button class='btn' data-v='so'>✔ Só guardar</button><button class='btn p' data-v='tabaco'>🛒 Encomenda de tabaco · ADELAIDE</button><button class='btn az' data-v='aquecido'>🛒 Encomenda de aquecido e recargas · LOGISTA</button><button class='btn' data-v='maq'>📈 Só ver as vendas da máquina</button><button class='btn' data-v=''>Cancelar</button></div>");
   ir("reg");
+  /* fica sempre guardado na app (fonte única das vendas por artigo: ENSE, etc.) */
+  guardarVendasExcel(f).then(function (r) { var e = $("#vaGuardado"); if (e) { e.className = "msgOk"; e.textContent = "✔ Guardado na app: vendas de " + dmy(r.de) + " a " + dmy(r.ate) + " (" + r.linhas.length + " artigos)."; } })
+    .catch(function (e) { var x = $("#vaGuardado"); if (x) { x.className = "msgErr"; x.textContent = "✖ Não ficou guardado: " + falhou(e); } });
   $$("#painel [data-v]").forEach(function (b) { b.onclick = async function () {
     var o = b.dataset.v; fecharPainel(); if (!o) return;
+    if (o === "so") { ir("va"); return; }
     ir(o === "maq" ? "maq" : "nova");
     try {
       var w = await esperarNex(function (w) { return o === "maq" ? w.document.getElementById("maqFile") && w.document.getElementById("maqFile").onchange : typeof w.salesChange === "function"; });

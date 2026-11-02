@@ -98,6 +98,7 @@ a.btn{text-decoration:none;color:inherit;display:inline-block}.btn{background:va
 .fl input:disabled{opacity:.7}
 .res{display:flex;justify-content:space-between;background:var(--soft);border-radius:10px;padding:10px 12px;font-size:14px}
 .res b{font:700 18px var(--f-num)}
+.enseIn{width:110px;text-align:right;font:600 15px var(--f-num)}.enseIn.man{border-color:#F36C21;background:var(--wnb)}
 #mbConf tr.lin-ok td{background:var(--okb)}#mbConf tr.lin-ok td:first-child{box-shadow:inset 4px 0 0 var(--ok)}#mbConf tr.lin-wn td{background:var(--wnb)}#mbConf tr.lin-wn td:first-child{box-shadow:inset 4px 0 0 #F36C21}#mbConf tr.lin-wn td b{color:var(--wn)}#mbConf tr.lin-ok td b{color:var(--ok)}
 /* barra do resultado: verde sem falta (diferença ≥ −0,50 €), laranja quando falta dinheiro */
 .res.r-ok{background:var(--okb);box-shadow:inset 5px 0 0 var(--ok)}.res.r-wn,.res.r-bad{background:var(--wnb);box-shadow:inset 5px 0 0 #F36C21}
@@ -195,6 +196,22 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
   <div id="v-luc" class="v" hidden>
     <div class="bar"><button class="btn" id="lAnt">‹</button><input type="month" id="lMes"><button class="btn" id="lSeg">›</button><button class="btn p adm" id="bCbos">📄 Carregar relatório de vendas do mês</button><input type="file" id="fCbos" accept="application/pdf,.pdf" hidden></div>
     <div id="lucCorpo" style="display:grid;gap:12px"></div>
+  </div>
+
+  <!-- VENDAS: RELATÓRIO DE VENDAS POR ARTIGO (EXCEL) -->
+  <div id="v-va" class="v" hidden>
+    <div class="bar"><button class="btn p adm" id="bVa">📄 Carregar relatório de vendas (Excel)</button><input type="file" id="fVa" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden></div>
+    <div id="vaCorpo" style="display:grid;gap:12px"></div>
+  </div>
+  <!-- COMPRAS: ENTRADA DE COMBUSTÍVEL -->
+  <div id="v-comb" class="v" hidden>
+    <div class="bar"><button class="btn" id="cAnt">‹</button><input type="month" id="cMes"><button class="btn" id="cSeg">›</button></div>
+    <div id="combCorpo" style="display:grid;gap:12px"></div>
+  </div>
+  <!-- RELATÓRIOS: ENSE MENSAL -->
+  <div id="v-ense" class="v" hidden>
+    <div class="bar"><button class="btn" id="eAnt">‹</button><input type="month" id="eMes"><button class="btn" id="eSeg">›</button><button class="btn p" id="bEnsePdf">📄 Gerar PDF para a ENSE</button></div>
+    <div id="enseCorpo" style="display:grid;gap:12px"></div>
   </div>
 
   <!-- GESTÃO: MARGENS E CUSTOS -->
@@ -438,6 +455,8 @@ entrar().catch(function(e){$("#vLogin").hidden=false;$("#lErro").textContent=fal
 <script src="equipa.js"></script>
 <script src="tms.js"></script>
 <script src="lucro.js"></script>
+<script src="vendas_excel.js"></script>
+<script src="combustivel.js"></script>
 <script src="areas.js"></script>
 <script>$$("#tabSub button").forEach(function(b){b.onclick=function(){tabaco(b.dataset.t)}});$("#eqBtnNovo").onclick=formNovo;</script>
 </body>
