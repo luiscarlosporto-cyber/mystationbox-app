@@ -180,7 +180,7 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
   <div class="aviso" id="avRO" hidden><p>A sua conta pode consultar mas não alterar. Registar e corrigir é para administradores.</p></div>
 
   <!-- INÍCIO -->
-  <div id="v-ini" class="v" hidden><div id="iniCorpo" class="ini"></div></div>
+  <div id="v-ini" class="v" hidden><div id="iniCorpo" class="ini"></div><p class="mut" style="text-align:center;font-size:12px;margin:14px 0 80px"><span id="versaoApp"></span></p></div>
 
   <!-- STOCK, COMPRAS E VENDAS DO TABACO (módulo de stock embutido) -->
   <div id="v-nex" class="v" hidden><div id="nexBox"></div></div>
@@ -424,6 +424,13 @@ $("#hDia").onchange=carregarHist;
 document.addEventListener("visibilitychange",function(){if(!document.hidden&&EU&&VISTA==="reg"&&!document.activeElement.matches("input"))irDia(DIA)});
 sb.auth.onAuthStateChange(function(ev){if(ev==="SIGNED_OUT"){EU=null;$("#vApp").hidden=true;$("#vLogin").hidden=false}});
 if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(function(){});
+/* atualizações: quando a app volta ao ecrã (telemóvel), vê se há versão nova e recarrega sozinha */
+var VERSAO_APP=null;
+function versaoPublicada(){return fetch("sw.js?v="+Date.now(),{cache:"no-store"}).then(function(r){return r.text()}).then(function(t){var m=t.match(/mystationbox-v(\d+)/);return m?m[1]:null}).catch(function(){return null})}
+versaoPublicada().then(function(v){VERSAO_APP=v;var e=$("#versaoApp");if(e&&v)e.textContent="versão "+v});
+function verAtualizacao(){if(document.hidden||!VERSAO_APP)return;versaoPublicada().then(function(v){if(v&&v!==VERSAO_APP){var ativo=document.activeElement;if(ativo&&ativo.matches&&ativo.matches("input,textarea,select")&&ativo.value)return;
+  if(navigator.serviceWorker&&navigator.serviceWorker.getRegistration)navigator.serviceWorker.getRegistration().then(function(r){if(r)r.update()}).catch(function(){});location.reload()}})}
+document.addEventListener("visibilitychange",verAtualizacao);window.addEventListener("focus",verAtualizacao);setInterval(verAtualizacao,10*60*1000);
 entrar().catch(function(e){$("#vLogin").hidden=false;$("#lErro").textContent=falhou(e)});
 </script>
 <script src="leitores.js"></script>
