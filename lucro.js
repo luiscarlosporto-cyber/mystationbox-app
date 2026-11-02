@@ -9,6 +9,9 @@ function falhouLucro(e) { var m = falhou(e); return /msb_(margens|custos|vendas_
 var COMB_CAT = [["consignacao", "Consignação (sem desconto)"], ["desconto", "Desconto imediato My Repsol"], ["solred", "Solred"]];
 function premium(p) { return /E\+10|EFITEC/i.test(p); }
 function tmsParaRelatorio(n) { n = n.toUpperCase().trim(); return n === "GASOLINA 95" ? "GASOLINA SIMPLES" : n; }
+/* Uma margem sobre a venda nunca chega a 100 %. Valores de 100 % ou mais são margem sobre o custo (ex.: cafetaria 150 %:
+ * custo 1 € → venda 2,50 €), convertida para % da venda = p ÷ (100 + p) × 100 (150 % → 60 % da venda). */
+function pctVenda(p) { return p >= 100 ? p / (100 + p) * 100 : p; }
 function chaveLoja(fam, sub) { return "loja:" + fam + (sub ? "/" + sub : ""); }
 var LOJA_SUB = [["TABACO", "ACESSORIOS TABACARIA"]];   // subfamílias com margem própria (acessórios ≠ tabaco)
 
@@ -40,7 +43,7 @@ async function carregarMargens() {
       COMB_CAT.map(function (c) { return "<tr><td class='l'>" + c[1] + "</td>" + ["simples", "premium"].map(function (t) { var k = "comb:" + c[0] + ":" + t; return "<td class='n'><input class='mg' data-k='" + k + "' data-u='eur_litro' inputmode='decimal' value='" + num4(M[k]) + "' style='width:90px;text-align:right'> €/L</td>"; }).join("") + "</tr>"; }).join("") +
       "</tbody></table></div></div>";
     var linhas = []; F.forEach(function (f) { linhas.push([f, ""]); LOJA_SUB.forEach(function (s) { if (s[0] === f) linhas.push([f, s[1]]); }); });
-    h += "<div class='card' style='padding:14px;display:grid;gap:10px'><h2 style='margin:0'>🛍️ Loja · margem por categoria (% sobre a venda sem IVA)</h2>" +
+    h += "<div class='card' style='padding:14px;display:grid;gap:10px'><h2 style='margin:0'>🛍️ Loja · margem por categoria (% sobre a venda sem IVA)</h2><p class='mut' style='margin:0'>Até 99 % = margem sobre a venda. 100 % ou mais = margem sobre o custo (ex.: 150 % → custo 1 €, venda 2,50 €, ou seja 60 % da venda).</p>" +
       "<p class='mut' style='margin:0;font-size:13px'>Deixe vazio o que não sabe: no relatório de lucro aparece como \"margem por definir\" e não entra na conta. Tabaco: 6,8 % é a média das faturas da Adelaide.</p>" +
       "<div class='sc'><table><thead><tr><th class='l'>Categoria (família do relatório de vendas)</th><th>Margem</th></tr></thead><tbody>" +
       linhas.map(function (l) { var k = chaveLoja(l[0], l[1]); return "<tr><td class='l'>" + esc(l[0]) + (l[1] ? " · <span class='mut'>" + esc(l[1]) + "</span>" : "") + "</td><td class='n'><input class='mg' data-k='" + esc(k) + "' data-u='pct' inputmode='decimal' value='" + num4(M[k]) + "' style='width:80px;text-align:right'> %</td></tr>"; }).join("") +
@@ -60,7 +63,7 @@ async function gravarMargens() {
   var st = $("#mrgSt"), b = $("#mrgGravar"); st.className = "st"; st.textContent = "";
   try {
     var up = [], del = [], erro = "";
-    $$("#mrgCorpo input.mg").forEach(function (i) { var v = lerNum(i.value); if (v === null) del.push(i.dataset.k); else if (isNaN(v) || v < 0 || (i.dataset.u === "pct" && v >= 100)) erro = "Valor inválido: " + i.value; else up.push({estacao: EST, chave: i.dataset.k, valor: v, unidade: i.dataset.u, atualizado: new Date().toISOString()}); });
+    $$("#mrgCorpo input.mg").forEach(function (i) { var v = lerNum(i.value); if (v === null) del.push(i.dataset.k); else if (isNaN(v) || v < 0 || (i.dataset.u === "pct" && v >= 1000)) erro = "Valor inválido: " + i.value; else up.push({estacao: EST, chave: i.dataset.k, valor: v, unidade: i.dataset.u, atualizado: new Date().toISOString()}); });
     var custos = []; $$("#custosLista .custo").forEach(function (d) { var n = d.querySelector(".cn").value.trim(), v = lerNum(d.querySelector(".cv").value); if (!n && v === null) return; if (!n || v === null || isNaN(v) || v < 0) erro = "Custo incompleto: " + (n || "sem nome"); else custos.push({estacao: EST, nome: n.slice(0, 80), valor_c: Math.round(v * 100)}); });
     if (erro) throw new Error(erro);
     b.disabled = true;
@@ -124,8 +127,8 @@ async function carregarLucro() {
       var f = fams[cat] || (fams[cat] = {base: 0, liq: 0, k: k}); f.base += l[3]; f.liq += l[4];
     });
     var mL = 0, lj = Object.keys(fams).sort(function (a, b) { return fams[b].base - fams[a].base; }).map(function (c) {
-      var f = fams[c], pct = M[f.k], mg = pct == null ? null : f.base * pct / 100; if (mg != null) mL += mg; else falta.push("loja: " + c);
-      return "<tr><td class='l'>" + esc(c) + "</td><td class='n'>" + fmt(f.base) + "</td><td class='n'>" + (pct == null ? "<a href='#' data-ir='mrg' class='mut'>por definir</a>" : num4(pct) + " %") + "</td><td class='n'><b>" + (mg == null ? "—" : fmt(Math.round(mg))) + "</b></td></tr>";
+      var f = fams[c], pct = M[f.k], pv = pct == null ? null : pctVenda(pct), mg = pv == null ? null : f.base * pv / 100; if (mg != null) mL += mg; else falta.push("loja: " + c);
+      return "<tr><td class='l'>" + esc(c) + "</td><td class='n'>" + fmt(f.base) + "</td><td class='n'>" + (pct == null ? "<a href='#' data-ir='mrg' class='mut'>por definir</a>" : pct >= 100 ? num4(pct) + " % s/ custo<br><small class='mut'>= " + num4(Math.round(pv * 10) / 10) + " % da venda</small>" : num4(pct) + " %") + "</td><td class='n'><b>" + (mg == null ? "—" : fmt(Math.round(mg))) + "</b></td></tr>";
     }).join("");
     totM += mL / 100;
     h += "<div class='card' style='padding:14px;display:grid;gap:8px'><h2 style='margin:0'>🛍️ Loja</h2><div class='sc'><table><thead><tr><th class='l'>Categoria</th><th>Vendas sem IVA €</th><th>Margem</th><th>Margem €</th></tr></thead><tbody>" + lj +
