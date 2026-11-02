@@ -243,6 +243,18 @@ function carregarPdfLib() {
   pdfLibP = new Promise(function (ok, ko) { var s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"; s.onload = ok; s.onerror = function () { pdfLibP = null; ko(new Error("Não foi possível carregar o gerador de PDF (sem internet?)")); }; document.head.appendChild(s); });
   return pdfLibP;
 }
+/* Marca registada em todos os relatórios PDF (02/11/2026): logótipo pequeno + "mystationbox®" no rodapé, à esquerda.
+   O nome da estação vai no cabeçalho de cada relatório, nunca junto ao logótipo. */
+var marcaPng = null;
+async function marcaPdf(doc, pg, F, B, x, y, t) {   // x, y em pontos (canto inferior esquerdo), t = tamanho da letra
+  t = t || 7.5;
+  try { if (!marcaPng) marcaPng = new Uint8Array(await (await fetch("marca_pdf.png")).arrayBuffer()); var im = await doc.embedPng(marcaPng), h = t * 1.7;
+    pg.drawImage(im, {x: x, y: y - t * 0.35, width: h * im.width / im.height, height: h}); return; } catch (e) { /* sem imagem: só texto */ }
+  var P = window.PDFLib, az = P.rgb(0.039, 0.173, 0.278), la = P.rgb(0.953, 0.424, 0.129);
+  pg.drawText("mystation", {x: x, y: y, size: t, font: B, color: az}); x += B.widthOfTextAtSize("mystation", t);
+  pg.drawText("box", {x: x, y: y, size: t, font: B, color: la}); x += B.widthOfTextAtSize("box", t);
+  pg.drawText("\u00AE", {x: x + 0.5, y: y + t * 0.45, size: t * 0.55, font: F, color: la});
+}
 /* PDF numa só página A4 (deitada): uma tabela com uma linha por produto e as três partes do formulário da ENSE em colunas
    (recebidos · total de vendas em quantidade e € · cartão frotista). Combustíveis primeiro, depois garrafas de gás. */
 async function fazerPdfENSE(D, inst) {
@@ -302,7 +314,8 @@ async function fazerPdfENSE(D, inst) {
       "; cartão frotista: Turno por formas de cobrança mensal, Solred" + (D.fonte ? " (" + dmy(D.fonte.de) + " a " + dmy(D.fonte.ate) + ")" : " (em falta)") + ".", 14, y + 1, {t: 7.5, c: cinz});
   txt("Recebidos: guias de remessa registadas na app. Garrafas de gás: relatório de vendas por artigo" + (D.va ? " (" + dmy(D.va.de) + " a " + dmy(D.va.ate) + ")" : " (em falta)") + "; recebidas = vendidas." +
       (cfg.produtos.indexOf("gplauto") >= 0 ? " GPL: 1 kg = " + String(cfg.gpl_kg_litros).replace(".", ",") + " litros." : "") + " Valores de venda com IVA.", 14, y + 5, {t: 7.5, c: cinz});
-  txt("mystationbox · gerado em " + new Date().toLocaleString("pt-PT"), W - 14, H - 6, {t: 7, c: cinz, dir: 1});
+  txt("gerado em " + new Date().toLocaleString("pt-PT"), W - 14, H - 6, {t: 7, c: cinz, dir: 1});
+  await marcaPdf(doc, pg, F, B, mm(14), mm(6), 7.5);
   return doc.save();
 }
 async function pdfENSE() {

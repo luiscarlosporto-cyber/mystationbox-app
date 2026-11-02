@@ -136,7 +136,8 @@ async function fazerPdfKms() {
     pg.drawImage(png, {x: mm(154 - sw / 2), y: mm(H - (ya + 3 + sh)), width: mm(sw), height: mm(sh)}); }
   pg.drawLine({start: {x: mm(122), y: mm(H - ya - 30)}, end: {x: mm(186), y: mm(H - ya - 30)}, thickness: 0.5, color: cinz});
   txt(c.nome, 154, ya + 33.5, {t: 7, c: cinz, mid: 1});
-  txt("mystationbox · gerado em " + new Date().toLocaleString("pt-PT"), W - 12, H - 6, {t: 6.5, c: cinz, dir: 1});
+  txt("gerado em " + new Date().toLocaleString("pt-PT"), W - 12, H - 6, {t: 6.5, c: cinz, dir: 1});
+  await marcaPdf(doc, pg, F, B, mm(12), mm(6), 7);
   return doc.save();
 }
 async function pdfKms() {

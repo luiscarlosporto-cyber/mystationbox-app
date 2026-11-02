@@ -70,9 +70,10 @@ async function fazerPdfMB(M, C, ent, inst) {
   }
   /* rodapé em todas as páginas */
   var pags = doc.getPages();
-  pags.forEach(function (p, i) { pg = p;
-    txt("Turnos com MB registado no mês; crédito ligado ao turno com o mesmo valor (liquidação: próprio dia, véspera ou dia seguinte; transferência: até 10 dias antes). Valores em euros.", 14, H - 10, {t: 6.5, c: cinz});
-    txt("mystationbox · gerado em " + new Date().toLocaleString("pt-PT") + " · página " + (i + 1) + " de " + pags.length, W - 14, H - 6, {t: 6.5, c: cinz, dir: 1}); });
+  for (var i = 0; i < pags.length; i++) { pg = pags[i];
+    txt("Turnos com MB registado no mês; crédito ligado ao turno com o mesmo valor (liquidação: próprio dia, véspera ou dia seguinte; transferência: até 10 dias antes). Valores em euros.", 14, H - 11, {t: 6.5, c: cinz});
+    txt("gerado em " + new Date().toLocaleString("pt-PT") + " · página " + (i + 1) + " de " + pags.length, W - 14, H - 6, {t: 6.5, c: cinz, dir: 1});
+    await marcaPdf(doc, pg, F, B, mm(14), mm(6), 7); }
   return doc.save();
 }
 async function pdfMB(M) {
