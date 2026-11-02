@@ -90,6 +90,8 @@ async function carregarENSE() {
     var c = await cfgENSE(), fim = addMes(M, 1) + "-01";
     var re = await sb.from("msb_comb_entradas").select("produto,qtd,kg").eq("estacao", EST).gte("dia", M + "-01").lt("dia", fim); if (re.error) throw re.error;
     var rv = await sb.from("msb_vendas_mes").select("dados,de,ate,fonte").eq("estacao", EST).eq("mes", M).maybeSingle();
+    var rf = await sb.from("msb_folha_fecho").select("dados,de,ate,fonte").eq("estacao", EST).eq("mes", M).maybeSingle();
+    var FF = rf && !rf.error && rf.data ? rf.data : null;
     var rm = await sb.from("msb_ense").select("produto,campo,valor").eq("estacao", EST).eq("mes", M); if (rm.error) throw rm.error;
     var auto = {}, man = {}, semProd = [], gas = null;
     c.produtos.forEach(function (p) { auto[p] = {recebidos: 0, vendas_qtd: null, vendas_valor: null, frota_qtd: null}; });
@@ -103,6 +105,13 @@ async function carregarENSE() {
         auto[p].vendas_qtd += v[0]; auto[p].vendas_valor += v[2]; if (forma === "solred") auto[p].frota_qtd += v[0]; }); });
       (V.loja || []).forEach(function (l) { if (/^GAS$/.test(l[0])) gas = (gas || 0) + l[2]; });
     }
+    /* vendas totais de combustível (já com Solred): FOLHA DE FECHO TURNO MENSAL, quando existe (volume e vendas líquidas) */
+    if (FF) {
+      c.produtos.forEach(function (p) { if (ENSE_PROD[p].cbos) { auto[p].vendas_qtd = 0; auto[p].vendas_valor = 0; if (auto[p].frota_qtd == null) auto[p].frota_qtd = null; } });
+      FF.dados.comb.forEach(function (x) { var nome = x[0], p = /NEXA/.test(nome) ? (c.produtos.indexOf("nexa") >= 0 ? "nexa" : null) : c.produtos.find(function (k) { return k !== "nexa" && ENSE_PROD[k].cbos && ENSE_PROD[k].cbos.test(nome); });
+        if (!p) { if (semProd.indexOf(nome) < 0) semProd.push(nome); return; } auto[p].vendas_qtd += x[2]; auto[p].vendas_valor += x[6]; });
+      FF.dados.loja.forEach(function (l) { if (l[0] === "GAS") gas = l[2]; });
+    }
     /* garrafas de gás: relatório de vendas por artigo (Excel) do mês; recebidas = vendidas (regra do utilizador, 02/11/2026) */
     var VA = await vendasArtigosDoMes(M), gasNao = [];
     if (VA) {
@@ -113,13 +122,15 @@ async function carregarENSE() {
       c.produtos.forEach(function (p) { if (ENSE_PROD[p].art) auto[p].recebidos = auto[p].vendas_qtd; });
     }
     (rm.data || []).forEach(function (x) { (man[x.produto] = man[x.produto] || {})[x.campo] = x.valor; });
-    ENSE_DADOS = {M: M, c: c, auto: auto, man: man, V: V, fonte: V ? rv.data : null, va: VA};
+    ENSE_DADOS = {M: M, c: c, auto: auto, man: man, V: V, fonte: V ? rv.data : null, ff: FF, va: VA};
     var val = function (p, k) { return man[p] && man[p][k] != null ? man[p][k] : auto[p][k]; };
     var cel = function (p, k, euro) { var m = man[p] && man[p][k] != null, v = val(p, k), kg = !euro && ENSE_PROD[p].kg ? kgENSE(ENSE_DADOS, p, k) : null;
       return "<td class='n'>" + (ADMIN ? "<input class='enseIn" + (m ? " man" : "") + "' data-p='" + p + "' data-k='" + k + "' inputmode='decimal' value='" + (v == null ? "" : euro ? fmt(v) : q100(v)) + "' placeholder='0' title='" + (m ? "escrito à mão" : "calculado") + "'>" : (v == null ? "—" : euro ? fmt(v) : q100(v))) + (kg != null ? "<br><small class='mut'>= " + q100(kg) + " kg</small>" : "") + "</td>"; };
     var h = "<div class='card'><div class='cb' style='display:grid;gap:6px'>" +
-      (V ? "<div class='msgOk' style='padding:8px 10px;border-radius:8px'>✔ Vendas do relatório de " + dmy(rv.data.de) + " a " + dmy(rv.data.ate) + " (software Repsol). Cartão frotista = Solred.</div>"
-         : "<div class='msgErr' style='padding:8px 10px;border-radius:8px'>⚠ Falta o relatório de vendas de " + esc(nomeMes(M)) + ". Carregue-o em Relatórios → Lucro (📄 Carregar relatório de vendas do mês) ou no 📥 Carregar. Até lá, as vendas ficam por preencher.</div>") +
+      (FF ? "<div class='msgOk' style='padding:8px 10px;border-radius:8px'>✔ Vendas totais de combustível: FOLHA DE FECHO TURNO MENSAL de " + dmy(FF.de) + " a " + dmy(FF.ate) + ".</div>"
+          : "<div class='msgErr' style='padding:8px 10px;border-radius:8px'>⚠ Falta a FOLHA DE FECHO TURNO MENSAL de " + esc(nomeMes(M)) + " (vendas totais de combustível)." + (V ? " Por agora usam-se os totais do TURNO POR FORMAS DE COBRANÇA MENSAL." : "") + " Carregue-a no botão 📥 acima.</div>") +
+      (V ? "<div class='msgOk' style='padding:8px 10px;border-radius:8px'>✔ Vendas Solred (cartão frotista): TURNO POR FORMAS DE COBRANÇA MENSAL de " + dmy(rv.data.de) + " a " + dmy(rv.data.ate) + ".</div>"
+         : "<div class='msgErr' style='padding:8px 10px;border-radius:8px'>⚠ Falta o TURNO POR FORMAS DE COBRANÇA MENSAL de " + esc(nomeMes(M)) + " (vendas Solred para o cartão frotista). Carregue-o no botão 📥 acima.</div>") +
       (semProd.length ? "<div class='mut' style='font-size:13px'>Produtos do relatório sem linha na ENSE (não contados): " + semProd.map(esc).join(", ") + ".</div>" : "") +
       (VA ? "<div class='msgOk' style='padding:8px 10px;border-radius:8px'>✔ Garrafas de gás do relatório de vendas por artigo (Excel) de " + dmy(VA.de) + " a " + dmy(VA.ate) + ". Recebidas = vendidas.</div>"
           : "<div class='msgErr' style='padding:8px 10px;border-radius:8px'>⚠ Falta o relatório de vendas por artigo (Excel) do mês inteiro de " + esc(nomeMes(M)) + ". Carregue-o em Vendas → Relatório de vendas (Excel) ou no 📥 Carregar.</div>") +
@@ -169,7 +180,7 @@ async function fazerPdfENSE(D, inst) {
   txt("Entidade: " + (cfg.entidade || "Porto João & Nunes LDA."), 14, y, {t: 10}); y += 5;
   txt("Instalação: " + inst, 14, y, {t: 10}); y += 5;
   txt("Período: " + nomeMes(D.M), 14, y, {t: 10}); y += 5;
-  txt("Combustíveis: " + (D.fonte ? "relatório de vendas do software Repsol, " + dmy(D.fonte.de) + " a " + dmy(D.fonte.ate) : "sem relatório de vendas carregado") + "; entradas registadas na app.", 14, y, {t: 8}); y += 4.5;
+  txt("Vendas de combustível: " + (D.ff ? "Folha de fecho turno mensal, " + dmy(D.ff.de) + " a " + dmy(D.ff.ate) : D.fonte ? "Turno por formas de cobrança mensal, " + dmy(D.fonte.de) + " a " + dmy(D.fonte.ate) : "sem relatório") + ". Cartão frotista: " + (D.fonte ? "Turno por formas de cobrança mensal (Solred)" : "sem relatório") + ". Recebidos: entradas registadas na app.", 14, y, {t: 8}); y += 4.5;
   txt("Garrafas de gás: " + (D.va ? "vendas por artigo (Excel), " + dmy(D.va.de) + " a " + dmy(D.va.ate) + "; recebidas = vendidas." : "sem relatório de vendas por artigo."), 14, y, {t: 8}); y += 9;
   var secao = function (titulo, cols) {
     quebra(30);
@@ -201,3 +212,28 @@ async function pdfENSE() {
   } catch (e) { status(false, e.message); }
 }
 $("#bEnsePdf").onclick = pdfENSE;
+
+/* FOLHA DE FECHO TURNO MENSAL: PDF do CBOS "Folha de Fecho de turno" do mês (leitor em motor.js, igual ao Python) */
+function msgENSE(cls, t) { var e = $("#enseMsg"); e.hidden = !t; e.className = "card " + cls; e.style.padding = "12px"; e.textContent = t || ""; }
+async function importarFolhaFecho(f) {
+  if (PAGINA !== "ense") ir("ense");
+  msgENSE("mut", "⏳ A ler " + f.name + "…");
+  try {
+    var bytes = new Uint8Array(await f.arrayBuffer()), L = await linhasPdf(bytes.slice()), r = MOTOR.lerFolhaFecho(L);
+    var est = ESTS.find(function (x) { return (x.posto_repsol || "").toUpperCase() === r.posto; });
+    if (!est) throw new Error("A folha é do posto " + r.posto + " - " + r.nome_posto + ", que não é nenhuma das suas lojas.");
+    if (est.id !== EST) throw new Error("Esta folha é de " + (est.name || est.short_name) + " (posto " + r.posto + "), mas está a trabalhar em " + $("#hEst").textContent + ". Mude de loja no topo e carregue de novo.");
+    var erros = r.verificacoes.filter(function (v) { return v.nivel === "erro"; });
+    if (erros.length) throw new Error("As contas da folha não batem certo; não foi gravada. " + erros.map(function (v) { return v.msg; }).join(" "));
+    var h = await sha(bytes), caminho = EST + "/vendas/folha_fecho_" + r.mes + "_" + h + ".pdf";
+    await guardarOriginal(caminho, new Blob([bytes], {type: "application/pdf"}), "application/pdf");
+    var g = await sb.from("msb_folha_fecho").upsert({estacao: EST, mes: r.mes, de: r.de, ate: r.ate, dados: r, fonte: f.name + " · " + caminho, criado: new Date().toISOString()}, {onConflict: "estacao,mes"});
+    if (g.error) throw g.error;
+    $("#eMes").value = r.mes; await carregarENSE();
+    msgENSE("msgOk", "✔ Folha de fecho turno mensal de " + dmy(r.de) + " a " + dmy(r.ate) + " gravada. " + r.verificacoes.map(function (v) { return v.msg; }).join(" "));
+  } catch (e) { msgENSE("msgErr", "✖ " + f.name + ": " + falhouComb(e)); }
+}
+$("#bFF").onclick = function () { $("#fFF").click(); };
+$("#fFF").onchange = function () { var f = this.files[0]; this.value = ""; if (f) importarFolhaFecho(f); };
+$("#bFC").onclick = function () { $("#fFC").click(); };
+$("#fFC").onchange = function () { var f = this.files[0]; this.value = ""; if (f) importarVendasCBOS(f); };

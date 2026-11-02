@@ -180,7 +180,8 @@ async function tipoFicheiro(f) {
   if (/^image\//.test(f.type) || /\.(jpe?g|png|heic|webp)$/i.test(f.name)) return "foto";
   if (ini.slice(0, 4) === "%PDF") {   // relatório de vendas do CBOS (título "CBOS | Resultado turno…") ou documento Repsol
     var txt = new TextDecoder("latin1").decode(new Uint8Array(await f.slice(0, 200000).arrayBuffer()));
-    return /00430042004F0053|CBOS/i.test(txt) ? "cbos" : "pdf";
+    if (/Folhas de turno|0046006F006C0068006100730020006400650020007400750072006E006F/i.test(txt)) return "folha";   // FOLHA DE FECHO TURNO MENSAL
+    return /00430042004F0053|CBOS/i.test(txt) ? "cbos" : "pdf";                                                    // TURNO POR FORMAS DE COBRANÇA MENSAL
   }
   if (b[0] === 0xD0 && b[1] === 0xCF && b[2] === 0x11 && b[3] === 0xE0) return "xls";
   if (/^comercio;/i.test(ini.replace(/^﻿/, ""))) return "tms";
@@ -216,7 +217,7 @@ function escolherVendas(f) {
   }; });
 }
 async function carregarFicheiros(fs) {
-  var g = {pdf: [], cbos: [], foto: [], xls: [], tms: [], vendas: [], csv: [], "": []};
+  var g = {pdf: [], cbos: [], folha: [], foto: [], xls: [], tms: [], vendas: [], csv: [], "": []};
   for (var i = 0; i < fs.length; i++) g[await tipoFicheiro(fs[i])].push(fs[i]);
   if (g[""].length || g.csv.length) ir("reg");      // a mensagem aparece na barra do Registo
   if (g[""].length) status(false, "⚠ Não reconheço: " + g[""].map(function (f) { return f.name; }).join(", ") + ". Ficheiros aceites: folha de turno (.xls), fotografia do talão, PDF da Repsol, fecho mensal TMS (.csv), relatório de vendas de tabaco (Excel .xlsx), relatório «Turno por formas de cobrança» (PDF feito com «Guardar como PDF»).");
@@ -224,6 +225,7 @@ async function carregarFicheiros(fs) {
   if (g.tms.length) { ir("tms"); for (var j = 0; j < g.tms.length; j++) await importarTMS(g.tms[j]); }
   if (g.pdf.length) { ir("rep"); carregarPdfs(g.pdf); }
   if (g.cbos.length) await importarVendasCBOS(g.cbos[0]);
+  if (g.folha.length) await importarFolhaFecho(g.folha[0]);
   if (g.xls.length) { ir("reg"); $("#fXls").onchange.call({files: [g.xls[0]], value: ""}); }
   if (g.foto.length) { ir("reg"); $("#fFecho").onchange.call({files: [g.foto[0]], value: ""}); }
   if (g.vendas.length) escolherVendas(g.vendas[0]);

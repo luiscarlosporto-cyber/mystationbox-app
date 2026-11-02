@@ -195,7 +195,7 @@ async function importarVendasCBOS(f) {
     var g = await sb.from("msb_vendas_mes").upsert({estacao: EST, mes: r.mes, de: r.de, ate: r.ate, dados: r, fonte: f.name + " · " + caminho}, {onConflict: "estacao,mes"});
     if (g.error) throw g.error;
     $("#lMes").value = r.mes; await carregarLucro();
-    box.insertAdjacentHTML("afterbegin", "<div class='card msgOk' style='padding:12px'>✔ Relatório de vendas de " + dmy(r.de) + " a " + dmy(r.ate) + " carregado. " + r.verificacoes.map(function (v) { return esc(v.msg); }).join(" ") + "</div>");
+    box.insertAdjacentHTML("afterbegin", "<div class='card msgOk' style='padding:12px'>✔ Turno por formas de cobrança mensal de " + dmy(r.de) + " a " + dmy(r.ate) + " carregado. " + r.verificacoes.map(function (v) { return esc(v.msg); }).join(" ") + "</div>");
   } catch (e) { box.innerHTML = "<div class='card' style='padding:12px;border:2px solid var(--bad);color:var(--bad)'>✖ " + esc(falhouLucro(e)) + "</div>"; }
 }
 function semAcentosCBOS(t) { return String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/\bSTO\.?\s/g, "SANTO ").replace(/^REPSOL\s+/, ""); }

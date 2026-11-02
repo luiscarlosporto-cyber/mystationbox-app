@@ -787,8 +787,62 @@ function verificarCBOS(r, subC, subF, tot) {
   } else v.push({nivel: "erro", msg: "Loja: sem total no relatório para conferir."});
   return v;
 }
+/* "Folha de Fecho de turno" do mês (CBOS) — na app: FOLHA DE FECHO TURNO MENSAL. Igual a caixa_app/folha_fecho.py.
+   Vendas totais de combustível por produto (já com Solred), loja por família, formas de cobrança. Lê cada linha pelos números do fim. */
+var FF_N = "-?\\d[\\d.]*(?:,\\d+)?";
+var FF_PROD = new RegExp("^(\\d+)\\s+(.+?)\\s+(" + FF_N + ")\\s+(" + FF_N + ")\\s+(" + FF_N + ")€\\s*(" + FF_N + ")€\\s*(" + FF_N + ")€\\s*(" + FF_N + ")€$");
+var FF_FAM = new RegExp("^(.+?)\\s+(" + FF_N + ")\\s+(" + FF_N + ")\\s+(" + FF_N + ")€\\s*(" + FF_N + ")€\\s*(" + FF_N + ")€\\s*(" + FF_N + ")€$");
+var FF_TOT = new RegExp("^Total (Combust[ií]vel|Loja):\\s+(" + FF_N + ")\\s+(" + FF_N + ")\\s+(" + FF_N + ")€\\s*(" + FF_N + ")€\\s*(" + FF_N + ")€\\s*(" + FF_N + ")€$");
+var FF_FORMA = new RegExp("^([A-Z][A-Z0-9 .\\-/]*?)\\s+(" + FF_N + ")$");
+function ffN(t) { return inteiro100(t.replace(/\./g, "").replace(/€/g, "").trim()); }
+function lerFolhaFecho(linhas) {
+  var r = {posto: "", nome_posto: "", de: null, ate: null, comb: [], loja: [], formas: {}, totais: {}, verificacoes: []}, sec = null, tot = {}, formasTotal = null;
+  linhas.forEach(function (bruta) {
+    var ln = bruta.trim().replace(/\s+/g, " "), m; if (!ln) return;
+    m = /Lojas: (E\d{3,5}) - (.+?)(?: \d{2}\/\d{2}\/\d{4}|$)/.exec(ln);
+    if (m) { r.posto = m[1]; r.nome_posto = m[2].trim(); return; }
+    if (ln.indexOf("Desde:") === 0) { r.de = cbosData(ln.slice(0, 20)); m = /Até: (\d{2}\/\d{2}\/\d{4})/.exec(ln); if (m) r.ate = cbosData(m[1]); return; }
+    if (ln === "Vendas de Combustível") { sec = "comb"; return; }
+    if (ln === "Vendas em Loja") { sec = "loja"; return; }
+    if (ln === "Rendimentos por formas de cobrança") { sec = "formas"; return; }
+    if (["Vendas Totais", "Movimentos de Caixa", "Balanço de Caixa", "Impostos"].indexOf(ln) >= 0) { sec = null; return; }
+    m = FF_TOT.exec(ln);
+    if (m) { tot[m[1].indexOf("Combust") === 0 ? "comb" : "loja"] = [2, 3, 4, 5, 6, 7].map(function (i) { return ffN(m[i]); }); sec = null; return; }
+    if (sec === "comb") { m = FF_PROD.exec(ln); if (m) r.comb.push([m[2].toUpperCase(), ffN(m[3]), ffN(m[4]), ffN(m[5]), ffN(m[6]), ffN(m[7]), ffN(m[8]), m[1]]); return; }
+    if (sec === "loja") { m = FF_FAM.exec(ln); if (m) r.loja.push([m[1].toUpperCase(), ffN(m[2]), ffN(m[3]), ffN(m[4]), ffN(m[5]), ffN(m[6]), ffN(m[7])]); return; }
+    if (sec === "formas") {
+      m = new RegExp("^Total: (" + FF_N + ")$").exec(ln); if (m) { formasTotal = ffN(m[1]); return; }
+      m = FF_FORMA.exec(ln); if (m && m[1] !== "Forma de pagamento") r.formas[m[1].trim().replace(/\.+$/, "")] = ffN(m[2]);
+    }
+  });
+  if (!r.posto || !r.de || !r.ate || !r.comb.length || !tot.comb)
+    throw tmsErro("Não é a \"Folha de Fecho de turno\" do mês com texto (falta o posto, o período ou as vendas de combustível). Se foi impresso com \"Microsoft Print to PDF\", imprima de novo com \"Guardar como PDF\".");
+  r.mes = r.ate.slice(0, 7);
+  r.totais = {comb: tot.comb || null, loja: tot.loja || null, formas: formasTotal};
+  r.verificacoes = verificarFolhaFecho(r);
+  return r;
+}
+function verificarFolhaFecho(r) {
+  var v = [], t = r.totais, soma = function (L, i) { return L.reduce(function (a, x) { return a + x[i]; }, 0); };
+  var s = [1, 2, 3, 4, 5, 6].map(function (i) { return soma(r.comb, i); }), tc = t.comb;
+  if (tc && s[0] === tc[0] && s[1] === tc[1] && [2, 3, 4, 5].every(function (i) { return Math.abs(s[i] - tc[i]) <= 5; }))
+    v.push({nivel: "ok", msg: "Combustível: " + r.comb.length + " produtos = total (" + tmsFmt(s[1]) + " L · " + tmsFmt(s[5]) + " € líquidos)."});
+  else v.push({nivel: "erro", msg: "Combustível: a soma dos produtos não dá o total do relatório."});
+  r.comb.forEach(function (p) { if (Math.abs(p[3] - p[4] - p[5] - p[6]) > 2) v.push({nivel: "erro", msg: "Combustível " + p[0] + ": brutas − devoluções − descontos ≠ líquidas."}); });
+  var tl = t.loja;
+  if (r.loja.length) {
+    var sl = [1, 2, 3, 4, 5, 6].map(function (i) { return soma(r.loja, i); });
+    if (tl && sl[0] === tl[0] && sl[1] === tl[1] && [2, 3, 4, 5].every(function (i) { return Math.abs(sl[i] - tl[i]) <= 5; }))
+      v.push({nivel: "ok", msg: "Loja: " + r.loja.length + " famílias = total (" + tmsFmt(sl[5]) + " € líquidos)."});
+    else v.push({nivel: "erro", msg: "Loja: a soma das famílias não dá o total do relatório."});
+  }
+  var ks = Object.keys(r.formas);
+  if (ks.length && t.formas != null) { var sf = ks.reduce(function (a, k) { return a + r.formas[k]; }, 0);
+    v.push(Math.abs(sf - t.formas) <= 5 ? {nivel: "ok", msg: "Formas de cobrança: " + tmsFmt(sf) + " € = total."} : {nivel: "erro", msg: "Formas de cobrança: a soma não dá o total do relatório."}); }
+  return v;
+}
 var MOTOR = {num: num, num1: num1, pt: pt, lerTurno: lerTurno, pdfPaginas: pdfPaginas, lerDocumento: lerDocumento, classificarDoc: classificarDoc, verificar: verificar,
   lerFecho: lerFecho, pontuarFecho: pontuarFecho, lerMB: lerMB, lerSolred: lerSolred, verificarMB: verificarMB, verificarSolred: verificarSolred, turnoSugerido: turnoSugerido, classificarFecho: classificarFecho, valores: valores, ratio: ratio,
-  lerTMS: lerTMS, lerTMSBytes: lerTMSBytes, inteiro100: inteiro100, turnoDoFecho: turnoDoFecho, turnoSeguinte: turnoSeguinte, lerVendasCBOS: lerVendasCBOS};
+  lerTMS: lerTMS, lerTMSBytes: lerTMSBytes, inteiro100: inteiro100, turnoDoFecho: turnoDoFecho, turnoSeguinte: turnoSeguinte, lerVendasCBOS: lerVendasCBOS, lerFolhaFecho: lerFolhaFecho};
 if (typeof module !== "undefined" && module.exports) module.exports = MOTOR; else raiz.MOTOR = MOTOR;
 })(typeof window !== "undefined" ? window : globalThis);

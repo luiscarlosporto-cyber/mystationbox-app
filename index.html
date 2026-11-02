@@ -194,7 +194,7 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
 
   <!-- RELATÓRIOS: LUCRO -->
   <div id="v-luc" class="v" hidden>
-    <div class="bar"><button class="btn" id="lAnt">‹</button><input type="month" id="lMes"><button class="btn" id="lSeg">›</button><button class="btn p adm" id="bCbos">📄 Carregar relatório de vendas do mês</button><input type="file" id="fCbos" accept="application/pdf,.pdf" hidden></div>
+    <div class="bar"><button class="btn" id="lAnt">‹</button><input type="month" id="lMes"><button class="btn" id="lSeg">›</button><button class="btn p adm" id="bCbos">📄 Turno por formas de cobrança mensal</button><input type="file" id="fCbos" accept="application/pdf,.pdf" hidden></div>
     <div id="lucCorpo" style="display:grid;gap:12px"></div>
   </div>
 
@@ -212,6 +212,8 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
   <!-- RELATÓRIOS: ENSE MENSAL -->
   <div id="v-ense" class="v" hidden>
     <div class="bar"><button class="btn" id="eAnt">‹</button><input type="month" id="eMes"><button class="btn" id="eSeg">›</button><button class="btn p" id="bEnsePdf">📄 Gerar PDF para a ENSE</button></div>
+    <div class="bar adm"><button class="btn" id="bFF">📥 Folha de fecho turno mensal</button><input type="file" id="fFF" accept="application/pdf,.pdf" hidden><button class="btn" id="bFC">📥 Turno por formas de cobrança mensal</button><input type="file" id="fFC" accept="application/pdf,.pdf" hidden></div>
+    <div id="enseMsg" hidden></div>
     <div id="enseCorpo" style="display:grid;gap:12px"></div>
   </div>
 
