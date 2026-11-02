@@ -12,7 +12,8 @@ var ENSE_PROD = {
   gas98ad: {n: "Gasolina I.O. 98 submetido a processo de aditivação suplementar", u: "L", cbos: /EFITEC 98|98/}, gasoleo: {n: "Gasóleo simples", u: "L", cbos: /^GASOLEO$|^GASÓLEO$|^GASOLEO SIMPLES/},
   gasoleoad: {n: "Gasóleo rodoviário submetido a processo de aditivação suplementar", u: "L", cbos: /E\+10|DIESEL/},
   butano6: {n: "Garrafas GPL - Butano 6 kg", u: "un", art: /BUTANO.*\b6\b/}, butano12: {n: "Garrafas GPL - Butano 12 kg", u: "un", art: /BUTANO.*\b12\b(?![,.]\d)/}, butano12_5: {n: "Garrafas GPL - Butano 12,5 kg", u: "un", art: /BUTANO.*\b12[,.]5\b/},
-  gplauto: {n: "GPL Auto", u: "L", kg: 1, cbos: /GPL|AUTOGAS/}
+  gplauto: {n: "GPL Auto", u: "L", kg: 1, cbos: /GPL|AUTOGAS/},
+  nexa: {n: "Nexa (combustível 100% renovável)", u: "L", cbos: /NEXA/}
 };
 var ENSE_CFG = {};
 async function cfgENSE() {
@@ -97,7 +98,7 @@ async function carregarENSE() {
     if (V) {
       c.produtos.forEach(function (p) { if (ENSE_PROD[p].cbos) { auto[p].vendas_qtd = 0; auto[p].vendas_valor = 0; auto[p].frota_qtd = 0; } });
       ["consigna", "solred"].forEach(function (forma) { Object.keys((V.comb || {})[forma] || {}).forEach(function (nome) {
-        var v = V.comb[forma][nome], p = c.produtos.find(function (k) { return ENSE_PROD[k].cbos && ENSE_PROD[k].cbos.test(nome); });
+        var v = V.comb[forma][nome], p = /NEXA/.test(nome) ? (c.produtos.indexOf("nexa") >= 0 ? "nexa" : null) : c.produtos.find(function (k) { return k !== "nexa" && ENSE_PROD[k].cbos && ENSE_PROD[k].cbos.test(nome); });
         if (!p) { semProd.push(nome); return; }
         auto[p].vendas_qtd += v[0]; auto[p].vendas_valor += v[2]; if (forma === "solred") auto[p].frota_qtd += v[0]; }); });
       (V.loja || []).forEach(function (l) { if (/^GAS$/.test(l[0])) gas = (gas || 0) + l[2]; });
