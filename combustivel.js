@@ -214,9 +214,11 @@ async function pdfENSE() {
 $("#bEnsePdf").onclick = pdfENSE;
 
 /* FOLHA DE FECHO TURNO MENSAL: PDF do CBOS "Folha de Fecho de turno" do mês (leitor em motor.js, igual ao Python) */
+window.msgENSE = msgENSE;
 function msgENSE(cls, t) { var e = $("#enseMsg"); e.hidden = !t; e.className = "card " + cls; e.style.padding = "12px"; e.textContent = t || ""; }
 async function importarFolhaFecho(f) {
   if (PAGINA !== "ense") ir("ense");
+  if (window.tipoFicheiro && await tipoFicheiro(f) === "cbos") return importarVendasCBOS(f);   // escolheu o turno por formas de cobrança neste botão
   msgENSE("mut", "⏳ A ler " + f.name + "…");
   try {
     var bytes = new Uint8Array(await f.arrayBuffer()), L = await linhasPdf(bytes.slice()), r = MOTOR.lerFolhaFecho(L);

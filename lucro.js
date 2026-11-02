@@ -179,24 +179,32 @@ async function linhasPdf(bytes) {
   }
   return out;
 }
+/* TURNO POR FORMAS DE COBRANÇA MENSAL. A mensagem fica num sítio próprio (não é apagada quando a página se atualiza):
+   na ENSE, por cima da tabela; nas outras páginas, no topo de Relatórios → Lucro. */
+function msgCBOS(cls, t) {
+  if (PAGINA === "ense" && window.msgENSE) return msgENSE(cls, t);
+  var e = $("#lucMsg"); e.hidden = !t; e.className = "card " + cls; e.style.padding = "12px"; e.textContent = t || "";
+}
 async function importarVendasCBOS(f) {
-  ir("luc"); var box = $("#lucCorpo"); box.innerHTML = "<div class='mut'>A ler " + esc(f.name) + "…</div>";
+  if (PAGINA !== "ense" && PAGINA !== "luc") ir("luc");
+  msgCBOS("mut", "⏳ A ler " + f.name + "…");
   try {
-    var bytes = new Uint8Array(await f.arrayBuffer()), L = await linhasPdf(bytes.slice()), r;
-    try { r = MOTOR.lerVendasCBOS(L); } catch (e) { throw new Error(e.message); }
+    var bytes = new Uint8Array(await f.arrayBuffer());
+    if (window.tipoFicheiro && await tipoFicheiro(f) === "folha") return importarFolhaFecho(f);   // escolheu a folha de fecho neste botão
+    var L = await linhasPdf(bytes.slice()), r = MOTOR.lerVendasCBOS(L);
     var est = ESTS.find(function (x) { return x.posto_repsol && x.posto_repsol.toUpperCase() === r.posto; }) ||
               ESTS.find(function (x) { return !x.posto_repsol && semAcentosCBOS(r.nome_posto).indexOf(semAcentosCBOS(x.short_name || x.name)) >= 0; });
     if (!est) throw new Error("O relatório é do posto " + r.posto + " - " + r.nome_posto + ", que não é nenhuma das suas lojas.");
     if (est.id !== EST) throw new Error("Este relatório é de " + (est.name || est.short_name) + " (posto " + r.posto + "), mas está a trabalhar em " + $("#hEst").textContent + ". Mude de loja no topo e carregue de novo.");
     var erros = r.verificacoes.filter(function (v) { return v.nivel === "erro"; });
-    if (erros.length) { box.innerHTML = "<div class='card' style='padding:12px;border:2px solid var(--bad)'><b>❌ O relatório tem contas que não batem certo. Não foi gravado.</b>" + erros.map(linhaVerif).join("") + "</div>"; return; }
+    if (erros.length) throw new Error("O relatório tem contas que não batem certo; não foi gravado. " + erros.map(function (v) { return v.msg; }).join(" "));
     var h = await sha(bytes), caminho = EST + "/vendas/cbos_" + r.mes + "_" + h + ".pdf";
     await guardarOriginal(caminho, new Blob([bytes], {type: "application/pdf"}), "application/pdf");
     var g = await sb.from("msb_vendas_mes").upsert({estacao: EST, mes: r.mes, de: r.de, ate: r.ate, dados: r, fonte: f.name + " · " + caminho}, {onConflict: "estacao,mes"});
     if (g.error) throw g.error;
-    $("#lMes").value = r.mes; await carregarLucro();
-    box.insertAdjacentHTML("afterbegin", "<div class='card msgOk' style='padding:12px'>✔ Turno por formas de cobrança mensal de " + dmy(r.de) + " a " + dmy(r.ate) + " carregado. " + r.verificacoes.map(function (v) { return esc(v.msg); }).join(" ") + "</div>");
-  } catch (e) { box.innerHTML = "<div class='card' style='padding:12px;border:2px solid var(--bad);color:var(--bad)'>✖ " + esc(falhouLucro(e)) + "</div>"; }
+    msgCBOS("msgOk", "✔ Turno por formas de cobrança mensal de " + dmy(r.de) + " a " + dmy(r.ate) + " gravado. " + r.verificacoes.map(function (v) { return v.msg; }).join(" "));
+    if (PAGINA === "ense") { $("#eMes").value = r.mes; carregarENSE(); } else { $("#lMes").value = r.mes; carregarLucro(); }
+  } catch (e) { msgCBOS("msgErr", "✖ " + f.name + ": " + falhouLucro(e)); }
 }
 function semAcentosCBOS(t) { return String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/\bSTO\.?\s/g, "SANTO ").replace(/^REPSOL\s+/, ""); }
 $("#bCbos").onclick = function () { $("#fCbos").click(); };
