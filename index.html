@@ -275,7 +275,8 @@ function cent(v){return String(v).trim()===""?null:Math.round(num(v)*100)}
 function fmt(c){return c==null?"":(c/100).toLocaleString("pt-PT",{minimumFractionDigits:2,maximumFractionDigits:2})}
 function eur(c){return c==null?"—":fmt(c)+" €"}
 function sinal(d){return d==null?"—":(d>0?"+":d<0?"−":"")+fmt(Math.abs(d))}
-function cls(d){if(d==null)return "";var a=Math.abs(d);return a<=50?"ok":a<=500?"wn":"bad"}
+/* cor da diferença (regra do utilizador, 02/11/2026): verde quando sobra ou bate certo (≥ −0,50 €), laranja quando falta dinheiro */
+function cls(d){if(d==null)return "";return d>=-50?"ok":"wn"}
 function recebido(r){return RECEBIDO.reduce(function(s,k){return s+(r&&r[k]||0)},0)}
 function dif(r){return !r||r.vendas_c==null?null:recebido(r)-r.vendas_c}
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
@@ -357,7 +358,7 @@ function totais(){var R=0,V=0,temV=false;["t1","t2"].forEach(function(t){var r=L
   if(r){R+=recebido(r);if(r.vendas_c!=null){V+=r.vendas_c;temV=true}}});
   $("#dRec").textContent=eur(R);$("#dVen").textContent=temV?eur(V):"—";var dd=temV?R-V:null,e=$("#dDif");e.textContent=sinal(dd);e.className=corRes(dd);e.parentElement.parentElement.className="res"+(dd==null?"":" r-"+corRes(dd))}
 /* barra do Registo: verde quando não falta dinheiro (diferença ≥ −0,50 €), laranja quando falta */
-function corRes(d){return d==null?"":d>=-50?"ok":"wn"}
+function corRes(d){return cls(d)}
 async function guardar(el){var t=el.dataset.t,k=el.dataset.k,val=el.value.trim(),r=LINHAS[t]||{estacao:EST,dia:DIA,turno:t,txt:{}};
   var linha={estacao:EST,dia:DIA,turno:t},txt=Object.assign({},r.txt||{});
   if(k==="func"){linha.func=val.slice(0,40)}

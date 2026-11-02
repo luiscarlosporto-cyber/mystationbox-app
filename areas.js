@@ -141,9 +141,9 @@ async function carregarInicio() {
     var dHoje = L.filter(function (r) { return r.dia === hoje; }), dOntem = L.filter(function (r) { return r.dia === hojeISO(-1); });
     var T = {v: 0, d: 0, n: 0}; L.forEach(function (r) { T.v += r.vendas_c || 0; var x = dif(r); if (x != null) { T.d += x; T.n++; } });
     var dia = function (ls, nome) { var v = ls.reduce(function (s, r) { return s + (r.vendas_c || 0); }, 0), df = ls.reduce(function (s, r) { var x = dif(r); return s + (x || 0); }, 0);
-      return cartao("reg", nome, ls.length ? fmt(v) + "<small> €</small>" : "—", ls.length ? ls.length + " de 2 turnos registados · diferença " + sinal(df) + " €" : "Nenhum turno registado", ls.length === 2 ? cls(df) === "bad" ? "bad" : "ok" : "al"); };
+      return cartao("reg", nome, ls.length ? fmt(v) + "<small> €</small>" : "—", ls.length ? ls.length + " de 2 turnos registados · diferença " + sinal(df) + " €" : "Nenhum turno registado", ls.length === 2 ? cls(df) === "wn" ? "al" : "ok" : "al"); };
     h += dia(dHoje, "Hoje · " + dmy(hoje).slice(0, 5)) + dia(dOntem, "Ontem · " + dmy(hojeISO(-1)).slice(0, 5));
-    h += cartao("mes", "Este mês · vendas", fmt(T.v) + "<small> €</small>", L.length + " turnos · diferença acumulada " + sinal(T.d) + " €", cls(T.d / Math.max(1, T.n)) === "bad" ? "bad" : "");
+    h += cartao("mes", "Este mês · vendas", fmt(T.v) + "<small> €</small>", L.length + " turnos · diferença acumulada " + sinal(T.d) + " €", cls(T.d / Math.max(1, T.n)) === "wn" ? "al" : "");
     var sai = await sb.from("msb_saidas").select("valor_c").eq("estacao", EST).is("recebido", null);
     var ns = (sai.data || []).length, vs = (sai.data || []).reduce(function (s, x) { return s + (x.valor_c || 0); }, 0);
     h += cartao("sai", "Saídas por entregar", ns ? fmt(vs) + "<small> €</small>" : "0", ns ? ns + " saída(s) de caixa ainda por entregar" : "Tudo entregue", ns ? "al" : "ok");
