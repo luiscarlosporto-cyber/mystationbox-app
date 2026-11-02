@@ -98,7 +98,7 @@ a.btn{text-decoration:none;color:inherit;display:inline-block}.btn{background:va
 .fl input:disabled{opacity:.7}
 .res{display:flex;justify-content:space-between;background:var(--soft);border-radius:10px;padding:10px 12px;font-size:14px}
 .res b{font:700 18px var(--f-num)}
-/* barra do resultado: verde sem diferença (≤ 0,50 €), laranja com diferença */
+/* barra do resultado: verde sem falta (diferença ≥ −0,50 €), laranja quando falta dinheiro */
 .res.r-ok{background:var(--okb);box-shadow:inset 5px 0 0 var(--ok)}.res.r-wn,.res.r-bad{background:var(--wnb);box-shadow:inset 5px 0 0 #F36C21}
 .ok{color:var(--ok)}.wn{color:var(--wn)}.bad{color:var(--bad)}
 .sai{border:1px dashed var(--bd);border-radius:12px;padding:10px;display:grid;gap:8px;font-size:14px}
@@ -353,9 +353,11 @@ function desenharDia(pronto){var h="";if(pronto)carregarFuncionarios();
   $$("#turnos input[data-k]").forEach(function(el){el.onchange=function(){guardar(el)};el.onfocus=function(){var r=LINHAS[el.dataset.t]||{},o=(r.txt||{})[el.dataset.k];if(o&&/[-+]/.test(String(o).slice(1)))el.value=o}});
   ["t1","t2"].forEach(desenharSaidas);totais()}
 function totais(){var R=0,V=0,temV=false;["t1","t2"].forEach(function(t){var r=LINHAS[t],d=dif(r);
-  $("#rc-"+t).textContent=r?eur(recebido(r)):"—";var e=$("#dd-"+t);e.textContent=sinal(d);e.className=cls(d);e.parentElement.parentElement.className="res"+(d==null?"":" r-"+cls(d));$("#df-"+t).textContent=d==null?"—":sinal(d)+" €";
+  $("#rc-"+t).textContent=r?eur(recebido(r)):"—";var e=$("#dd-"+t);e.textContent=sinal(d);e.className=corRes(d);e.parentElement.parentElement.className="res"+(d==null?"":" r-"+corRes(d));$("#df-"+t).textContent=d==null?"—":sinal(d)+" €";
   if(r){R+=recebido(r);if(r.vendas_c!=null){V+=r.vendas_c;temV=true}}});
-  $("#dRec").textContent=eur(R);$("#dVen").textContent=temV?eur(V):"—";var dd=temV?R-V:null,e=$("#dDif");e.textContent=sinal(dd);e.className=cls(dd);e.parentElement.parentElement.className="res"+(dd==null?"":" r-"+cls(dd))}
+  $("#dRec").textContent=eur(R);$("#dVen").textContent=temV?eur(V):"—";var dd=temV?R-V:null,e=$("#dDif");e.textContent=sinal(dd);e.className=corRes(dd);e.parentElement.parentElement.className="res"+(dd==null?"":" r-"+corRes(dd))}
+/* barra do Registo: verde quando não falta dinheiro (diferença ≥ −0,50 €), laranja quando falta */
+function corRes(d){return d==null?"":d>=-50?"ok":"wn"}
 async function guardar(el){var t=el.dataset.t,k=el.dataset.k,val=el.value.trim(),r=LINHAS[t]||{estacao:EST,dia:DIA,turno:t,txt:{}};
   var linha={estacao:EST,dia:DIA,turno:t},txt=Object.assign({},r.txt||{});
   if(k==="func"){linha.func=val.slice(0,40)}
