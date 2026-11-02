@@ -12,7 +12,7 @@ var ENSE_PROD = {
   gas98ad: {n: "Gasolina I.O. 98 submetido a processo de aditivação suplementar", u: "L", cbos: /EFITEC 98|98/}, gasoleo: {n: "Gasóleo simples", u: "L", cbos: /^GASOLEO$|^GASÓLEO$|^GASOLEO SIMPLES/},
   gasoleoad: {n: "Gasóleo rodoviário submetido a processo de aditivação suplementar", u: "L", cbos: /E\+10|DIESEL/},
   butano6: {n: "Garrafas GPL - Butano 6 kg", u: "un", art: /BUTANO\D*6(?![\d,.])/}, butano12: {n: "Garrafas GPL - Butano 12 kg", u: "un", art: /BUTANO\D*12(?![\d,.])/}, butano12_5: {n: "Garrafas GPL - Butano 12,5 kg", u: "un", art: /BUTANO\D*12[,.]5(?!\d)/},
-  gplauto: {n: "GPL Auto", u: "L", kg: 1, cbos: /GPL|AUTOGAS/},
+  gplauto: {n: "GPL Auto", u: "L", kg: 1, cbos: /GPL|GLP|AUTOGAS/},
   nexa: {n: "Nexa (combustível 100% renovável)", u: "L", cbos: /NEXA/}
 };
 var ENSE_CFG = {};
@@ -47,7 +47,9 @@ async function carregarEntradasComb() {
       "<div class='sc'><table><thead><tr><th class='l'>Produto</th><th>Quantidade recebida</th><th class='l'>Unidade</th></tr></thead><tbody>" +
       liq.map(function (p) { return "<tr><td class='l'>" + esc(ENSE_PROD[p].n) + "</td><td class='n'><input class='enseIn ceQ' data-p='" + p + "' inputmode='decimal' placeholder='0'>" + (ENSE_PROD[p].kg ? "<br><small class='mut ceConv' data-p='" + p + "'></small>" : "") + "</td><td class='l'>" + (ENSE_PROD[p].kg ? "kg" : "litros") + "</td></tr>"; }).join("") +
       "</tbody></table></div><div class='mut' style='font-size:13px'>Preencha só os produtos desta guia; os outros ficam em branco." + (liq.some(function (p) { return ENSE_PROD[p].kg; }) ? " GPL: escreva os kg; 1 kg = " + String(c.gpl_kg_litros).replace(".", ",") + " L." : "") + "</div>" +
-      "<div class='bar'><button class='btn p' id='ceGravar'>✔ Registar guia</button><span id='ceMsg'></span></div></div></div>" : "";
+      "<div class='bar'><button class='btn p' id='ceGravar'>✔ Registar guia</button><span id='ceMsg'></span></div></div></div>" +
+      "<div class='card'><div class='cb' style='display:grid;gap:8px'><h3 style='margin:0'>📥 Carregar do sistema Repsol</h3><p class='mut' style='margin:0;font-size:13px'>Ficheiro Excel «Histórico de movimentos de carburante» (receções). A app mostra as guias antes de gravar e não repete as que já estão registadas.</p>" +
+      "<div class='bar'><button class='btn' id='ceHist'>📥 Carregar histórico de movimentos (Excel)</button><input type='file' id='fCeHist' accept='.xlsx,.xls' hidden></div><div id='ceHistMsg'></div></div></div>" : "";
     h += "<div class='card'><div class='cb'><h3 style='margin:0 0 8px'>Totais recebidos · " + esc(nomeMes(M)) + "</h3><div class='sc'><table><thead><tr><th class='l'>Produto</th><th>Recebido</th><th class='l'>Unidade</th></tr></thead><tbody>" +
       c.produtos.filter(function (p) { return ENSE_PROD[p].u === "L"; }).map(function (p) { return "<tr><td class='l'>" + esc(ENSE_PROD[p].n) + "</td><td class='n'>" + (ENSE_PROD[p].kg ? "<b>" + q100(totKg[p] || 0) + "</b> kg = " : "") + "<b>" + (tot[p] ? q100(tot[p]) : "0") + "</b></td><td class='l'>" + unid(p) + "</td></tr>"; }).join("") + "</tbody></table></div></div></div>";
     var G = [], gi = {};
@@ -60,6 +62,8 @@ async function carregarEntradasComb() {
     if (ADMIN) {
       $$("#combCorpo .ceQ").forEach(function (el) { el.oninput = function () { var p = el.dataset.p, x = $("#combCorpo .ceConv[data-p='" + p + "']"), v = num(el.value);
         if (x) x.textContent = v > 0 ? "= " + (Math.round(v * c.gpl_kg_litros * 100) / 100).toLocaleString("pt-PT") + " litros" : ""; }; });
+      $("#ceHist").onclick = function () { $("#fCeHist").click(); };
+      $("#fCeHist").onchange = function () { var f = this.files[0]; this.value = ""; if (f) importarHistCarburante(f, c, L); };
       $("#ceGravar").onclick = async function () {
         var b = this, dia = $("#ceDia").value, guia = $("#ceGuia").value.trim(), nota = $("#ceNota").value.trim(), msg = $("#ceMsg"), linhas = [], mau = null;
         if (!dia) { msg.innerHTML = "<span class='bad'>Escolha a data.</span>"; return; }
@@ -80,6 +84,54 @@ async function carregarEntradasComb() {
         if (g.error) { b.textContent = "✖"; status(false, falhouComb(g.error)); } else carregarEntradasComb(); }; });
     }
   } catch (e) { box.innerHTML = "<div class='card msgErr' style='padding:12px'>✖ " + esc(falhouComb(e)) + "</div>"; }
+}
+/* Histórico de movimentos de carburante (Excel do sistema Repsol): colunas Data, Turno, Loja, Tipo, Nº Documento, Fornecedor,
+   Tanque, Produto, Volume, Volume a 15 graus, Temperatura, Montante Total. Só as linhas "Recepciones"; Volume em litros
+   (o GLP também vem em litros: os kg calculam-se pelo fator). Antes de gravar mostra-se o que entra; não se repete o que já existe. */
+async function importarHistCarburante(f, c, existentes) {
+  var box = $("#ceHistMsg"), m = function (cls, t) { box.className = cls; box.style.padding = "10px"; box.style.borderRadius = "10px"; box.innerHTML = t; };
+  m("mut", "⏳ A ler " + esc(f.name) + "…");
+  try {
+    await carregarXlsxMSB();
+    var wb = XLSX.read(new Uint8Array(await f.arrayBuffer()), {type: "array"}), L = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header: 1, raw: true, defval: ""});
+    var h = L.findIndex(function (r) { return r.some(function (x) { return String(x).trim() === "Nº Documento"; }) && r.some(function (x) { return String(x).trim() === "Produto"; }); });
+    if (h < 0) throw new Error("Não é o «Histórico de movimentos de carburante» (faltam as colunas Nº Documento e Produto).");
+    var cab = L[h].map(function (x) { return String(x).trim(); }), col = function (n) { return cab.indexOf(n); };
+    var iD = col("Data"), iL = col("Loja"), iT = col("Tipo"), iN = col("Nº Documento"), iTq = col("Tanque"), iP = col("Produto"), iV = col("Volume");
+    var novos = [], fora = [], postos = {};
+    L.slice(h + 1).forEach(function (r) {
+      if (!/^Recep/i.test(String(r[iT]))) return;
+      var mp = /\b(E\d{3,5})\b/.exec(String(r[iL])); if (mp) postos[mp[1]] = 1;
+      var d = /(\d{2})\/(\d{2})\/(\d{4})/.exec(String(r[iD])); if (!d) return;
+      var nome = semAcentosCBOS(r[iP]), p = /NEXA/.test(nome) ? (c.produtos.indexOf("nexa") >= 0 ? "nexa" : null) : c.produtos.find(function (k) { return k !== "nexa" && ENSE_PROD[k].u === "L" && ENSE_PROD[k].cbos && ENSE_PROD[k].cbos.test(nome); });
+      var v = Number(r[iV]) || 0; if (!(v > 0)) return;
+      if (!p) { fora.push(String(r[iP])); return; }
+      novos.push({estacao: EST, dia: d[3] + "-" + d[2] + "-" + d[1], produto: p, qtd: Math.round(v * 100), kg: ENSE_PROD[p].kg ? Math.round(v / c.gpl_kg_litros * 100) : null, guia: String(r[iN]).trim(), nota: String(r[iTq]).trim() + " · do sistema Repsol"});
+    });
+    var ps = Object.keys(postos), est = ESTS.find(function (x) { return (x.posto_repsol || "").toUpperCase() === ps[0]; });
+    if (ps.length !== 1) throw new Error(ps.length ? "O ficheiro tem várias lojas (" + ps.join(", ") + "). Exporte só uma." : "O ficheiro não diz de que loja é (coluna Loja).");
+    if (!est || est.id !== EST) throw new Error("Este ficheiro é do posto " + ps[0] + (est ? " (" + (est.short_name || est.name) + ")" : "") + ", mas está a trabalhar em " + $("#hEst").textContent + ". Mude de loja no topo e carregue de novo.");
+    if (!novos.length) throw new Error("Não há receções de combustível no ficheiro.");
+    /* não repetir: o que já existe com o mesmo dia, guia, produto e quantidade */
+    var dias = novos.map(function (x) { return x.dia; }).sort(), ex = await sb.from("msb_comb_entradas").select("dia,guia,produto,qtd").eq("estacao", EST).gte("dia", dias[0]).lte("dia", dias[dias.length - 1]);
+    if (ex.error) throw ex.error;
+    var ja = {}; (ex.data || []).forEach(function (x) { var k = x.dia + "|" + x.guia + "|" + x.produto + "|" + x.qtd; ja[k] = (ja[k] || 0) + 1; });
+    var gravar = novos.filter(function (x) { var k = x.dia + "|" + x.guia + "|" + x.produto + "|" + x.qtd; if (ja[k]) { ja[k]--; return false; } return true; });
+    var guias = {}; gravar.forEach(function (x) { var k = x.dia + "|" + x.guia; (guias[k] = guias[k] || []).push(x); });
+    var tot = gravar.reduce(function (a, x) { return a + x.qtd; }, 0);
+    m("card", "<b>" + esc(f.name) + "</b>: " + novos.length + " receções, " + (novos.length - gravar.length) + " já registadas" + (fora.length ? ", " + fora.length + " de produtos sem linha na ENSE (" + esc(fora.join(", ")) + ")" : "") + ".<br>" +
+      (gravar.length ? "Vão entrar <b>" + Object.keys(guias).length + " guias</b> (" + gravar.length + " linhas, " + q100(tot) + " L):<div class='sc' style='margin-top:6px'><table><thead><tr><th>Data</th><th class='l'>Guia</th><th class='l'>Produtos</th></tr></thead><tbody>" +
+        Object.keys(guias).sort().map(function (k) { var g = guias[k]; return "<tr><td>" + dmy(g[0].dia) + "</td><td class='l'><b>" + esc(g[0].guia) + "</b></td><td class='l'>" + g.map(function (x) { return esc(ENSE_PROD[x.produto].n) + ": " + q100(x.qtd) + " L" + (x.kg != null ? " (" + q100(x.kg) + " kg)" : ""); }).join("<br>") + "</td></tr>"; }).join("") +
+        "</tbody></table></div><div class='bar' style='margin-top:8px'><button class='btn p' id='ceHistOk'>✔ Gravar " + Object.keys(guias).length + " guias</button><button class='btn' id='ceHistNao'>Cancelar</button></div>"
+        : "Nada novo para gravar."));
+    if (!gravar.length) return;
+    $("#ceHistNao").onclick = function () { box.innerHTML = ""; box.className = ""; };
+    $("#ceHistOk").onclick = async function () { this.disabled = true;
+      try { var g = await sb.from("msb_comb_entradas").insert(gravar); if (g.error) throw g.error;
+        $("#cMes").value = gravar.map(function (x) { return x.dia; }).sort().pop().slice(0, 7);
+        await carregarEntradasComb(); var b2 = $("#ceHistMsg"); b2.className = "msgOk"; b2.style.padding = "10px"; b2.style.borderRadius = "10px"; b2.textContent = "✔ " + Object.keys(guias).length + " guias do sistema Repsol gravadas (" + gravar.length + " linhas)."; }
+      catch (e) { this.disabled = false; m("msgErr", "✖ " + esc(falhouComb(e))); } };
+  } catch (e) { m("msgErr", "✖ " + esc(f.name) + ": " + esc(falhouComb(e))); }
 }
 function nomeMes(M) { return new Date(M + "-15").toLocaleDateString("pt-PT", {month: "long", year: "numeric"}); }
 $("#cMes").onchange = carregarEntradasComb;
