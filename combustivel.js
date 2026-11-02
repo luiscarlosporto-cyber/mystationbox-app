@@ -107,9 +107,9 @@ async function carregarENSE() {
     var VA = await vendasArtigosDoMes(M), gasNao = [];
     if (VA) {
       c.produtos.forEach(function (p) { if (ENSE_PROD[p].art) { auto[p].vendas_qtd = 0; auto[p].vendas_valor = 0; auto[p].frota_qtd = 0; } });
-      VA.linhas.forEach(function (l) { var nm = semAcentosCBOS(l[1]), p = c.produtos.find(function (k) { return ENSE_PROD[k].art && ENSE_PROD[k].art.test(nm); });
+      VA.linhas.forEach(function (l) { var nm = semAcentosCBOS(l[1]), fam = semAcentosCBOS(l[4] || ""), p = (!fam || /GAS/.test(fam)) ? c.produtos.find(function (k) { return ENSE_PROD[k].art && ENSE_PROD[k].art.test(nm); }) : null;
         if (p) { auto[p].vendas_qtd += Math.round(l[2] * 100); auto[p].vendas_valor += Math.round(l[3] * 100); }
-        else if (/BUTANO|PROPANO|GARRAFA|\bGAS\b/.test(nm) && !/ISQUEIRO|CLIPPER/.test(nm) && l[2]) gasNao.push(l[1] + " (" + l[2] + ")"); });
+        else if ((/^GAS$/.test(fam) || /BUTANO|PROPANO|GARRAFA/.test(nm)) && !/ISQUEIRO|CLIPPER/.test(nm) && l[2]) gasNao.push(l[1] + " (" + l[2] + ")"); });
       c.produtos.forEach(function (p) { if (ENSE_PROD[p].art) auto[p].recebidos = auto[p].vendas_qtd; });
     }
     (rm.data || []).forEach(function (x) { (man[x.produto] = man[x.produto] || {})[x.campo] = x.valor; });

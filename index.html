@@ -200,7 +200,8 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
 
   <!-- VENDAS: RELATÓRIO DE VENDAS POR ARTIGO (EXCEL) -->
   <div id="v-va" class="v" hidden>
-    <div class="bar"><button class="btn p adm" id="bVa">📄 Carregar relatório de vendas (Excel)</button><input type="file" id="fVa" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden></div>
+    <div class="bar"><button class="btn p adm" id="bVa">📄 Carregar relatório de vendas (Excel)</button><input type="file" id="fVa" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" hidden></div>
+    <div id="vaMsg" hidden></div>
     <div id="vaCorpo" style="display:grid;gap:12px"></div>
   </div>
   <!-- COMPRAS: ENTRADA DE COMBUSTÍVEL -->

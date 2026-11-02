@@ -2,7 +2,8 @@
  * É a fonte única das vendas por artigo dentro da app: cada ficheiro carregado (em Vendas → Relatório de vendas,
  * ou pelo 📥 Carregar) fica guardado em msb_vendas_artigos por estação e período. A linha "Posto: E1344 - …" tem de
  * ser a loja aberta. A leitura é a mesma do módulo de stock (vendasDeLinhas): cabeçalho "Código", colunas
- * "dd/mm/aaaa - Quantidade" por dia, "Total quantidade" e "Total Montante". */
+ * "dd/mm/aaaa - Quantidade" por dia, "Total quantidade", "Total Montante" e "Família". O período vem da linha "Data:".
+ * Para servir a tudo (ex.: garrafas de gás para a ENSE), exporte com o Nó de todas as famílias, não só TABACO. */
 "use strict";
 var xlsxP = null;
 function carregarXlsxMSB() {
@@ -20,13 +21,19 @@ async function lerVendasExcel(f) {
   var h = L.findIndex(function (r) { return String(r[0] || "").trim() === "Código"; });
   if (h < 0) throw new Error("Não é o relatório de vendas por artigo (falta a coluna «Código»).");
   var cab = L[h].map(function (x) { return String(x || "").trim(); }), datas = cab.map(function (x) { return (/^(\d{1,2}\/\d{1,2}\/\d{4}) - Quantidade$/.exec(x) || [])[1]; }).filter(Boolean);
-  var iq = cab.indexOf("Total quantidade"), im = cab.indexOf("Total Montante"), linhas = [];
+  var iq = cab.indexOf("Total quantidade"), im = cab.indexOf("Total Montante"), ifam = cab.indexOf("Família"), linhas = [];
   L.slice(h + 1).forEach(function (r) { var c = String(r[0] == null ? "" : r[0]).trim(); if (!/^\d+$/.test(c)) return;
-    linhas.push([c, String(r[1] || "").trim(), Number(r[iq >= 0 ? iq : r.length - 3]) || 0, Math.round((Number(r[im >= 0 ? im : r.length - 2]) || 0) * 100) / 100]); });
+    linhas.push([c, String(r[1] || "").trim(), Number(r[iq >= 0 ? iq : r.length - 3]) || 0, Math.round((Number(r[im >= 0 ? im : r.length - 2]) || 0) * 100) / 100, ifam >= 0 ? String(r[ifam] || "").trim() : ""]); });
   if (!linhas.length) throw new Error("O ficheiro não tem artigos.");
-  var isos = datas.map(isoDeDMY).filter(Boolean).sort();
-  if (!isos.length) throw new Error("Não consegui ler as datas do relatório.");
-  return {posto: posto, nomePosto: pt.trim(), de: isos[0], ate: isos[isos.length - 1], dias: isos.length, linhas: linhas};
+  /* período: linha "Data: … Desde: dd/mm/aaaa … Até: dd/mm/aaaa"; senão as colunas por dia */
+  var ld = L.find(function (r) { return /^Data/i.test(String(r[0] || "")); }), td = ld ? String(ld[1] || "") : "", de = null, ate = null;
+  var md = /Desde:\s*(\d{1,2}\/\d{1,2}\/\d{4})/.exec(td), ma = /Até:\s*(\d{1,2}\/\d{1,2}\/\d{4})/.exec(td);
+  if (md && ma) { de = isoDeDMY(md[1]); ate = isoDeDMY(ma[1]); }
+  else { var isos = datas.map(isoDeDMY).filter(Boolean).sort(); if (isos.length) { de = isos[0]; ate = isos[isos.length - 1]; } }
+  if (!de || !ate) throw new Error("Não consegui ler o período do relatório (linha «Data: Desde … Até …»).");
+  var no = L.find(function (r) { return /^Nó/i.test(String(r[0] || "")); }), noTxt = no ? String(no[1] || "").trim() : "";
+  var dias = Math.round((new Date(ate + "T12:00:00") - new Date(de + "T12:00:00")) / 864e5) + 1;
+  return {posto: posto, nomePosto: pt.trim(), de: de, ate: ate, dias: dias, no: noTxt, linhas: linhas};
 }
 /* Lê, confere a loja e guarda. Devolve a leitura. */
 async function guardarVendasExcel(f) {
@@ -35,7 +42,7 @@ async function guardarVendasExcel(f) {
   var est = ESTS.find(function (x) { return (x.posto_repsol || "").toUpperCase() === r.posto; });
   if (!est) throw new Error("O relatório é do posto " + r.posto + ", que não é nenhuma das suas lojas.");
   if (est.id !== EST) throw new Error("Este relatório é de " + (est.name || est.short_name) + " (posto " + r.posto + "), mas está a trabalhar em " + $("#hEst").textContent + ". Mude de loja no topo e carregue de novo.");
-  var g = await sb.from("msb_vendas_artigos").upsert({estacao: EST, de: r.de, ate: r.ate, dias: r.dias, posto: r.posto, linhas: r.linhas, fonte: f.name, criado: new Date().toISOString()}, {onConflict: "estacao,de,ate"});
+  var g = await sb.from("msb_vendas_artigos").upsert({estacao: EST, de: r.de, ate: r.ate, dias: r.dias, posto: r.posto, linhas: r.linhas, fonte: f.name + (r.no ? " · nó " + r.no : ""), criado: new Date().toISOString()}, {onConflict: "estacao,de,ate"});
   if (g.error) throw g.error;
   return r;
 }
@@ -48,23 +55,27 @@ async function vendasArtigosDoMes(M) {
 }
 
 /* ---------------- Vendas → Relatório de vendas (Excel) ---------------- */
-async function carregarVendasArtigos(msg) {
+async function carregarVendasArtigos() {
   var box = $("#vaCorpo"); box.innerHTML = "<div class='mut'>A carregar…</div>";
   try {
     var r = await sb.from("msb_vendas_artigos").select("de,ate,dias,fonte,criado,linhas").eq("estacao", EST).order("ate", {ascending: false}).limit(24);
     if (r.error) throw r.error;
     var L = r.data || [];
-    box.innerHTML = (msg || "") + "<div class='card'><div class='cb'><p class='mut' style='margin:0 0 8px'>Relatório de vendas por artigo exportado do software Repsol, em Excel. Para o mês, exporte de dia 1 ao último dia. Fica guardado e é usado na app (ENSE: garrafas de gás; e o que mais precisar).</p>" +
+    box.innerHTML = "<div class='card'><div class='cb'><p class='mut' style='margin:0 0 8px'>Relatório de vendas por artigo exportado do software Repsol, em Excel. Para o mês, exporte de dia 1 ao último dia e com <b>todas as famílias</b> (não só TABACO). Fica guardado e é usado na app (ENSE: garrafas de gás; e o que mais precisar).</p>" +
       (L.length ? "<div class='sc'><table><thead><tr><th class='l'>Período</th><th>Dias</th><th>Artigos</th><th>Montante</th><th class='l'>Ficheiro</th><th class='l'>Carregado</th></tr></thead><tbody>" +
         L.map(function (x) { var t = x.linhas.reduce(function (s, l) { return s + (l[3] || 0); }, 0); return "<tr><td class='l'>" + dmy(x.de) + " a " + dmy(x.ate) + "</td><td class='n'>" + x.dias + "</td><td class='n'>" + x.linhas.length + "</td><td class='n'>" + fmt(Math.round(t * 100)) + " €</td><td class='l'>" + esc(x.fonte) + "</td><td class='l'>" + dmy(x.criado) + "</td></tr>"; }).join("") + "</tbody></table></div>"
         : "<p class='mut' style='margin:0'>Ainda não há relatórios guardados nesta loja.</p>") + "</div></div>";
   } catch (e) { box.innerHTML = "<div class='card msgErr' style='padding:12px'>✖ " + esc(falhou(e)) + "</div>"; }
 }
+/* a mensagem fica num sítio próprio (#vaMsg), para a lista não a apagar quando se atualiza */
+function msgVa(cls, t) { var e = $("#vaMsg"); e.hidden = !t; e.className = "card " + cls; e.style.padding = "12px"; e.textContent = t || ""; }
 async function importarVendasExcel(f) {
-  ir("va"); var box = $("#vaCorpo"); box.innerHTML = "<div class='mut'>A ler " + esc(f.name) + "…</div>";
+  if (PAGINA !== "va") ir("va");
+  msgVa("mut", "⏳ A ler " + f.name + "…");
   try { var r = await guardarVendasExcel(f);
-    await carregarVendasArtigos("<div class='card msgOk' style='padding:12px'>✔ Relatório de " + dmy(r.de) + " a " + dmy(r.ate) + " (" + r.dias + " dias, " + r.linhas.length + " artigos) guardado.</div>"); }
-  catch (e) { box.innerHTML = "<div class='card msgErr' style='padding:12px'>✖ " + esc(falhou(e)) + "</div>"; }
+    msgVa("msgOk", "✔ Relatório de " + dmy(r.de) + " a " + dmy(r.ate) + " (" + r.dias + " dias, " + r.linhas.length + " artigos" + (r.no ? ", nó " + r.no : "") + ") guardado." + (/^TABACO$/i.test(r.no) ? " Atenção: este ficheiro só tem tabaco; para as garrafas de gás da ENSE exporte com todas as famílias." : ""));
+    await carregarVendasArtigos(); }
+  catch (e) { msgVa("msgErr", "✖ " + f.name + ": " + falhou(e)); }
 }
 $("#bVa").onclick = function () { $("#fVa").click(); };
 $("#fVa").onchange = function () { var f = this.files[0]; this.value = ""; if (f) importarVendasExcel(f); };
