@@ -292,7 +292,7 @@ function desenharRepsol(M, docs, ligados, turnos, checks) {
   var nm = new Date(M + "-15").toLocaleDateString("pt-PT", {month: "long", year: "numeric"});
   $("#mbTotem").innerHTML = "<div class='t'>Multibanco · " + esc(nm) + "</div>" + [["Registado", reg], ["Creditado ✔", creditado], ["Em falta", falta.reduce(function (s, x) { return s + x.t.mb_c; }, 0)], ["Ainda não liquidado", pend.reduce(function (s, t) { return s + t.mb_c; }, 0)], ["Sem verificação", semv.reduce(function (s, t) { return s + t.mb_c; }, 0)]]
     .map(function (x) { return "<div><div class='k'>" + x[0] + "</div><div class='v'>" + fmt(x[1]) + "<small>€</small></div></div>"; }).join("");
-  var h = "";
+  var h = conferenciaMB(nm, tm, ligTurno, primeira, ultima);
   if (falta.length) h += "<div class='liq'><h3>⚠️ MB por creditar (" + falta.length + ")<span class='mut' style='font-weight:400;font-size:13px'>turnos com MB sem crédito igual nos documentos carregados</span></h3><div class='sc'><table><thead><tr><th>Dia</th><th class='l'>Turno</th><th>MB registado</th><th class='l'>Crédito mais próximo</th></tr></thead><tbody>" +
     falta.map(function (x) { return "<tr><td>" + dmy(x.t.dia) + "</td><td class='l'>" + (x.t.turno === "t1" ? "☀️ T1" : "🌙 T2") + " " + esc(x.t.func || "") + "</td><td class='n'>" + fmt(x.t.mb_c) + "</td><td class='l'>" + (x.l ? "fecho " + esc(x.l.c.fecho) + " · " + fmt(x.l.c.valor_c) + " <span class='b wn'>dif. " + fmt(x.l.c.valor_c - x.t.mb_c) + "</span>" : "<span class='mut'>nenhum</span>") + "</td></tr>"; }).join("") + "</tbody></table></div></div>";
   if (!liqs.length && !outros.length) h += "<div class='vazio'>Sem documentos da Repsol emitidos em " + esc(nm) + "." + (ADMIN ? " Carregue os PDF com o botão laranja (pode escolher vários)." : "") + "</div>";
@@ -317,6 +317,26 @@ function desenharRepsol(M, docs, ligados, turnos, checks) {
   $("#repChecks").innerHTML = vis.length ? "<h2>🔎 Verificações · " + esc(nm) + " <span class='b " + (ne ? "bad" : "ok") + "'>" + (ne ? ne + " erro(s)" : "tudo certo") + "</span></h2>" + ord.map(function (k) { var l = g[k], bad = l.some(function (c) { return c.nivel === "erro"; }), w = l.some(function (c) { return c.nivel === "aviso"; });
     return "<details class='grp'" + (bad || w ? " open" : "") + "><summary>" + (bad ? "❌ " : w ? "⚠️ " : "✅ ") + esc(k) + " <small class='mut' style='font-weight:400'>(" + l.length + ")</small></summary>" + l.map(linhaVerif).join("") + "</details>"; }).join("") : "";
   $$("#repDocs [data-pdf]").forEach(function (a) { a.onclick = function (ev) { ev.preventDefault(); abrirOriginal(a.dataset.pdf); }; });
+  var so = $("#mbSoNao"); if (so) so.onchange = function () { $$("#mbConf tbody tr").forEach(function (tr) { tr.hidden = so.checked && tr.dataset.ok === "1"; }); };
   $$("#repDocs tr[data-ir]").forEach(function (tr) { tr.style.cursor = "pointer"; tr.onclick = function () { vista("reg"); irDia(tr.dataset.ir); }; });
+}
+/* Conferência turno a turno: MB registado na caixa × MB creditado nos documentos de liquidação.
+   Verde = creditado com o mesmo valor; laranja = ainda não creditado (em falta, por liquidar, com diferença ou sem verificação). */
+function conferenciaMB(nm, tm, ligTurno, primeira, ultima) {
+  if (!tm.length) return "";
+  var T = {r: 0, c: 0, n: 0, nc: 0, d: 0}, linhas = tm.slice().sort(function (a, b) { return a.dia < b.dia ? -1 : a.dia > b.dia ? 1 : a.turno < b.turno ? -1 : 1; }).map(function (t) {
+    var l = ligTurno[t.dia + t.turno], ok = l && l.est === "ok", cred = l && l.c ? l.c.valor_c : null, est;
+    if (ok) est = "✔ creditado";
+    else if (l && l.est === "dif") est = "⚠ creditado com diferença";
+    else if (t.dia < primeira) est = "sem documento para verificar";
+    else if (t.dia <= addDia(ultima, -1)) est = "✖ em falta nos documentos";
+    else est = "⏳ ainda não liquidado";
+    T.r += t.mb_c; if (cred != null) { T.c += cred; T.d += cred - t.mb_c; } if (ok) T.n++; else T.nc += t.mb_c;
+    return "<tr class='" + (ok ? "lin-ok" : "lin-wn") + "' data-ir='" + t.dia + "' data-ok='" + (ok ? 1 : 0) + "'><td>" + dmy(t.dia).slice(0, 5) + "</td><td class='l'>" + (t.turno === "t1" ? "☀️ T1" : "🌙 T2") + " " + esc(t.func || "") + "</td><td class='n'>" + fmt(t.mb_c) + "</td><td class='n'>" + (cred == null ? "—" : fmt(cred)) + "</td><td class='l'>" + (l && l.c ? "Liq. " + esc(l.c.doc) + " <small class='mut'>fecho #" + esc(l.c.fecho) + " · " + dmy(l.c.data).slice(0, 5) + "</small>" : "—") + "</td><td class='n'>" + (cred == null ? "—" : sinal(cred - t.mb_c)) + "</td><td class='l'><b>" + est + "</b></td></tr>";
+  });
+  return "<div class='liq'><h3>💳 MB registado × creditado · " + esc(nm) + "<span class='mut' style='font-weight:400;font-size:13px'>" + T.n + " de " + tm.length + " turnos creditados · por creditar " + fmt(T.nc) + " €</span></h3>" +
+    "<label class='mut' style='font-size:13px;display:flex;gap:6px;align-items:center;margin:0 0 6px'><input type='checkbox' id='mbSoNao'> Mostrar só os não creditados</label>" +
+    "<div class='sc'><table id='mbConf'><thead><tr><th>Dia</th><th class='l'>Turno</th><th>MB registado</th><th>MB creditado</th><th class='l'>Documento</th><th>Diferença</th><th class='l'>Estado</th></tr></thead><tbody>" + linhas.join("") +
+    "</tbody><tfoot><tr><th colspan='2' class='l'>Total</th><th class='n'>" + fmt(T.r) + "</th><th class='n'>" + fmt(T.c) + "</th><th></th><th class='n'>" + sinal(T.d) + "</th><th class='l'>por creditar " + fmt(T.nc) + " €</th></tr></tfoot></table></div></div>";
 }
 function chipDoc(x) { var d = x.dados; return "<span class='chip'>" + (NOMES_DOC[x.tipo] || x.tipo) + " <b>" + esc(x.numero) + "</b> · " + dmy(x.emissao).slice(0, 5) + (d.total != null ? " · " + MOTOR.pt(d.total) + " €" : "") + (x.pdf ? " <a href='#' data-pdf='" + esc(x.pdf) + "'>PDF</a>" : "") + "</span>"; }
