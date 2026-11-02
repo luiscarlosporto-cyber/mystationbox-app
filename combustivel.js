@@ -158,7 +158,7 @@ async function carregarENSE() {
       c.produtos.forEach(function (p) { if (ENSE_PROD[p].cbos) { auto[p].vendas_qtd = 0; auto[p].vendas_valor = 0; auto[p].frota_qtd = 0; } });
       ["consigna", "solred"].forEach(function (forma) { Object.keys((V.comb || {})[forma] || {}).forEach(function (nome) {
         var v = V.comb[forma][nome], p = /NEXA/.test(nome) ? (c.produtos.indexOf("nexa") >= 0 ? "nexa" : null) : c.produtos.find(function (k) { return k !== "nexa" && ENSE_PROD[k].cbos && ENSE_PROD[k].cbos.test(nome); });
-        if (!p) { semProd.push(nome); return; }
+        if (!p) { if (!/AD ?BLUE/.test(nome)) semProd.push(nome); return; }
         auto[p].vendas_qtd += v[0]; auto[p].vendas_valor += v[2]; if (forma === "solred") auto[p].frota_qtd += v[0]; }); });
       (V.loja || []).forEach(function (l) { if (/^GAS$/.test(l[0])) gas = (gas || 0) + l[2]; });
     }
@@ -166,7 +166,7 @@ async function carregarENSE() {
     if (FF) {
       c.produtos.forEach(function (p) { if (ENSE_PROD[p].cbos) { auto[p].vendas_qtd = 0; auto[p].vendas_valor = 0; if (auto[p].frota_qtd == null) auto[p].frota_qtd = null; } });
       FF.dados.comb.forEach(function (x) { var nome = x[0], p = /NEXA/.test(nome) ? (c.produtos.indexOf("nexa") >= 0 ? "nexa" : null) : c.produtos.find(function (k) { return k !== "nexa" && ENSE_PROD[k].cbos && ENSE_PROD[k].cbos.test(nome); });
-        if (!p) { if (semProd.indexOf(nome) < 0) semProd.push(nome); return; } auto[p].vendas_qtd += x[2]; auto[p].vendas_valor += x[6]; });
+        if (!p) { if (semProd.indexOf(nome) < 0 && !/AD ?BLUE/.test(nome)) semProd.push(nome); return; } auto[p].vendas_qtd += x[2]; auto[p].vendas_valor += x[6]; });
       FF.dados.loja.forEach(function (l) { if (l[0] === "GAS") gas = l[2]; });
     }
     /* garrafas de gás: relatório de vendas por artigo (Excel) do mês; recebidas = vendidas (regra do utilizador, 02/11/2026) */
@@ -175,7 +175,7 @@ async function carregarENSE() {
       c.produtos.forEach(function (p) { if (ENSE_PROD[p].art) { auto[p].vendas_qtd = 0; auto[p].vendas_valor = 0; auto[p].frota_qtd = 0; } });
       VA.linhas.forEach(function (l) { var nm = semAcentosCBOS(l[1]), fam = semAcentosCBOS(l[4] || ""), p = (!fam || /GAS/.test(fam)) ? c.produtos.find(function (k) { return ENSE_PROD[k].art && ENSE_PROD[k].art.test(nm); }) : null;
         if (p) { auto[p].vendas_qtd += Math.round(l[2] * 100); auto[p].vendas_valor += Math.round(l[3] * 100); }
-        else if ((/^GAS$/.test(fam) || /BUTANO|PROPANO/.test(nm)) && !/ISQUEIRO|CLIPPER/.test(nm) && l[2]) gasNao.push(l[1] + " (" + l[2] + ")"); });
+        else if ((/^GAS$/.test(fam) || /BUTANO|PROPANO/.test(nm)) && !/ISQUEIRO|CLIPPER|REDUTOR|REGULADOR|MANGUEIRA/.test(nm) && l[2]) gasNao.push(l[1] + " (" + l[2] + ")"); });
       c.produtos.forEach(function (p) { if (ENSE_PROD[p].art) auto[p].recebidos = auto[p].vendas_qtd; });
     }
     (rm.data || []).forEach(function (x) { (man[x.produto] = man[x.produto] || {})[x.campo] = x.valor; });

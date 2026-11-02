@@ -746,15 +746,15 @@ function lerVendasCBOS(linhas) {
     var c = cbosCols(ln);
     if (!c.length || c[0] === "Forma de pagamento" || c[0] === "Família") return;
     if (sec === "comb") {
-      if (c[0].indexOf("Subtotal ") === 0) { subC[c[0].slice(9).trim()] = [cbosNum(c[1]), cbosNum(c[2])]; return; }
-      if (c[0] === "Total") { tot.comb = [cbosNum(c[1]), cbosNum(c[2])]; return; }
+      if (c[0].indexOf("Subtotal ") === 0) { if (c.length < 3) return; subC[c[0].slice(9).trim()] = [cbosNum(c[1]), cbosNum(c[2])]; return; }
+      if (c[0] === "Total") { if (c.length < 3) return; tot.comb = [cbosNum(c[1]), cbosNum(c[2])]; return; }
       if (c.length === 9 && !cbosENum(c[0])) { forma = c[0].toLowerCase(); c = c.slice(1); }
       if (c.length === 8 && forma && !cbosENum(c[0])) (r.comb[forma] = r.comb[forma] || {})[c[0].toUpperCase()] = [cbosNum(c[1]), cbosNum(c[2]), cbosNum(c[5])];
       return;
     }
     if (sec === "loja") {
-      if (c[0].indexOf("Subtotal ") === 0) { subF[c[0].slice(9).trim()] = [cbosNum(c[1]), cbosNum(c[2])]; return; }
-      if (c[0] === "Total") { tot.loja = [cbosNum(c[1]), cbosNum(c[2])]; sec = null; return; }
+      if (c[0].indexOf("Subtotal ") === 0) { if (c.length < 3) return; subF[c[0].slice(9).trim()] = [cbosNum(c[1]), cbosNum(c[2])]; return; }
+      if (c[0] === "Total") { if (c.length < 3) return; tot.loja = [cbosNum(c[1]), cbosNum(c[2])]; sec = null; return; }
       if (c.length === 9 && !cbosENum(c[0]) && !cbosENum(c[1])) { fam = c[0].toUpperCase(); c = c.slice(1); }
       if (c.length === 8 && fam && !cbosENum(c[0])) r.loja.push([fam, c[0].toUpperCase(), cbosNum(c[1]), cbosNum(c[2]), cbosNum(c[5])]);
     }
