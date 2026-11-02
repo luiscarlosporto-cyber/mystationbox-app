@@ -1,6 +1,6 @@
 /* mystationbox · combustíveis: entradas (guias de remessa) e relatório mensal para a ENSE (02/11/2026).
  * Entradas: Compras → Entrada de combustível (msb_comb_entradas). Combustível em litros; GPL auto entra em kg e
- * converte-se para litros (msb_config.ense.gpl_kg_litros, 1,832); garrafas de gás em unidades.
+ * converte-se para litros (msb_config.ense.gpl_kg_litros, 1 kg = 1,8 L); o GPL mostra sempre kg e litros; garrafas de gás em unidades.
  * ENSE: Relatórios → ENSE mensal. Produtos recebidos = soma das entradas do mês; total de vendas e vendas a cartão
  * frotista = relatório de vendas do mês do software Repsol (msb_vendas_mes, consigna + Solred; Solred = frotista).
  * O que não vem de documentos (garrafas) ou precise de correção escreve-se na tabela e fica em msb_ense ("manual").
@@ -18,7 +18,7 @@ var ENSE_CFG = {};
 async function cfgENSE() {
   if (ENSE_CFG[EST]) return ENSE_CFG[EST];
   var r = await sb.from("msb_config").select("ense").eq("estacao", EST).maybeSingle();
-  var c = (r.data && r.data.ense) || {produtos: ["butano13", "propano11", "gas95", "gas95ad", "gas98ad", "gasoleo", "gasoleoad", "butano6", "butano12", "butano12_5"], gpl_kg_litros: 1.832};
+  var c = (r.data && r.data.ense) || {produtos: ["butano13", "propano11", "gas95", "gas95ad", "gas98ad", "gasoleo", "gasoleoad", "butano6", "butano12", "butano12_5"], gpl_kg_litros: 1.8};
   return (ENSE_CFG[EST] = c);
 }
 function q100(v) { return v == null ? "" : (v / 100).toLocaleString("pt-PT", {minimumFractionDigits: v % 100 ? 2 : 0, maximumFractionDigits: 2}); }
@@ -35,7 +35,7 @@ async function carregarEntradasComb() {
     var r = await sb.from("msb_comb_entradas").select("*").eq("estacao", EST).gte("dia", M + "-01").lt("dia", fim).order("dia", {ascending: false}).order("id", {ascending: false});
     if (r.error) throw r.error;
     var L = r.data || [], tot = {};
-    L.forEach(function (x) { tot[x.produto] = (tot[x.produto] || 0) + x.qtd; });
+    var totKg = {}; L.forEach(function (x) { tot[x.produto] = (tot[x.produto] || 0) + x.qtd; if (x.kg != null) totKg[x.produto] = (totKg[x.produto] || 0) + x.kg; });
     var opc = c.produtos.filter(function (p) { return ENSE_PROD[p].u === "L"; }).map(function (p) { return "<option value='" + p + "'>" + esc(ENSE_PROD[p].n) + " (" + (ENSE_PROD[p].kg ? "kg → litros" : unid(p)) + ")</option>"; }).join("");
     var h = ADMIN ? "<div class='card'><div class='cb' style='display:grid;gap:10px'><h3 style='margin:0'>⛽ Registar entrada</h3>" +
       "<div class='grid2' style='display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px'>" +
@@ -47,7 +47,7 @@ async function carregarEntradasComb() {
       "<div id='ceConv' class='mut' style='font-size:13px'></div>" +
       "<div class='bar'><button class='btn p' id='ceGravar'>+ Registar entrada</button><span id='ceMsg'></span></div></div></div>" : "";
     h += "<div class='card'><div class='cb'><h3 style='margin:0 0 8px'>Totais recebidos · " + esc(nomeMes(M)) + "</h3><div class='sc'><table><thead><tr><th class='l'>Produto</th><th>Recebido</th><th class='l'>Unidade</th></tr></thead><tbody>" +
-      c.produtos.filter(function (p) { return ENSE_PROD[p].u === "L"; }).map(function (p) { return "<tr><td class='l'>" + esc(ENSE_PROD[p].n) + "</td><td class='n'><b>" + (tot[p] ? q100(tot[p]) : "0") + "</b></td><td class='l'>" + unid(p) + "</td></tr>"; }).join("") + "</tbody></table></div></div></div>";
+      c.produtos.filter(function (p) { return ENSE_PROD[p].u === "L"; }).map(function (p) { return "<tr><td class='l'>" + esc(ENSE_PROD[p].n) + "</td><td class='n'>" + (ENSE_PROD[p].kg ? "<b>" + q100(totKg[p] || 0) + "</b> kg = " : "") + "<b>" + (tot[p] ? q100(tot[p]) : "0") + "</b></td><td class='l'>" + unid(p) + "</td></tr>"; }).join("") + "</tbody></table></div></div></div>";
     h += "<div class='card'><div class='cb'><h3 style='margin:0 0 8px'>Entradas registadas (" + L.length + ")</h3>" + (L.length ? "<div class='sc'><table><thead><tr><th>Data</th><th class='l'>Produto</th><th>Quantidade</th><th class='l'>Guia</th><th class='l'>Nota</th>" + (ADMIN ? "<th></th>" : "") + "</tr></thead><tbody>" +
       L.map(function (x) { return "<tr><td>" + dmy(x.dia) + "</td><td class='l'>" + esc((ENSE_PROD[x.produto] || {n: x.produto}).n) + "</td><td class='n'>" + q100(x.qtd) + " " + (ENSE_PROD[x.produto] && ENSE_PROD[x.produto].u === "L" ? "L" : "un") + (x.kg != null ? " <small class='mut'>(" + q100(x.kg) + " kg)</small>" : "") + "</td><td class='l'>" + esc(x.guia) + "</td><td class='l'>" + esc(x.nota) + "</td>" + (ADMIN ? "<td><button class='btn' data-apagar='" + x.id + "' title='Apagar'>🗑</button></td>" : "") + "</tr>"; }).join("") + "</tbody></table></div>" : "<p class='mut' style='margin:0'>Ainda não há entradas neste mês.</p>") + "</div></div>";
     box.innerHTML = h;
@@ -87,12 +87,12 @@ async function carregarENSE() {
   box.innerHTML = "<div class='mut'>A carregar…</div>";
   try {
     var c = await cfgENSE(), fim = addMes(M, 1) + "-01";
-    var re = await sb.from("msb_comb_entradas").select("produto,qtd").eq("estacao", EST).gte("dia", M + "-01").lt("dia", fim); if (re.error) throw re.error;
+    var re = await sb.from("msb_comb_entradas").select("produto,qtd,kg").eq("estacao", EST).gte("dia", M + "-01").lt("dia", fim); if (re.error) throw re.error;
     var rv = await sb.from("msb_vendas_mes").select("dados,de,ate,fonte").eq("estacao", EST).eq("mes", M).maybeSingle();
     var rm = await sb.from("msb_ense").select("produto,campo,valor").eq("estacao", EST).eq("mes", M); if (rm.error) throw rm.error;
     var auto = {}, man = {}, semProd = [], gas = null;
     c.produtos.forEach(function (p) { auto[p] = {recebidos: 0, vendas_qtd: null, vendas_valor: null, frota_qtd: null}; });
-    (re.data || []).forEach(function (x) { if (auto[x.produto]) auto[x.produto].recebidos += x.qtd; });
+    (re.data || []).forEach(function (x) { if (auto[x.produto]) { auto[x.produto].recebidos += x.qtd; if (x.kg != null) auto[x.produto].recebidos_kg = (auto[x.produto].recebidos_kg || 0) + x.kg; } });
     var V = rv && !rv.error && rv.data ? rv.data.dados : null;
     if (V) {
       c.produtos.forEach(function (p) { if (ENSE_PROD[p].cbos) { auto[p].vendas_qtd = 0; auto[p].vendas_valor = 0; auto[p].frota_qtd = 0; } });
@@ -114,8 +114,8 @@ async function carregarENSE() {
     (rm.data || []).forEach(function (x) { (man[x.produto] = man[x.produto] || {})[x.campo] = x.valor; });
     ENSE_DADOS = {M: M, c: c, auto: auto, man: man, V: V, fonte: V ? rv.data : null, va: VA};
     var val = function (p, k) { return man[p] && man[p][k] != null ? man[p][k] : auto[p][k]; };
-    var cel = function (p, k, euro) { var m = man[p] && man[p][k] != null, v = val(p, k);
-      return "<td class='n'>" + (ADMIN ? "<input class='enseIn" + (m ? " man" : "") + "' data-p='" + p + "' data-k='" + k + "' inputmode='decimal' value='" + (v == null ? "" : euro ? fmt(v) : q100(v)) + "' placeholder='0' title='" + (m ? "escrito à mão" : "calculado") + "'>" : (v == null ? "—" : euro ? fmt(v) : q100(v))) + "</td>"; };
+    var cel = function (p, k, euro) { var m = man[p] && man[p][k] != null, v = val(p, k), kg = !euro && ENSE_PROD[p].kg ? kgENSE(ENSE_DADOS, p, k) : null;
+      return "<td class='n'>" + (ADMIN ? "<input class='enseIn" + (m ? " man" : "") + "' data-p='" + p + "' data-k='" + k + "' inputmode='decimal' value='" + (v == null ? "" : euro ? fmt(v) : q100(v)) + "' placeholder='0' title='" + (m ? "escrito à mão" : "calculado") + "'>" : (v == null ? "—" : euro ? fmt(v) : q100(v))) + (kg != null ? "<br><small class='mut'>= " + q100(kg) + " kg</small>" : "") + "</td>"; };
     var h = "<div class='card'><div class='cb' style='display:grid;gap:6px'>" +
       (V ? "<div class='msgOk' style='padding:8px 10px;border-radius:8px'>✔ Vendas do relatório de " + dmy(rv.data.de) + " a " + dmy(rv.data.ate) + " (software Repsol). Cartão frotista = Solred.</div>"
          : "<div class='msgErr' style='padding:8px 10px;border-radius:8px'>⚠ Falta o relatório de vendas de " + esc(nomeMes(M)) + ". Carregue-o em Relatórios → Lucro (📄 Carregar relatório de vendas do mês) ou no 📥 Carregar. Até lá, as vendas ficam por preencher.</div>") +
@@ -132,6 +132,9 @@ async function carregarENSE() {
     $$("#enseTab .enseIn").forEach(function (el) { el.onchange = function () { gravarENSE(el); }; });
   } catch (e) { box.innerHTML = "<div class='card msgErr' style='padding:12px'>✖ " + esc(falhouComb(e)) + "</div>"; }
 }
+/* GPL: kg da guia quando há (recebidos sem correção); senão litros ÷ fator */
+function kgENSE(D, p, k) { var m = D.man[p] && D.man[p][k] != null, v = m ? D.man[p][k] : D.auto[p][k];
+  if (v == null) return null; if (k === "recebidos" && !m && D.auto[p].recebidos_kg != null) return D.auto[p].recebidos_kg; return Math.round(v / D.c.gpl_kg_litros); }
 async function gravarENSE(el) {
   var D = ENSE_DADOS, p = el.dataset.p, k = el.dataset.k, t = el.value.trim(), euro = k === "vendas_valor";
   try {
@@ -176,7 +179,7 @@ async function fazerPdfENSE(D, inst) {
       quebra(alt);
       if (i % 2) pg.drawRectangle({x: mm(14), y: mm(297 - y - alt + 3.8), width: mm(182), height: mm(alt), color: P.rgb(0.95, 0.956, 0.965)});
       nome.forEach(function (l, k) { txt(l, 16, y + k * 3.6); });
-      cols.forEach(function (cc) { var v = val(p, cc.k); txt(v == null ? "-" : cc.euro ? fmt(v) : q100(v), cc.x, y, {b: 1, dir: 1}); txt(cc.euro ? "(€)" : "(" + unid(p) + ")", cc.x + 2, y); });
+      cols.forEach(function (cc) { var v = val(p, cc.k); txt(v == null ? "-" : cc.euro ? fmt(v) : q100(v), cc.x, y, {b: 1, dir: 1}); txt(cc.euro ? "(€)" : "(" + unid(p) + (ENSE_PROD[p].kg && v != null ? " = " + q100(kgENSE(D, p, cc.k)) + " kg" : "") + ")", cc.x + 2, y); });
       y += alt;
     });
     y += 3;
@@ -184,7 +187,7 @@ async function fazerPdfENSE(D, inst) {
   secao("Produtos recebidos", [{k: "recebidos", x: 160}]);
   secao("Total de vendas", [{k: "vendas_qtd", x: 128}, {k: "vendas_valor", x: 176, euro: true}]);
   secao("Vendas - cartão frotista", [{k: "frota_qtd", x: 160}]);
-  txt("GPL auto recebido em kg convertido a " + String(cfg.gpl_kg_litros).replace(".", ",") + " L/kg. Valores de venda com IVA. Gerado pelo mystationbox em " + new Date().toLocaleString("pt-PT") + ".", 14, 290, {t: 7, cor: P.rgb(0.45, 0.45, 0.45)});
+  txt((cfg.produtos.indexOf("gplauto") >= 0 ? "GPL auto: 1 kg = " + String(cfg.gpl_kg_litros).replace(".", ",") + " litros. " : "") + "Valores de venda com IVA. Gerado pelo mystationbox em " + new Date().toLocaleString("pt-PT") + ".", 14, 290, {t: 7, cor: P.rgb(0.45, 0.45, 0.45)});
   return doc.save();
 }
 async function pdfENSE() {
