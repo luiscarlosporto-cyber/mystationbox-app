@@ -7,11 +7,11 @@
  * O PDF segue a ordem e as unidades do formulário da ENSE. */
 "use strict";
 var ENSE_PROD = {
-  butano13: {n: "Garrafas GPL - Butano 13Kg", u: "un", art: /BUTANO.*\b13\b/}, propano11: {n: "Garrafas GPL - Propano 11Kg", u: "un", art: /PROPANO.*\b11\b/},
+  butano13: {n: "Garrafas GPL - Butano 13Kg", u: "un", art: /BUTANO\D*13(?![\d,.])/}, propano11: {n: "Garrafas GPL - Propano 11Kg", u: "un", art: /PROPANO\D*11(?![\d,.])/},
   gas95: {n: "Gasolina simples 95", u: "L", cbos: /^GASOLINA (SIMPLES|95)/}, gas95ad: {n: "Gasolina I.O. 95 submetido a processo de aditivação suplementar", u: "L", cbos: /EFITEC 95|95 PREM/},
   gas98ad: {n: "Gasolina I.O. 98 submetido a processo de aditivação suplementar", u: "L", cbos: /EFITEC 98|98/}, gasoleo: {n: "Gasóleo simples", u: "L", cbos: /^GASOLEO$|^GASÓLEO$|^GASOLEO SIMPLES/},
   gasoleoad: {n: "Gasóleo rodoviário submetido a processo de aditivação suplementar", u: "L", cbos: /E\+10|DIESEL/},
-  butano6: {n: "Garrafas GPL - Butano 6 kg", u: "un", art: /BUTANO.*\b6\b/}, butano12: {n: "Garrafas GPL - Butano 12 kg", u: "un", art: /BUTANO.*\b12\b(?![,.]\d)/}, butano12_5: {n: "Garrafas GPL - Butano 12,5 kg", u: "un", art: /BUTANO.*\b12[,.]5\b/},
+  butano6: {n: "Garrafas GPL - Butano 6 kg", u: "un", art: /BUTANO\D*6(?![\d,.])/}, butano12: {n: "Garrafas GPL - Butano 12 kg", u: "un", art: /BUTANO\D*12(?![\d,.])/}, butano12_5: {n: "Garrafas GPL - Butano 12,5 kg", u: "un", art: /BUTANO\D*12[,.]5(?!\d)/},
   gplauto: {n: "GPL Auto", u: "L", kg: 1, cbos: /GPL|AUTOGAS/},
   nexa: {n: "Nexa (combustível 100% renovável)", u: "L", cbos: /NEXA/}
 };
@@ -109,7 +109,7 @@ async function carregarENSE() {
       c.produtos.forEach(function (p) { if (ENSE_PROD[p].art) { auto[p].vendas_qtd = 0; auto[p].vendas_valor = 0; auto[p].frota_qtd = 0; } });
       VA.linhas.forEach(function (l) { var nm = semAcentosCBOS(l[1]), fam = semAcentosCBOS(l[4] || ""), p = (!fam || /GAS/.test(fam)) ? c.produtos.find(function (k) { return ENSE_PROD[k].art && ENSE_PROD[k].art.test(nm); }) : null;
         if (p) { auto[p].vendas_qtd += Math.round(l[2] * 100); auto[p].vendas_valor += Math.round(l[3] * 100); }
-        else if ((/^GAS$/.test(fam) || /BUTANO|PROPANO|GARRAFA/.test(nm)) && !/ISQUEIRO|CLIPPER/.test(nm) && l[2]) gasNao.push(l[1] + " (" + l[2] + ")"); });
+        else if ((/^GAS$/.test(fam) || /BUTANO|PROPANO/.test(nm)) && !/ISQUEIRO|CLIPPER/.test(nm) && l[2]) gasNao.push(l[1] + " (" + l[2] + ")"); });
       c.produtos.forEach(function (p) { if (ENSE_PROD[p].art) auto[p].recebidos = auto[p].vendas_qtd; });
     }
     (rm.data || []).forEach(function (x) { (man[x.produto] = man[x.produto] || {})[x.campo] = x.valor; });
