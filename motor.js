@@ -871,7 +871,7 @@ var PRECOS_ENSE = {
   "GASOLEO": "Gasóleo simples",
   "REPSOLDIESELE+10": "Gasóleo rodoviário submetido a processo de aditivação suplementar",
   "AUTOGAS": "GPL Auto",
-  "DIESELNEXA100%": "Gasóleo 100% renovável"
+  "DIESELNEXA100%": "Gasóleo 100% Renovável - B100"
 };
 var PRECOS_FORA_ENSE = {"ADBLUEGRANEL": 1};
 var PRECOS_MESES = ["JANEIRO", "FEVEREIRO", "MARCO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];

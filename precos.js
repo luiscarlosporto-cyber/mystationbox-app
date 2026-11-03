@@ -6,7 +6,7 @@
  * anterior e marcar como comunicado (quem e quando). As garrafas de gás não vêm no PDF: na ENSE ficam como estão. */
 "use strict";
 var PRE_ORDEM = ["Gasóleo rodoviário submetido a processo de aditivação suplementar", "Gasóleo simples", "Gasolina I.O. 95 submetido a processo de aditivação suplementar", "Gasolina I.O. 98 submetido a processo de aditivação suplementar", "Gasolina simples 95"];
-var PRE_CURTO = {"Gasóleo rodoviário submetido a processo de aditivação suplementar": "Gasóleo aditivado", "Gasóleo simples": "Gasóleo simples", "Gasolina I.O. 95 submetido a processo de aditivação suplementar": "Gasolina 95 aditivada", "Gasolina I.O. 98 submetido a processo de aditivação suplementar": "Gasolina 98 aditivada", "Gasolina simples 95": "Gasolina simples 95", "GPL Auto": "GPL Auto (Autogás)", "Gasóleo 100% renovável": "Diesel Nexa 100% renovável"};
+var PRE_CURTO = {"Gasóleo rodoviário submetido a processo de aditivação suplementar": "Gasóleo aditivado", "Gasóleo simples": "Gasóleo simples", "Gasolina I.O. 95 submetido a processo de aditivação suplementar": "Gasolina 95 aditivada", "Gasolina I.O. 98 submetido a processo de aditivação suplementar": "Gasolina 98 aditivada", "Gasolina simples 95": "Gasolina simples 95", "GPL Auto": "GPL Auto (Autogás)", "Gasóleo 100% Renovável - B100": "Diesel Nexa 100% renovável"};
 var PRE_CAMPOS = PRE_ORDEM;   // campos desta estação: os que aparecem nos PDF guardados (Penafiel tem também GPL Auto e Nexa)
 function camposDe(L) { var v = {}; L.forEach(function (x) { (x.produtos || []).forEach(function (p) { if (p.ense) v[p.ense] = 1; }); });
   var o = PRE_ORDEM.filter(function (c) { return v[c]; }); Object.keys(v).forEach(function (c) { if (o.indexOf(c) < 0) o.push(c); }); return o.length ? o : PRE_ORDEM; }
