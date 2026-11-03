@@ -869,8 +869,11 @@ var PRECOS_ENSE = {
   "GASOLINAS/CHUMBO95": "Gasolina simples 95",
   "EF95PREMIUM": "Gasolina I.O. 95 submetido a processo de aditivação suplementar",
   "GASOLEO": "Gasóleo simples",
-  "REPSOLDIESELE+10": "Gasóleo rodoviário submetido a processo de aditivação suplementar"
+  "REPSOLDIESELE+10": "Gasóleo rodoviário submetido a processo de aditivação suplementar",
+  "AUTOGAS": "GPL Auto",
+  "DIESELNEXA100%": "Gasóleo 100% renovável"
 };
+var PRECOS_FORA_ENSE = {"ADBLUEGRANEL": 1};
 var PRECOS_MESES = ["JANEIRO", "FEVEREIRO", "MARCO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
 function precosChave(nome) {
   var t = nome.toUpperCase(), tr = [["Á", "A"], ["À", "A"], ["Ã", "A"], ["Â", "A"], ["É", "E"], ["Ê", "E"], ["Í", "I"], ["Ó", "O"], ["Õ", "O"], ["Ô", "O"], ["Ú", "U"], ["Ç", "C"]];
@@ -897,13 +900,13 @@ function lerPrecosRepsol(linhas) {
   if (!r.vigor) erros.push("não encontrei a data de entrada em vigor");
   if (!r.produtos.length) erros.push("não encontrei nenhum produto com preço");
   r.produtos.forEach(function (p) {
-    p.chave = precosChave(p.pdf); p.ense = PRECOS_ENSE[p.chave] || null;
-    if (!p.ense) erros.push("produto «" + p.pdf + "» não tem campo ENSE conhecido");
+    p.chave = precosChave(p.pdf); p.ense = PRECOS_ENSE[p.chave] || null; p.fora = !!PRECOS_FORA_ENSE[p.chave];
+    if (!p.ense && !p.fora) erros.push("produto «" + p.pdf + "» não tem campo ENSE conhecido");
     if (vistos[p.chave]) erros.push("produto «" + p.pdf + "» repetido");
     vistos[p.chave] = 1;
     if ((p.ref - p.preco) * 100 !== p.red_civa) erros.push(p.pdf + ": referência − reduzido (" + (p.ref - p.preco) + ") não bate com a redução " + p.red_civa);
     if (Math.abs(p.red_civa / 1.23 - p.red_siva) > 1.5) erros.push(p.pdf + ": redução s/IVA " + p.red_siva + " não corresponde a " + p.red_civa + " ÷ 1,23");
-    if (!(p.preco >= 500 && p.preco <= 5000)) erros.push(p.pdf + ": preço " + p.preco + " fora do normal");
+    if (!p.fora && !(p.preco >= 500 && p.preco <= 5000)) erros.push(p.pdf + ": preço " + p.preco + " fora do normal");
   });
   erros.forEach(function (e) { r.verificacoes.push({nivel: "erro", texto: e}); });
   if (!erros.length) r.verificacoes.push({nivel: "ok", texto: r.produtos.length + " produtos; referência − reduzido = redução em todos"});
