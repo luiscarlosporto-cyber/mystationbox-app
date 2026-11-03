@@ -15,6 +15,18 @@ function pctVenda(p) { return p >= 100 ? p / (100 + p) * 100 : p; }
 function chaveLoja(fam, sub) { return "loja:" + fam + (sub ? "/" + sub : ""); }
 var LOJA_SUB = [["TABACO", "ACESSORIOS TABACARIA"]];   // subfamílias com margem própria (acessórios ≠ tabaco)
 
+/* Bónus do combustível · Política Comercial Rede EESS 2026 (Repsol, 02/03/2026), em €/m³ (guardados em €/L em msb_margens).
+ * Bónus variáveis e My Repsol: conta consignação, My Repsol e desconto imediato (não Solred). Dinamização: só conta consignação,
+ * para postos com volume CC+MR+DI do ano anterior < 1 750 m³. Taxa My Repsol: −0,8 €/m³ sobre os mesmos volumes. */
+var BONUS_VAR = [["servicos", "Pagamento de serviços", 1], ["atempado", "Pagamento atempado", 2], ["garantia", "Garantia bancária", 1], ["fatura", "Faturação eletrónica", 1], ["voc", "VoC: avaliação global ≥ 4,67 (ou índice de melhoria ≥ 0,05)", 3]];
+var BONUS_MR = [["", "Sem bónus My Repsol (< 25 %)"], [2.5, "My Repsol ≥ 25 % e < 30 %"], [3, "My Repsol ≥ 30 % e < 35 %"], [3.5, "My Repsol ≥ 35 % e < 40 %"], [4, "My Repsol ≥ 40 % e < 45 %"], [4.5, "My Repsol ≥ 45 % e < 50 %"], [5, "My Repsol ≥ 50 %"]];
+var BONUS_DIN = [["", "Sem bónus de dinamização (não elegível ou CC ≥ 45 %)"], [22, "CC < 600 m³ · vol. CC < 25 %"], [18, "CC < 600 m³ · vol. CC ≥ 25 % e < 30 %"], [14, "CC < 600 m³ · vol. CC ≥ 30 % e < 35 %"], [10, "CC < 600 m³ · vol. CC ≥ 35 % e < 40 %"], [6, "CC < 600 m³ · vol. CC ≥ 40 % e < 45 %"],
+  [15, "CC ≥ 600 m³ · vol. CC < 25 %"], [12, "CC ≥ 600 m³ · vol. CC ≥ 25 % e < 30 %"], [9, "CC ≥ 600 m³ · vol. CC ≥ 30 % e < 35 %"], [6.001, "CC ≥ 600 m³ · vol. CC ≥ 35 % e < 40 %"], [3, "CC ≥ 600 m³ · vol. CC ≥ 40 % e < 45 %"]];
+/* €/L a somar à comissão: consignação (com dinamização) e desconto imediato / My Repsol */
+function bonusLitro(M) {
+  var v = BONUS_VAR.reduce(function (s, b) { return s + (M["bonus:" + b[0]] || 0); }, 0), mr = M["bonus:myrepsol"] || 0, din = Math.round((M["bonus:dinam"] || 0) * 1000) / 1000, tx = M["bonus:taxa_mr"] || 0;
+  return {cons: v + mr + din - tx, desc: v + mr - tx, var: v, mr: mr, din: din, tx: tx};
+}
 async function lerMargens() {
   var r = await sb.from("msb_margens").select("chave,valor,unidade").eq("estacao", EST); if (r.error) throw r.error;
   var m = {}; (r.data || []).forEach(function (x) { m[x.chave] = Number(x.valor); }); return m;
@@ -38,10 +50,19 @@ async function carregarMargens() {
   try {
     var M = await lerMargens(), C = await lerCustos(), F = await familiasConhecidas(M);
     var h = "<div class='card' style='padding:14px;display:grid;gap:10px'><h2 style='margin:0'>⛽ Combustível · margem por litro (€/L)</h2>" +
-      "<p class='mut' style='margin:0;font-size:13px'>Valores iniciais = política comercial 2026 sem bónus (ex.: 45 €/m³ = 0,045 €/L). Ajuste aos valores reais do seu contrato, com bónus se quiser incluí-los.</p>" +
+      "<p class='mut' style='margin:0;font-size:13px'>Valores iniciais = política comercial 2026 sem bónus (ex.: 45 €/m³ = 0,045 €/L). Ajuste aos valores reais do seu contrato. Os bónus marcam-se no quadro seguinte (não os some aqui).</p>" +
       "<div class='sc'><table><thead><tr><th class='l'>Categoria</th><th>Simples (gasóleo, gasolina)</th><th>Premium (Diesel e+10, Efitec)</th></tr></thead><tbody>" +
       COMB_CAT.map(function (c) { return "<tr><td class='l'>" + c[1] + "</td>" + ["simples", "premium"].map(function (t) { var k = "comb:" + c[0] + ":" + t; return "<td class='n'><input class='mg' data-k='" + k + "' data-u='eur_litro' inputmode='decimal' value='" + num4(M[k]) + "' style='width:90px;text-align:right'> €/L</td>"; }).join("") + "</tr>"; }).join("") +
       "</tbody></table></div></div>";
+    var chk = function (k, v, t) { return "<label style='display:flex;gap:8px;align-items:center'><input type='checkbox' class='bn' data-k='bonus:" + k + "' data-v='" + v / 1000 + "'" + (M["bonus:" + k] ? " checked" : "") + "> <span style='flex:1'>" + t + "</span><b>" + num4(v) + " €/m³</b></label>"; };
+    var sel = function (k, ops) { var cur = M["bonus:" + k]; return "<select class='bn' data-k='bonus:" + k + "' style='width:100%'>" + ops.map(function (o) { var v = o[0] === "" ? "" : o[0] / 1000; return "<option value='" + v + "'" + ((cur == null && o[0] === "") || (cur != null && o[0] !== "" && Math.abs(cur - v) < 1e-9) ? " selected" : "") + ">" + o[1] + (o[0] === "" ? "" : " · " + num4(Math.round(o[0] * 10) / 10) + " €/m³") + "</option>"; }).join("") + "</select>"; };
+    h += "<div class='card' style='padding:14px;display:grid;gap:10px'><h2 style='margin:0'>🎯 Bónus do combustível · política comercial 2026</h2>" +
+      "<p class='mut' style='margin:0;font-size:13px'>Marque os bónus que o posto recebe. Somam-se à comissão de cada litro no relatório de lucro: bónus variáveis e My Repsol em conta consignação e desconto imediato; dinamização só em conta consignação; Solred não tem bónus.</p>" +
+      "<b>Bónus variáveis (até 8 €/m³)</b>" + BONUS_VAR.map(function (b) { return chk(b[0], b[2], b[1]); }).join("") +
+      "<b>Bónus My Repsol (até 5 €/m³)</b>" + sel("myrepsol", BONUS_MR) +
+      "<b>Bónus de dinamização (só conta consignação, até 22 €/m³)</b><p class='mut' style='margin:0;font-size:13px'>Só para postos com volume conta consignação + My Repsol + desconto imediato do ano anterior abaixo de 1 750 m³.</p>" + sel("dinam", BONUS_DIN) +
+      "<b>Taxas</b>" + chk("taxa_mr", 0.8, "Descontar a taxa My Repsol (sobre consignação, My Repsol e desconto imediato)").replace("<b>0,8 €/m³</b>", "<b>−0,8 €/m³</b>") +
+      "<p class='mut' style='margin:0;font-size:13px'>A taxa da loja (50 € a 350 € por mês, conforme as vendas da loja) é um custo fixo: acrescente-a em «Custos fixos por mês».</p></div>";
     var linhas = []; F.forEach(function (f) { linhas.push([f, ""]); LOJA_SUB.forEach(function (s) { if (s[0] === f) linhas.push([f, s[1]]); }); });
     h += "<div class='card' style='padding:14px;display:grid;gap:10px'><h2 style='margin:0'>🛍️ Loja · margem por categoria (% sobre a venda sem IVA)</h2><p class='mut' style='margin:0'>Até 99 % = margem sobre a venda. 100 % ou mais = margem sobre o custo (ex.: 150 % → custo 1 €, venda 2,50 €, ou seja 60 % da venda).</p>" +
       "<p class='mut' style='margin:0;font-size:13px'>Deixe vazio o que não sabe: no relatório de lucro aparece como \"margem por definir\" e não entra na conta. Tabaco: 6,8 % é a média das faturas da Adelaide.</p>" +
@@ -68,6 +89,8 @@ async function gravarMargens() {
     var up = [], del = [], erro = "";
     $$("#mrgCorpo input.mg").forEach(function (i) { var v = lerNum(i.value); if (v === null) del.push(i.dataset.k); else if (isNaN(v) || v < 0 || (i.dataset.u === "pct" && v >= 1000)) erro = "Valor inválido: " + i.value; else up.push({estacao: EST, chave: i.dataset.k, valor: v, unidade: i.dataset.u, atualizado: new Date().toISOString()}); });
     var custos = []; $$("#custosLista .custo").forEach(function (d) { var n = d.querySelector(".cn").value.trim(), v = lerNum(d.querySelector(".cv").value); if ((!n || d.classList.contains("base")) && v === null) return; if (!n || v === null || isNaN(v) || v < 0) erro = "Custo incompleto: " + (n || "sem nome"); else custos.push({estacao: EST, nome: n.slice(0, 80), valor_c: Math.round(v * 100)}); });
+    $$("#mrgCorpo .bn").forEach(function (i) { var v = i.type === "checkbox" ? (i.checked ? Number(i.dataset.v) : null) : (i.value === "" ? null : Number(i.value));
+      if (v == null) del.push(i.dataset.k); else up.push({estacao: EST, chave: i.dataset.k, valor: Math.round(v * 1e7) / 1e7, unidade: "eur_litro", atualizado: new Date().toISOString()}); });
     if (erro) throw new Error(erro);
     b.disabled = true;
     if (up.length) { var r1 = await sb.from("msb_margens").upsert(up, {onConflict: "estacao,chave"}); if (r1.error) throw r1.error; }
@@ -108,22 +131,24 @@ async function carregarLucro() {
     var DESC = descontoTMS(rt.data && rt.data[0] && rt.data[0].dados);
     var h = "", totM = 0, falta = [];
     /* combustível */
+    var BL = bonusLitro(M), tBon = 0;
     var prods = Object.keys(Object.assign({}, D.comb.consigna || {}, D.comb.solred || {})).sort(), linhas = "", tl = {cons: 0, desc: 0, sol: 0}, mC = 0;
     prods.forEach(function (p) {
       var t = premium(p) ? "premium" : "simples", cons = ((D.comb.consigna || {})[p] || [0])[0], sol = ((D.comb.solred || {})[p] || [0])[0];
       var desc = DESC ? Math.min(cons, Math.max(0, Math.round(DESC[p] || 0))) : 0, pura = cons - desc;
       var mc = M["comb:consignacao:" + t], md = M["comb:desconto:" + t], ms = M["comb:solred:" + t];
       [["consignação", mc], ["desconto imediato", md], ["Solred", ms]].forEach(function (x) { if (x[1] == null && falta.indexOf("combustível: " + x[0] + " " + t) < 0) falta.push("combustível: " + x[0] + " " + t); });
-      var mg = (pura / 100) * (mc || 0) + (desc / 100) * (md || 0) + (sol / 100) * (ms || 0);
+      var bon = (pura / 100) * BL.cons + (desc / 100) * BL.desc, mg = (pura / 100) * (mc || 0) + (desc / 100) * (md || 0) + (sol / 100) * (ms || 0) + bon; tBon += bon;
       mC += mg; tl.cons += pura; tl.desc += desc; tl.sol += sol;
-      linhas += "<tr><td class='l'>" + esc(p) + " <span class='mut' style='font-size:12px'>" + t + "</span></td><td class='n'>" + litros2(cons) + "</td><td class='n'>" + litros2(desc) + "</td><td class='n'><b>" + litros2(pura) + "</b></td><td class='n'>" + litros2(sol) + "</td><td class='n'><b>" + fmt(Math.round(mg * 100)) + "</b></td></tr>";
+      linhas += "<tr><td class='l'>" + esc(p) + " <span class='mut' style='font-size:12px'>" + t + "</span></td><td class='n'>" + litros2(cons) + "</td><td class='n'>" + litros2(desc) + "</td><td class='n'><b>" + litros2(pura) + "</b></td><td class='n'>" + litros2(sol) + "</td><td class='n'>" + fmt(Math.round(bon * 100)) + "</td><td class='n'><b>" + fmt(Math.round(mg * 100)) + "</b></td></tr>";
     });
     totM += mC;
     h += "<div class='card' style='padding:14px;display:grid;gap:8px'><h2 style='margin:0'>⛽ Combustível</h2>" +
       (DESC ? "<p class='mut' style='margin:0;font-size:13px'>Consignação = litros em consignação − litros com desconto imediato (fecho mensal TMS, já sem os reembolsos).</p>"
             : "<div class='aviso'><p>⚠ Sem fecho mensal TMS deste mês: não sei os litros com desconto imediato, por isso todo o consignado conta como consignação. Carregue o TMS para o valor certo.</p></div>") +
-      "<div class='sc'><table><thead><tr><th class='l'>Produto</th><th>Consignado (L)</th><th>− Desconto imediato (L)</th><th>= Consignação (L)</th><th>Solred (L)</th><th>Margem €</th></tr></thead><tbody>" + linhas +
-      "</tbody><tfoot><tr><td class='l'>Total</td><td class='n'>" + litros2(tl.cons + tl.desc) + "</td><td class='n'>" + litros2(tl.desc) + "</td><td class='n'>" + litros2(tl.cons) + "</td><td class='n'>" + litros2(tl.sol) + "</td><td class='n'><b>" + fmt(Math.round(mC * 100)) + "</b></td></tr></tfoot></table></div></div>";
+      "<p class='mut' style='margin:0;font-size:13px'>" + (BL.cons || BL.desc ? "Bónus (política 2026): consignação " + num4(Math.round(BL.cons * 10000) / 10) + " €/m³ · desconto imediato " + num4(Math.round(BL.desc * 10000) / 10) + " €/m³ (variáveis " + num4(Math.round(BL.var * 10000) / 10) + ", My Repsol " + num4(Math.round(BL.mr * 10000) / 10) + ", dinamização " + num4(Math.round(BL.din * 10000) / 10) + (BL.tx ? ", taxa My Repsol −" + num4(Math.round(BL.tx * 10000) / 10) : "") + ")." : "Sem bónus marcados (Gestão → Margens e custos).") + "</p>" +
+      "<div class='sc'><table><thead><tr><th class='l'>Produto</th><th>Consignado (L)</th><th>− Desconto imediato (L)</th><th>= Consignação (L)</th><th>Solred (L)</th><th>dos quais bónus €</th><th>Margem €</th></tr></thead><tbody>" + linhas +
+      "</tbody><tfoot><tr><td class='l'>Total</td><td class='n'>" + litros2(tl.cons + tl.desc) + "</td><td class='n'>" + litros2(tl.desc) + "</td><td class='n'>" + litros2(tl.cons) + "</td><td class='n'>" + litros2(tl.sol) + "</td><td class='n'>" + fmt(Math.round(tBon * 100)) + "</td><td class='n'><b>" + fmt(Math.round(mC * 100)) + "</b></td></tr></tfoot></table></div></div>";
     /* loja */
     var fams = {}; (D.loja || []).forEach(function (l) {
       var kSub = chaveLoja(l[0], l[1]), usaSub = M[kSub] != null, cat = usaSub ? l[0] + " · " + l[1] : l[0], k = usaSub ? kSub : chaveLoja(l[0]);
