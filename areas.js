@@ -9,7 +9,7 @@ var AREAS = [
   {id: "ven", n: "📈 Vendas", adm: 1, p: [["ven", "Vendas e margens"], ["va", "Relatório de vendas (Excel)"], ["maq", "Máquina de tabaco"]]},
   {id: "com", n: "🛒 Compras", adm: 1, p: [["enc", "Por aprovar"], ["nova", "Nova encomenda"], ["comh", "Encomendas feitas"], ["ent", "Entrada de mercadoria"], ["comb", "Entrada de combustível"]]},
   {id: "stk", n: "📦 Stock", p: [["contar", "Contar"], ["ler", "Ler código"], ["stock", "Stock atual"], ["inv", "Inventário"], ["mov", "Movimentos"]]},
-  {id: "conf", n: "🏦 Conferências", adm: 1, p: [["rep", "Repsol e Multibanco"], ["tms", "Fecho mensal TMS"]]},
+  {id: "conf", n: "🏦 Conferências", adm: 1, p: [["rep", "Repsol e Multibanco"], ["tms", "Fecho mensal TMS"], ["pre", "Preços ENSE"]]},
   {id: "rel", n: "📊 Relatórios", adm: 1, p: [["luc", "Lucro"], ["mes", "Mês"], ["fun", "Por funcionário"], ["ense", "ENSE mensal"]]},
   {id: "ges", n: "⚙️ Gestão", adm: 1, p: [["mrg", "Margens e custos"], ["kms", "Mapa de kms do gerente"], ["eq", "Equipa e acessos"], ["prod", "Produtos e códigos"], ["cfg", "Configuração do stock"]]}
 ];
@@ -25,7 +25,7 @@ var NEXP = {
   prod: {tab: "settings", only: ["Gestão de produtos"]},
   cfg: {tab: "settings", only: ["Configuração da base de dados central", "Importante"]}
 };
-var VISTA_DA = {ini: "ini", reg: "reg", sai: "sai", his: "his", ven: "tab", comh: "tab", mov: "tab", rep: "rep", tms: "tms", mes: "mes", fun: "fun", eq: "ges", luc: "luc", mrg: "mrg", comb: "comb", ense: "ense", va: "va", kms: "kms"};
+var VISTA_DA = {ini: "ini", reg: "reg", sai: "sai", his: "his", ven: "tab", comh: "tab", mov: "tab", rep: "rep", tms: "tms", mes: "mes", fun: "fun", eq: "ges", luc: "luc", mrg: "mrg", comb: "comb", ense: "ense", va: "va", kms: "kms", pre: "pre"};
 var PAGINA = "ini";
 function areasVisiveis() { return AREAS.filter(function (a) { return ADMIN || !a.adm; }); }
 function areaDe(pg) { return AREAS.find(function (a) { return a.p.some(function (x) { return x[0] === pg; }); }); }
@@ -69,6 +69,7 @@ window.depoisVista = function (v) {
   if (v === "ense") carregarENSE();
   if (v === "va") carregarVendasArtigos();
   if (v === "kms") carregarKms();
+  if (v === "pre") carregarPrecos();
 };
 
 /* ---------------- módulo de stock embutido ---------------- */
@@ -181,6 +182,7 @@ async function tipoFicheiro(f) {
   if (/^image\//.test(f.type) || /\.(jpe?g|png|heic|webp)$/i.test(f.name)) return "foto";
   if (ini.slice(0, 4) === "%PDF") {   // relatório de vendas do CBOS (título "CBOS | Resultado turno…") ou documento Repsol
     var txt = new TextDecoder("latin1").decode(new Uint8Array(await f.slice(0, 200000).arrayBuffer()));
+    if (ehPrecosPdf(txt)) return "precos";                                                                      // tabela semanal de preços (ENSE)
     if (/Folhas de turno|0046006F006C0068006100730020006400650020007400750072006E006F/i.test(txt)) return "folha";   // FOLHA DE FECHO TURNO MENSAL
     return /00430042004F0053|CBOS/i.test(txt) ? "cbos" : "pdf";                                                    // TURNO POR FORMAS DE COBRANÇA MENSAL
   }
@@ -218,7 +220,7 @@ function escolherVendas(f) {
   }; });
 }
 async function carregarFicheiros(fs) {
-  var g = {pdf: [], cbos: [], folha: [], foto: [], xls: [], tms: [], vendas: [], csv: [], "": []};
+  var g = {pdf: [], precos: [], cbos: [], folha: [], foto: [], xls: [], tms: [], vendas: [], csv: [], "": []};
   for (var i = 0; i < fs.length; i++) g[await tipoFicheiro(fs[i])].push(fs[i]);
   /* Excel de créditos MB/Solred por transferência: reconhece-se pelo cabeçalho (N.º doc. · Mont. em MI) */
   var trf = []; for (var k = g.vendas.length - 1; k >= 0; k--) if (await ehTransferencias(g.vendas[k])) trf.push(g.vendas.splice(k, 1)[0]);
@@ -227,6 +229,7 @@ async function carregarFicheiros(fs) {
   if (g.csv.length) status(false, "⚠ " + g.csv.map(function (f) { return f.name; }).join(", ") + ": o relatório de vendas tem de ser em Excel (.xlsx), porque o CSV não diz de que loja é.");
   if (g.tms.length) { ir("tms"); for (var j = 0; j < g.tms.length; j++) await importarTMS(g.tms[j]); }
   if (g.pdf.length) { ir("rep"); carregarPdfs(g.pdf); }
+  for (var q = 0; q < g.precos.length; q++) await importarPrecos(g.precos[q]);
   if (g.cbos.length) await importarVendasCBOS(g.cbos[0]);
   if (g.folha.length) await importarFolhaFecho(g.folha[0]);
   if (g.xls.length) { ir("reg"); $("#fXls").onchange.call({files: [g.xls[0]], value: ""}); }

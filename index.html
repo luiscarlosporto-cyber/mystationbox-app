@@ -192,6 +192,13 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
     <div id="tmsBox"></div>
   </div>
 
+  <!-- CONFERÊNCIAS: PREÇOS SEMANAIS PARA A ENSE -->
+  <div id="v-pre" class="v" hidden>
+    <div class="bar"><button class="btn p adm" id="bPre">📄 Carregar PDF de preços da Repsol</button><input type="file" id="fPre" accept="application/pdf,.pdf" hidden></div>
+    <div id="preMsg" hidden></div>
+    <div id="preCorpo" style="display:grid;gap:12px"></div>
+  </div>
+
   <!-- RELATÓRIOS: LUCRO -->
   <div id="v-luc" class="v" hidden>
     <div class="bar"><button class="btn" id="lAnt">‹</button><input type="month" id="lMes"><button class="btn" id="lSeg">›</button><button class="btn p adm" id="bCbos">📄 Turno por formas de cobrança mensal</button><input type="file" id="fCbos" accept="application/pdf,.pdf" hidden><button class="btn" id="bLucPdf">📄 PDF do relatório</button></div>
@@ -470,6 +477,7 @@ entrar().catch(function(e){$("#vLogin").hidden=false;$("#lErro").textContent=fal
 <script src="mbpdf.js"></script>
 <script src="kms.js"></script>
 <script src="relpdf.js"></script>
+<script src="precos.js"></script>
 <script src="areas.js"></script>
 <script>$$("#tabSub button").forEach(function(b){b.onclick=function(){tabaco(b.dataset.t)}});$("#eqBtnNovo").onclick=formNovo;</script>
 </body>

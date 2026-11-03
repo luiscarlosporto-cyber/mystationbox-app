@@ -863,8 +863,54 @@ function verificarFolhaFecho(r) {
     v.push(Math.abs(sf - t.formas) <= 5 ? {nivel: "ok", msg: "Formas de cobrança: " + tmsFmt(sf) + " € = total."} : {nivel: "erro", msg: "Formas de cobrança: a soma não dá o total do relatório."}); }
   return v;
 }
+/* ---------------- tabela semanal de preços da Repsol para a ENSE (tradução de caixa_app/precos_repsol.py) ---------------- */
+var PRECOS_ENSE = {
+  "GASOLINAEFITEC98": "Gasolina I.O. 98 submetido a processo de aditivação suplementar",
+  "GASOLINAS/CHUMBO95": "Gasolina simples 95",
+  "EF95PREMIUM": "Gasolina I.O. 95 submetido a processo de aditivação suplementar",
+  "GASOLEO": "Gasóleo simples",
+  "REPSOLDIESELE+10": "Gasóleo rodoviário submetido a processo de aditivação suplementar"
+};
+var PRECOS_MESES = ["JANEIRO", "FEVEREIRO", "MARCO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
+function precosChave(nome) {
+  var t = nome.toUpperCase(), tr = [["Á", "A"], ["À", "A"], ["Ã", "A"], ["Â", "A"], ["É", "E"], ["Ê", "E"], ["Í", "I"], ["Ó", "O"], ["Õ", "O"], ["Ô", "O"], ["Ú", "U"], ["Ç", "C"]];
+  tr.forEach(function (x) { t = t.split(x[0]).join(x[1]); });
+  return t.replace(/\s+/g, "");
+}
+function lerPrecosRepsol(linhas) {
+  var N3 = "\\d+,\\d{3}", RE_P = new RegExp("^(.*?)\\s+(" + N3 + ")\\s+(" + N3 + ")\\s+(" + N3 + ")\\s+(" + N3 + ")\\s+(" + N3 + ")$"), mm = function (t) { return parseInt(t.replace(",", ""), 10); };
+  var L = linhas.map(function (l) { return l.trim().replace(/\s+/g, " "); }).filter(function (l) { return l; }), texto = L.join(" ");
+  if (texto.indexOf("Preços de Referência e de Preços Reduzidos") < 0 && texto.indexOf("Preços de Referência e Preços Reduzidos") < 0) throw tmsErro("Não é a tabela de preços da Repsol (falta «Preços de Referência e Preços Reduzidos»).");
+  var r = {posto: "", nome_posto: "", vigor: "", hora: "", produtos: [], verificacoes: []}, m;
+  for (var i = 0; i < L.length; i++) { m = /^(E\d{4}) (.+)$/.exec(L[i]); if (m) { r.posto = m[1]; r.nome_posto = m[2].trim(); break; } }
+  m = /em vigor a partir das (\d{2})h (\d{2}) do dia (\d{1,2}) de ([A-Za-zçÇ]+) de (\d{4})/.exec(texto);
+  if (m) { var k = PRECOS_MESES.indexOf(precosChave(m[4])); if (k >= 0) { r.vigor = m[5] + "-" + String(k + 1).padStart(2, "0") + "-" + String(parseInt(m[3], 10)).padStart(2, "0"); r.hora = m[1] + ":" + m[2]; } }
+  var atual = null;
+  L.forEach(function (l) {
+    var p = RE_P.exec(l);
+    if (p) { atual = {pdf: p[1], ref: mm(p[2]), preco: mm(p[3]), red_civa: mm(p[4]), red_siva: mm(p[5]), retalhista: mm(p[6])}; r.produtos.push(atual); return; }
+    if (atual && l.length <= 20 && !new RegExp(N3).test(l)) atual.pdf += " " + l;
+    atual = null;
+  });
+  var erros = [], vistos = {};
+  if (!r.posto) erros.push("o PDF não diz o posto (E….)");
+  if (!r.vigor) erros.push("não encontrei a data de entrada em vigor");
+  if (!r.produtos.length) erros.push("não encontrei nenhum produto com preço");
+  r.produtos.forEach(function (p) {
+    p.chave = precosChave(p.pdf); p.ense = PRECOS_ENSE[p.chave] || null;
+    if (!p.ense) erros.push("produto «" + p.pdf + "» não tem campo ENSE conhecido");
+    if (vistos[p.chave]) erros.push("produto «" + p.pdf + "» repetido");
+    vistos[p.chave] = 1;
+    if ((p.ref - p.preco) * 100 !== p.red_civa) erros.push(p.pdf + ": referência − reduzido (" + (p.ref - p.preco) + ") não bate com a redução " + p.red_civa);
+    if (Math.abs(p.red_civa / 1.23 - p.red_siva) > 1.5) erros.push(p.pdf + ": redução s/IVA " + p.red_siva + " não corresponde a " + p.red_civa + " ÷ 1,23");
+    if (!(p.preco >= 500 && p.preco <= 5000)) erros.push(p.pdf + ": preço " + p.preco + " fora do normal");
+  });
+  erros.forEach(function (e) { r.verificacoes.push({nivel: "erro", texto: e}); });
+  if (!erros.length) r.verificacoes.push({nivel: "ok", texto: r.produtos.length + " produtos; referência − reduzido = redução em todos"});
+  return r;
+}
 var MOTOR = {num: num, num1: num1, pt: pt, lerTurno: lerTurno, pdfPaginas: pdfPaginas, lerDocumento: lerDocumento, classificarDoc: classificarDoc, verificar: verificar,
   lerFecho: lerFecho, pontuarFecho: pontuarFecho, lerMB: lerMB, lerSolred: lerSolred, verificarMB: verificarMB, verificarSolred: verificarSolred, turnoSugerido: turnoSugerido, classificarFecho: classificarFecho, valores: valores, ratio: ratio,
-  lerTMS: lerTMS, lerTMSBytes: lerTMSBytes, inteiro100: inteiro100, turnoDoFecho: turnoDoFecho, turnoSeguinte: turnoSeguinte, lerVendasCBOS: lerVendasCBOS, lerFolhaFecho: lerFolhaFecho};
+  lerTMS: lerTMS, lerTMSBytes: lerTMSBytes, inteiro100: inteiro100, turnoDoFecho: turnoDoFecho, turnoSeguinte: turnoSeguinte, lerVendasCBOS: lerVendasCBOS, lerFolhaFecho: lerFolhaFecho, lerPrecosRepsol: lerPrecosRepsol, PRECOS_ENSE: PRECOS_ENSE};
 if (typeof module !== "undefined" && module.exports) module.exports = MOTOR; else raiz.MOTOR = MOTOR;
 })(typeof window !== "undefined" ? window : globalThis);
