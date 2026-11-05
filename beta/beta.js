@@ -105,7 +105,7 @@
 
   /* ---- sem emoji no conteúdo: tira-os do texto que as páginas escrevem. Fica ✔ e ⚠, que dizem o estado;
      um botão que só tem o emoji fica como está, para não ficar vazio. ---- */
-  var EMO = /(?:\p{Emoji_Presentation}|[\u2600\u2601\u270F\u2709\u2699\u2328\u23F1\u231A\u2702\u{1F5A8}\u{1F5D1}\u{1F5C4}\u{1F5BC}\u{1F3F7}\u{1F58A}\u{1F4FD}\u{1F6E2}\u{1F321}])\uFE0F?\s*/gu;
+  var EMO = /(?:\p{Emoji_Presentation}|(?![\u26A0\u2714])\p{Extended_Pictographic}\uFE0F|[\u2600\u2601\u270F\u2709\u2699\u2328\u23F1\u231A\u2702\u{1F5A8}\u{1F5D1}\u{1F5C4}\u{1F5BC}\u{1F3F7}\u{1F58A}\u{1F4FD}\u{1F6E2}\u{1F321}\u{1F6CD}])\uFE0F?\s*/gu;
   var ROTULO = {"\u270F": "Editar", "\u{1F5D1}": "Apagar", "\u{1F4C4}": "PDF", "\u{1F4CB}": "Copiar", "\u{1F4AC}": "WhatsApp", "\u{1F3B2}": "Gerar", "\u{1F4CE}": "Original", "\u{1F441}": "Ver", "\u{1F4E4}": "Enviar"};
   function trocarTexto(t) { return t.replace(/\u2705\s*/g, "\u2714 ").replace(/\u274C\s*/g, "\u2716 ").replace(EMO, ""); }
   function limpar(n) {
