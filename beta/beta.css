@@ -80,7 +80,7 @@ body.b-rec #bChips:not(:empty){display:flex}
 #bMais button,#bMais a{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:13px 12px;border-radius:8px;font:500 15px var(--f-body);color:var(--fg);cursor:pointer}
 
 /* ---- componentes (Etapa 1) ---- */
-main .wrap{max-width:1200px;padding:18px 20px 40px;gap:14px}
+main .wrap{max-width:1360px;margin:0;padding:18px 20px 40px;gap:14px}
 .v{gap:14px}
 h2{font:600 18px var(--f-body);letter-spacing:-.01em}
 :focus-visible{outline:2px solid var(--azul);outline-offset:1px}
@@ -124,7 +124,7 @@ body.b-rec #nexFrame{height:calc(100dvh - 146px)!important}
 /* ---- telemóvel ---- */
 @media (max-width:700px){
   :root,body.b-rec{--lat:0px}
-  #bLat,#bBusca kbd,#bBusca span,#bCam .ar,#bSairT{display:none}
+  #bLat,#bBusca kbd,#bBusca span,#bCam .ar,#bTopo #bSair{display:none}
   #vApp{margin-left:0}
   #bTopo{padding:7px 12px;gap:6px;min-height:52px}
   #bCam{font-size:15px}#bCam .sep{display:none}
