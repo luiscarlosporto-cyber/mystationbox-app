@@ -27,6 +27,11 @@
 
   var SELO = 0;
   function seloH(x) { return x.id === "ini" && SELO ? "<i class='selo'>" + SELO + "</i>" : ""; }
+  /* números sempre agrupados, também com 4 algarismos: 4 174,50 € */
+  window.fmt = function (c) { return c == null ? "" : (c / 100).toLocaleString("pt-PT", {minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always"}); };
+  /* o Registo do dia só se lê quando se abre: no arranque abre-se o Painel */
+  var irDiaReal = window.irDia, DIA_ADIADO = false;
+  window.irDia = function (d) { if (window.PAGINA === "reg") { DIA_ADIADO = false; return irDiaReal(d); } DIA = d; DIA_ADIADO = true; return Promise.resolve(); };
   var recolhido = ler("msb_lat") === "1";
   function acertarLargura() { document.body.classList.toggle("b-rec", recolhido || innerWidth <= 1024); }
 
@@ -75,6 +80,8 @@
 
   var ABERTA = "";
   function marcar(pg, a) {
+    if (pg === "reg" && DIA_ADIADO) { DIA_ADIADO = false; irDiaReal(DIA); }
+    $("#bQuem").textContent = $("#hQuem").textContent;
     if (pg !== ABERTA) { ABERTA = pg; setTimeout(function () { if (PAGINA === pg) MSB_NAV.abrirPagina(pg); }); }
     var ps = paginasDe(a), gr = "", atual = a.p.find(function (x) { return x[0] === pg; }), grp = grupoDe(pg);
     var vistos = {}, itens = ps.filter(function (p) { var g = grupoDe(p[0]); if (!g) return true; if (vistos[g.n]) return false; return vistos[g.n] = 1; });

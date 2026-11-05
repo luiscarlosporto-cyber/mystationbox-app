@@ -36,7 +36,7 @@
         var v = L.map(function (e) { return val(F[e.id]); });
         return "<tr><td class='l'>" + esc(nome) + "</td>" + v.map(function (x) { return "<td class='n'>" + fm(x) + "</td>"; }).join("") + (dif ? "<td class='n'>" + (v[1] - v[0] > 0 ? "+" : "") + fm(v[1] - v[0]) + "</td>" : "") + "</tr>";
       };
-      var lit = function (c) { return Math.round(c / 100).toLocaleString("pt-PT") + " L"; };
+      var lit = function (c) { return Math.round(c / 100).toLocaleString("pt-PT", {useGrouping: "always"}) + " L"; };
       var h = "<div class='sc'><table><thead>" + cab + "</thead><tbody>" +
         linha("Vendas totais", function (d) { return d.totais.formas || 0; }, eur) +
         linha("Combustível", function (d) { return (d.totais.comb || [])[5] || 0; }, eur) +

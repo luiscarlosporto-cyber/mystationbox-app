@@ -5,7 +5,7 @@
 (function () {
   var IND = [   // indicadores que se podem escolher e ordenar; valor por loja a partir de D (dados da loja)
     ["vend", "Vendas do mês", 1, function (D) { return D.f ? eur(D.f.dados.totais.formas) : null; }],
-    ["lit", "Litros vendidos", 1, function (D) { return D.f && D.f.dados.totais.comb ? Math.round(D.f.dados.totais.comb[1] / 100).toLocaleString("pt-PT") + " L" : null; }],
+    ["lit", "Litros vendidos", 1, function (D) { return D.f && D.f.dados.totais.comb ? Math.round(D.f.dados.totais.comb[1] / 100).toLocaleString("pt-PT", {useGrouping: "always"}) + " L" : null; }],
     ["comb", "Combustível", 1, function (D) { return D.f && D.f.dados.totais.comb ? eur(D.f.dados.totais.comb[5]) : null; }],
     ["loja", "Loja", 1, function (D) { return D.f && D.f.dados.totais.loja ? eur(D.f.dados.totais.loja[5]) : null; }],
     ["mb", "Multibanco", 0, function (D) { return forma(D, ["CARTAO BANCARIO", "BANCARIO OFFLINE"]); }],
