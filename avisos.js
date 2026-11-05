@@ -58,6 +58,35 @@ async function aviAprovar(est, dia) {
   if (r.error) return status(false, "⚠ " + falhou(r.error));
   carregarAvisos(); aviSelo();
 }
+/* ---- pedir vendas ao OCTAN AI: o PC lê no CBOS e devolve aqui ---- */
+var AVI_PASTAS = [["TODAS", "Tudo"], ["TABACO", "Tabaco"], ["GAS", "Gás"], ["LOJA", "Loja"], ["IMPRENSA", "Imprensa"], ["JOGO", "Jogo"], ["LAVAGEM", "Lavagem"], ["LUBRIFICANTES", "Lubrificantes"], ["OUTROS COMBUSTIVEIS", "Outros combustíveis"]];
+function aviForm() {
+  return "<div class='card' style='padding:12px 14px'><b>🔎 Pedir vendas ao OCTAN AI</b>" +
+    "<div style='display:grid;gap:8px;margin-top:8px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))'>" +
+    "<label>Loja<select id='pvLoja'>" + (ESTS || []).map(function (e) { return "<option value='" + e.id + "'" + (e.id === EST ? " selected" : "") + ">" + esc(e.name) + "</option>"; }).join("") + "</select></label>" +
+    "<label>O quê<select id='pvPasta'>" + AVI_PASTAS.map(function (p) { return "<option value='" + p[0] + "'>" + p[1] + "</option>"; }).join("") + "</select></label>" +
+    "<label>De<input type='date' id='pvDe' value='" + hojeISO(-7) + "'></label><label>Até<input type='date' id='pvAte' value='" + hojeISO(-1) + "'></label>" +
+    "<label>Artigo (opcional)<input id='pvArtigo' placeholder='ex.: TEREA'></label></div>" +
+    "<div class='bar' style='margin-top:8px'><button class='btn p' id='pvPedir'>Pedir</button></div></div>";
+}
+function aviPedidos(L) {
+  return L.map(function (p) {
+    var t = "<b>" + esc(aviLoja(p.estacao)) + " · " + esc((AVI_PASTAS.find(function (x) { return x[0] === p.pasta; }) || [0, p.pasta])[1]) + (p.artigo ? " · " + esc(p.artigo) : "") + "</b><div class='mut'>" + dmy(p.de) + " a " + dmy(p.ate) + "</div>";
+    if (p.estado === "pendente" || p.estado === "a_ler") return "<div class='aviso'>⏳ " + t + "O OCTAN AI responde nos próximos 15 minutos.</div>";
+    if (p.estado === "erro") return "<div class='card' style='padding:12px 14px'>❌ " + t + "<div class='bad'>" + esc(p.erro) + "</div></div>";
+    var L2 = p.linhas || [], q = L2.reduce(function (s, x) { return s + x[2]; }, 0), v = L2.reduce(function (s, x) { return s + x[3]; }, 0);
+    return "<details class='card' style='padding:12px 14px'><summary>✅ " + t + "<div class='mut'>" + L2.length + " artigos · " + fmt(q * 100).replace(",00", "") + " un. · " + fmt(v * 100) + " €</div></summary>" +
+      "<div class='sc' style='margin-top:6px'><table><thead><tr><th class='l'>Artigo</th><th>Qtd</th><th>Montante €</th></tr></thead><tbody>" +
+      L2.map(function (x) { return "<tr><td class='l'>" + esc(x[1]) + "</td><td class='n'>" + fmt(x[2] * 100).replace(",00", "") + "</td><td class='n'>" + fmt(x[3] * 100) + "</td></tr>"; }).join("") + "</tbody></table></div></details>";
+  }).join("");
+}
+async function aviPedir() {
+  var de = $("#pvDe").value, ate = $("#pvAte").value;
+  if (!de || !ate || ate < de) return status(false, "⚠ Confirma as datas.");
+  var r = await sb.from("msb_pedidos").insert({estacao: $("#pvLoja").value, de: de, ate: ate, pasta: $("#pvPasta").value, artigo: $("#pvArtigo").value.trim().slice(0, 60), pedido_por: (PERFIL && PERFIL.display_name) || ""});
+  if (r.error) return status(false, "⚠ " + falhou(r.error));
+  carregarAvisos();
+}
 /* número no botão Início, atualizado de 5 em 5 minutos enquanto a app está aberta */
 async function aviSelo() {
   if (typeof ADMIN === "undefined" || !ADMIN) return;
@@ -97,7 +126,9 @@ async function carregarAvisos() {
         (a.detalhe ? "<div style='white-space:pre-wrap;margin-top:6px'>" + esc(a.detalhe) + "</div>" : "") +
         (novo ? "<div style='margin-top:8px'><button class='btn' data-avi='" + a.id + "'>✔ Visto</button></div>" : "") + "</div>";
     }).join("");
-    box.innerHTML = h + aviHistorico();
+    var pd = await sb.from("msb_pedidos").select("*").order("criado", {ascending: false}).limit(8);
+    box.innerHTML = aviForm() + aviPedidos(pd.data || []) + h + aviHistorico();
+    $("#pvPedir").onclick = aviPedir;
     $$("#aviCorpo [data-aprova]").forEach(function (b) { b.onclick = function () { var k = b.dataset.aprova.split("|"); aviAprovar(k[0], k[1]); }; });
     $$("#aviCorpo [data-avi]").forEach(function (b) { b.onclick = function () { aviVisto([Number(b.dataset.avi)]); }; });
     var t = $("#aviTudo"); if (t) t.onclick = function () { aviVisto(porLer.map(function (a) { return a.id; })); };
