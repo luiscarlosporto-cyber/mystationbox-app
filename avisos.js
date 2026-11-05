@@ -1,4 +1,4 @@
-/* mystationbox · avisos dos agentes (05/11/2026).
+/* mystationbox · avisos do OCTAN AI, o agente de compras e ENSE (05/11/2026).
  * O agente de compras (PC da loja) deixa aqui, todos os dias, o resultado da corrida: faturas guardadas como rascunho
  * no CBOS à espera de validação, faturas por resolver e erros. Vê-se o de todas as lojas, sem mudar de loja.
  * Quem escreve é a Edge Function msb-aviso; aqui só se lê e se marca como lido. Só administradores. */
@@ -22,14 +22,14 @@ async function cartaoAvisos() {
   if (!L.length) return "";
   var porLer = L.filter(function (a) { return !a.lido_em && a.nivel !== "info"; }), erro = porLer.some(function (a) { return a.nivel === "erro"; }), p = aviParado(L);
   var mau = porLer.find(function (a) { return a.nivel === "erro"; }) || porLer[0];
-  var t = p ? "O agente não corre desde " + aviDataHora(p.criado) : mau ? mau.titulo : "Sem nada por ver";
-  return cartao("avi", "Avisos dos agentes", String(porLer.length), esc(t), erro || p || porLer.length ? "al" : "ok");
+  var t = p ? "O OCTAN AI não corre desde " + aviDataHora(p.criado) : mau ? mau.titulo : "Sem nada por ver";
+  return cartao("avi", "OCTAN AI", String(porLer.length), esc(t), erro || p || porLer.length ? "al" : "ok");
 }
 async function carregarAvisos() {
   var box = $("#aviCorpo"); box.innerHTML = "<div class='mut'>A carregar…</div>";
   try {
     var L = await avisosRecentes(100), p = aviParado(L), h = "";
-    if (p) h += "<div class='bad'>⚠️ O agente de compras não corre desde " + aviDataHora(p.criado) + ". Confirma se o portátil da loja está ligado.</div>";
+    if (p) h += "<div class='bad'>⚠️ O OCTAN AI não corre desde " + aviDataHora(p.criado) + ". Confirma se o portátil da loja está ligado.</div>";
     var porLer = L.filter(function (a) { return !a.lido_em && a.nivel !== "info"; });
     if (porLer.length) h += "<div class='bar'><button class='btn' id='aviTudo'>✔ Marcar tudo como visto (" + porLer.length + ")</button></div>";
     if (!L.length) h += "<div class='mut'>Ainda não há avisos.</div>";

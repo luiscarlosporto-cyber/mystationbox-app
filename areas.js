@@ -11,7 +11,7 @@ var AREAS = [
   {id: "stk", n: "📦 Stock", p: [["contar", "Contar"], ["ler", "Ler código"], ["stock", "Stock atual"], ["inv", "Inventário"], ["mov", "Movimentos"]]},
   {id: "conf", n: "🏦 Conferências", adm: 1, p: [["rep", "Repsol e Multibanco"], ["tms", "Fecho mensal TMS"], ["pre", "Preços ENSE"]]},
   {id: "rel", n: "📊 Relatórios", adm: 1, p: [["luc", "Lucro"], ["mes", "Mês"], ["fun", "Por funcionário"], ["ense", "ENSE mensal"]]},
-  {id: "ges", n: "⚙️ Gestão", adm: 1, p: [["avi", "Avisos dos agentes"], ["mrg", "Margens e custos"], ["kms", "Mapa de kms do gerente"], ["eq", "Equipa e acessos"], ["prod", "Produtos e códigos"], ["cfg", "Configuração do stock"]]}
+  {id: "ges", n: "⚙️ Gestão", adm: 1, p: [["avi", "OCTAN AI"], ["mrg", "Margens e custos"], ["kms", "Mapa de kms do gerente"], ["eq", "Equipa e acessos"], ["prod", "Produtos e códigos"], ["cfg", "Configuração do stock"]]}
 ];
 /* páginas do módulo de stock: separador e cartões (pelo título, ou "#id" do cartão) a mostrar ou esconder.
    O cartão da encomenda muda de título ("Encomenda LOGISTA · Penafiel · por validar"), por isso vai pelo id. */
