@@ -365,7 +365,7 @@ async function entrar(){
   mostrarEst();irDia(DIA);window.APP_ARRANCOU=1;if(window.montarMenu)montarMenu();
 }
 function mostrarEst(){var e=ESTS.find(function(x){return x.id===EST});$("#hEst").textContent=e?(e.name||e.short_name):"—"}
-$("#selEst").onchange=async function(){var N=window.MSB_NAV,nova=this.value;if(N&&N.antesLoja&&!await N.antesLoja()){this.value=EST;return}EST=nova;if(window.NEX_EST!==undefined)NEX_EST=null;try{localStorage.setItem("msb_est",EST)}catch(e){}mostrarEst();LINHAS={};irDia(DIA);if(window.msbIr)msbIr(PAGINA);if(N&&N.abrirPagina)N.abrirPagina(PAGINA);else if(VISTA!=="reg")vista(VISTA)};
+$("#selEst").onchange=async function(){var N=window.MSB_NAV,nova=this.value;if(N&&N.antesLoja&&!await N.antesLoja()){this.value=EST;return}EST=nova;if(window.NEX_EST!==undefined)NEX_EST=null;try{localStorage.setItem("msb_est",EST)}catch(e){}mostrarEst();LINHAS={};irDia(DIA);if(window.msbIr){msbIr(PAGINA);if(N&&N.abrirPagina)N.abrirPagina(PAGINA)}else if(VISTA!=="reg")vista(VISTA)};
 $("#fLogin").onsubmit=async function(ev){ev.preventDefault();$("#lErro").textContent="";$("#lBtn").disabled=true;
   try{var r=await sb.auth.signInWithPassword({email:$("#lEmail").value.trim(),password:$("#lPass").value});if(r.error)throw r.error;await entrar()}
   catch(e){$("#lErro").textContent=/Invalid login/i.test(e.message)?"Email ou palavra-passe errados.":falhou(e)}finally{$("#lBtn").disabled=false}};
