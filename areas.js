@@ -11,7 +11,7 @@ var AREAS = [
   {id: "stk", n: "📦 Stock", p: [["contar", "Contar"], ["ler", "Ler código"], ["stock", "Stock atual"], ["inv", "Inventário"], ["mov", "Movimentos"]]},
   {id: "conf", n: "🏦 Conferências", adm: 1, p: [["rep", "Repsol e Multibanco"], ["tms", "Fecho mensal TMS"], ["pre", "Preços ENSE"]]},
   {id: "rel", n: "📊 Relatórios", adm: 1, p: [["luc", "Lucro"], ["mes", "Mês"], ["fun", "Por funcionário"], ["ense", "ENSE mensal"]]},
-  {id: "ges", n: "⚙️ Gestão", adm: 1, p: [["mrg", "Margens e custos"], ["kms", "Mapa de kms do gerente"], ["eq", "Equipa e acessos"], ["prod", "Produtos e códigos"], ["cfg", "Configuração do stock"]]}
+  {id: "ges", n: "⚙️ Gestão", adm: 1, p: [["avi", "Avisos dos agentes"], ["mrg", "Margens e custos"], ["kms", "Mapa de kms do gerente"], ["eq", "Equipa e acessos"], ["prod", "Produtos e códigos"], ["cfg", "Configuração do stock"]]}
 ];
 /* páginas do módulo de stock: separador e cartões (pelo título, ou "#id" do cartão) a mostrar ou esconder.
    O cartão da encomenda muda de título ("Encomenda LOGISTA · Penafiel · por validar"), por isso vai pelo id. */
@@ -25,7 +25,7 @@ var NEXP = {
   prod: {tab: "settings", only: ["Gestão de produtos"]},
   cfg: {tab: "settings", only: ["Configuração da base de dados central", "Importante"]}
 };
-var VISTA_DA = {ini: "ini", reg: "reg", sai: "sai", his: "his", ven: "tab", comh: "tab", mov: "tab", rep: "rep", tms: "tms", mes: "mes", fun: "fun", eq: "ges", luc: "luc", mrg: "mrg", comb: "comb", ense: "ense", va: "va", kms: "kms", pre: "pre"};
+var VISTA_DA = {avi: "avi", ini: "ini", reg: "reg", sai: "sai", his: "his", ven: "tab", comh: "tab", mov: "tab", rep: "rep", tms: "tms", mes: "mes", fun: "fun", eq: "ges", luc: "luc", mrg: "mrg", comb: "comb", ense: "ense", va: "va", kms: "kms", pre: "pre"};
 var PAGINA = "ini";
 function areasVisiveis() { return AREAS.filter(function (a) { return ADMIN || !a.adm; }); }
 function areaDe(pg) { return AREAS.find(function (a) { return a.p.some(function (x) { return x[0] === pg; }); }); }
@@ -70,6 +70,7 @@ window.depoisVista = function (v) {
   if (v === "va") carregarVendasArtigos();
   if (v === "kms") carregarKms();
   if (v === "pre") carregarPrecos();
+  if (v === "avi") carregarAvisos();
 };
 
 /* ---------------- módulo de stock embutido ---------------- */
@@ -153,6 +154,7 @@ async function carregarInicio() {
     var ns = (sai.data || []).length, vs = (sai.data || []).reduce(function (s, x) { return s + (x.valor_c || 0); }, 0);
     h += cartao("sai", "Saídas por entregar", ns ? fmt(vs) + "<small> €</small>" : "0", ns ? ns + " saída(s) de caixa ainda por entregar" : "Tudo entregue", ns ? "al" : "ok");
     if (ADMIN) {
+      try { h = (await cartaoAvisos()) + h; } catch (e) { /* os avisos nunca impedem o Início de abrir */ }
       var dias = new Date().getDate() - 1, tem = {}; L.forEach(function (r) { if (r.dia < hoje) tem[r.dia + r.turno] = 1; });
       var falta = 0; for (var i = 1; i <= dias; i++) { var k = mes + "-" + String(i).padStart(2, "0"); if (!tem[k + "t1"]) falta++; if (!tem[k + "t2"]) falta++; }
       h += cartao("mes", "Turnos em falta este mês", String(falta), falta ? "Até ontem, sem registo" : "Todos registados até ontem", falta ? "al" : "ok");
