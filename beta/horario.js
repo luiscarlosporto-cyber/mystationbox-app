@@ -18,7 +18,7 @@
   function linhas() {   // para as regras: uma linha por pessoa, com o que está no ecrã
     return X.P.filter(function (l) { return !l.espelho; }).map(function (l) {   // quem segue outra pessoa não conta para a cobertura
       var g = X.G[l.colaborador_id] || {}, c = X.C[l.colaborador_id] || {}, ant = X.ANT[l.colaborador_id] || [];
-      return {nome: c.curto || "", escala: l.escala, dias: X.dias.map(function (d) { return g[d] || ""; }), ant: ant.map(function (a) { return a[1]; }), fdsAnt: X.FDS[l.colaborador_id] || ""};
+      return {nome: c.curto || "", escala: l.escala, abate: abate(l.colaborador_id), dias: X.dias.map(function (d) { return g[d] || ""; }), ant: ant.map(function (a) { return a[1]; }), fdsAnt: X.FDS[l.colaborador_id] || ""};
     });
   }
   function celulas() {
@@ -29,8 +29,8 @@
       var c = X.C[l.colaborador_id] || {}, g = X.G[l.colaborador_id] || {}, tur = 0, fixo = !!l.espelho;
       h += "<tr" + (c.curto === eu ? " class='eu'" : "") + "><td class='l' title='" + esc(c.nome || "") + "'>" + esc(c.curto || "") + (fixo && X.ed ? "<small>segue " + esc((X.C[l.espelho] || {}).curto || "") + "</small>" : "") + "</td>" + X.dias.map(function (d) {
         var v = g[d] || ""; if (v === "M" || v === "T" || v === "MT") tur++;
-        var mudou = X.ALT[l.colaborador_id + "|" + d] != null, fx = (X.FX[l.colaborador_id] || {})[d];
-        return "<td class='" + t(d).cl + (mudou ? " alt" : "") + (fx ? " fx" : "") + "'" + (fx ? " title='Turno fixado'" : "") + (X.ed && !fixo ? " data-c='" + l.colaborador_id + "' data-d='" + d + "' tabindex='0' role='button' aria-label='" + esc(c.curto || "") + " dia " + d + "'" : "") + ">" + v + "</td>";
+        var mudou = X.ALT[l.colaborador_id + "|" + d] != null, fx = (X.FX[l.colaborador_id] || {})[d], es = (X.EM[l.colaborador_id] || {})[d];
+        return "<td class='" + t(d).cl + (mudou ? " alt" : "") + (fx ? " fx" : "") + "'" + (es ? " title='" + esc(TIPOS[es.tipo][0] + (es.nota ? ": " + es.nota : "")) + "'" : fx ? " title='Turno fixado'" : "") + (X.ed && (!fixo || es) ? " data-c='" + l.colaborador_id + "' data-d='" + d + "' tabindex='0' role='button' aria-label='" + esc(c.curto || "") + " dia " + d + "'" : "") + ">" + v + (es && TIPOS[es.tipo][2] ? "<small>" + TIPOS[es.tipo][2] + "</small>" : "") + "</td>";
       }).join("") + "<td class='n'>" + tur + "</td></tr>";
     });
     return h + "</tbody></table></div>";
@@ -40,17 +40,17 @@
     var h = "<div class='bl'><h3>Regras " + (r.erros.length ? "<span class='tag t-er'>" + r.erros.length + " a corrigir</span>" : "<span class='tag t-ok'>✔ Sem erros</span>") + (r.avisos.length ? "<span class='tag t-at'>" + r.avisos.length + " avisos</span>" : "") + "</h3>";
     if (r.erros.length) h += "<ul class='hl'>" + r.erros.map(function (e) { return "<li>" + esc(e.msg) + "</li>"; }).join("") + "</ul>";
     if (r.avisos.length) h += "<details><summary>Ver avisos</summary><ul class='hl'>" + r.avisos.map(function (e) { return "<li>" + esc(e.msg) + "</li>"; }).join("") + "</ul></details>";
-    if (ADMIN) h += "<div class='sc' style='margin-top:8px'><table><thead><tr><th class='l'>Colaborador</th><th>Turnos</th><th>Meta</th><th>Férias (dias úteis)</th><th>Diferença</th></tr></thead><tbody>" +
-      r.metas.map(function (m) { return "<tr><td class='l'>" + esc(m.nome) + "</td><td class='n'>" + m.turnos + "</td><td class='n'>" + m.meta + "</td><td class='n'>" + m.ferias + "</td><td class='n'>" + (m.extra > 0 ? "+" : "") + m.extra + " h</td></tr>"; }).join("") + "</tbody></table></div>";
+    if (ADMIN) h += "<div class='sc' style='margin-top:8px'><table><thead><tr><th class='l'>Colaborador</th><th>Turnos</th><th>Meta</th><th>Ausências (dias)</th><th>Diferença</th></tr></thead><tbody>" +
+      r.metas.map(function (m) { return "<tr><td class='l'>" + esc(m.nome) + "</td><td class='n'>" + m.turnos + "</td><td class='n'>" + m.meta + "</td><td class='n'>" + m.ausencias + "</td><td class='n'>" + (m.extra > 0 ? "+" : "") + m.extra + " h</td></tr>"; }).join("") + "</tbody></table></div>";
     return h + "</div>";
   }
   function pintar() {
     var box = $("#v-hor"), n = Object.keys(X.ALT).length, b = "<div class='bar'><button class='btn' id='horAnt' aria-label='Mês anterior'>‹</button><input type='month' id='horMes' value='" + X.M + "'><button class='btn' id='horSeg' aria-label='Mês seguinte'>›</button>" +
       "<span class='tag " + (X.estado === "simulacao" ? "t-at'>Simulação" : "t-ok'>Horário real") + "</span>";
     if (ADMIN && X.P.length) b += X.ed
-      ? "<button class='btn az' id='horProj'" + (X.calc ? " disabled" : "") + ">" + (X.calc ? "A ajustar…" : "Projetar o resto") + "</button><button class='btn' id='horIni'" + (X.INI ? "" : " disabled") + ">Horário inicial</button><button class='btn p' id='horGrava'" + (n && !X.calc ? "" : " disabled") + ">Gravar" + (n ? " " + n : "") + "</button><button class='btn' id='horFim'>Sair da edição</button>"
-      : "<button class='btn' id='horEd'>Editar</button><button class='btn' id='horDefIni'>Guardar como inicial</button><button class='btn' id='horEst'>" + (X.estado === "simulacao" ? "Passar a real" : "Passar a simulação") + "</button><button class='btn' id='horXls'>Excel Picaponto</button><button class='btn' id='horPdf'>PDF</button>";
-    box.innerHTML = b + "</div>" + (X.P.length ? celulas() + "<p class='rod'>M manhã · T tarde · MT turno M/T · FG folga · F férias · FD feriado. Fundo azul: fim de semana; creme: feriado." + (X.ed ? " Toca numa célula e escolhe o turno: fica fixado (sublinhado) e a app ajusta o resto do mês às regras. Projetar o resto refaz tudo o que não está fixado. Horário inicial volta à versão de partida do mês." : "") + "</p>" + regras()
+      ? "<button class='btn az' id='horProj'" + (X.calc ? " disabled" : "") + ">" + (X.calc ? "A ajustar…" : "Projetar o resto") + "</button><button class='btn' id='horIni'" + (X.INI ? "" : " disabled") + ">Horário inicial</button><button class='btn' id='horEsp'>Especiais</button><button class='btn p' id='horGrava'" + (n && !X.calc ? "" : " disabled") + ">Gravar" + (n ? " " + n : "") + "</button><button class='btn' id='horFim'>Sair da edição</button>"
+      : "<button class='btn' id='horEd'>Editar</button><button class='btn' id='horEsp'>Especiais</button><button class='btn' id='horDefIni'>Guardar como inicial</button><button class='btn' id='horEst'>" + (X.estado === "simulacao" ? "Passar a real" : "Passar a simulação") + "</button><button class='btn' id='horXls'>Excel Picaponto</button><button class='btn' id='horPdf'>PDF</button>";
+    box.innerHTML = b + "</div>" + (X.esp ? cartaoEsp() : "") + (X.P.length ? celulas() + "<p class='rod'>M manhã · T tarde · MT turno M/T · FG folga · F férias · FD feriado. Fundo azul: fim de semana; creme: feriado." + (X.ESP.length ? " Especiais: B baixa · Fr formação · A aniversário · O outros."  : "") + (X.ed ? " Toca numa célula e escolhe o turno: fica fixado (sublinhado) e a app ajusta o resto do mês às regras. Projetar o resto refaz tudo o que não está fixado. Horário inicial volta à versão de partida do mês." : "") + "</p>" + regras()
       : "<div class='vazio'>Ainda não há horário de " + nomeMes(X.M) + " nesta loja." + (ADMIN ? "<p><button class='btn p' id='horNovo'>Criar horário do mês</button></p>" : "") + "</div>");
     $("#horAnt").onclick = function () { sair(function () { abrir(addMes(X.M, -1)); }); };
     $("#horSeg").onclick = function () { sair(function () { abrir(addMes(X.M, 1)); }); };
@@ -58,7 +58,7 @@
     var e = function (id, f) { var x = $(id); if (x) x.onclick = f; };
     e("#horEd", function () { X.ed = true; pintar(); });
     e("#horFim", function () { sair(function () { abrir(X.M); }); });
-    e("#horProj", projetar); e("#horIni", voltarInicial); e("#horDefIni", definirInicial); e("#horGrava", gravar); e("#horEst", mudarEstado); e("#horXls", excel); e("#horPdf", pdf); e("#horNovo", criar);
+    e("#horEsp", function () { X.esp = !X.esp; pintar(); }); if (X.esp) ligarEsp(); e("#horProj", projetar); e("#horIni", voltarInicial); e("#horDefIni", definirInicial); e("#horGrava", gravar); e("#horEst", mudarEstado); e("#horXls", excel); e("#horPdf", pdf); e("#horNovo", criar);
     var sc = $("#horSc"); if (sc) {
       var alvo = sc.querySelector("th.hj"); if (alvo && X.rolar) { sc.scrollLeft = Math.max(0, alvo.offsetLeft - 140); X.rolar = false; }
       if (X.ed) { sc.onclick = function (ev) { var t = ev.target.closest("td[data-c]"); if (t) escolher(t); }; sc.onkeydown = function (ev) { if (ev.key === "Enter" || ev.key === " ") { var t = ev.target.closest("td[data-c]"); if (t) { ev.preventDefault(); escolher(t); } } }; }
@@ -66,11 +66,12 @@
   }
   function sair(seg) {
     if (!X || !Object.keys(X.ALT).length) return seg();
-    msbConfirma("Há alterações por gravar. Sair sem gravar?", "Sair sem gravar").then(function (ok) { if (ok) seg(); });
+    msbConfirma("Há alterações por gravar. Sair sem gravar?", "Sair sem gravar").then(function (ok) { if (ok) { ADIAR[EST + X.M] = 1; seg(); } });
   }
   function escolher(td) {
     var f = $("#horPop"); if (f) f.remove();
     var id = +td.dataset.c, d = +td.dataset.d, c = X.C[id] || {}, m = document.createElement("div"); m.id = "horPop";
+    var es = (X.EM[id] || {})[d]; if (es) return editarEsp(es);
     var cods = HOR.CODIGOS.filter(function (k) { return k !== "MT" || X.mt; });
     var fx = (X.FX[id] || {})[d];
     m.innerHTML = "<b>Fixar turno · " + esc(c.curto || "") + " · dia " + d + "</b><div>" + cods.map(function (k) { return "<button data-k='" + k + "'>" + k + "</button>"; }).join("") + "<button data-k=''>Limpar</button>" + (fx && "F FD".indexOf((X.G[id] || {})[d]) < 0 ? "<button data-s='1'>Soltar</button>" : "") + "</div>";
@@ -90,9 +91,102 @@
     if (k === ori && !!fx === oriF) delete X.ALT[ch]; else X.ALT[ch] = k;
   }
   function definir(id, d, k, fx) {
-    pôr(id, d, k, fx); X.P.forEach(function (l) { if (l.espelho === id) pôr(l.colaborador_id, d, k, fx); });
+    pôr(id, d, k, fx); X.P.forEach(function (l) { if (l.espelho === id && !(X.EM[l.colaborador_id] || {})[d]) pôr(l.colaborador_id, d, k, fx); });
+    ajustar();
+  }
+  function ajustar() {
     X.calc = true; pintar();
     clearTimeout(X.tm); X.tm = setTimeout(function () { projetar(true); }, 500);   // vários toques seguidos dão um só ajuste
+  }
+  /* Dias especiais: cada período põe o código no horário (fixado) e o ajuste trata do resto. Motivo só para administradores (RLS) */
+  var TIPOS = {ferias: ["Férias", "F", ""], baixa: ["Baixa doença", "FG", "B"], formacao: ["Formação", "FG", "Fr"], aniversario: ["Dia de aniversário", "FG", "A"], outros: ["Outros", "FG", "O"]}, ADIAR = {};
+  function diasDe(e) {
+    var ini = X.M + "-01", fim = X.M + "-" + String(X.dias.length).padStart(2, "0"), L = [];
+    if (e.ate < ini || e.de > fim) return L;
+    for (var d = e.de < ini ? 1 : +e.de.slice(8), f = e.ate > fim ? X.dias.length : +e.ate.slice(8); d <= f; d++) L.push(d);
+    return L;
+  }
+  function mapaEsp() { X.EM = {}; X.ESP.forEach(function (e) { var m = X.EM[e.colaborador_id] = X.EM[e.colaborador_id] || {}; diasDe(e).forEach(function (d) { m[d] = e; }); }); }
+  function abate(id) {   // férias contam pelo código F; os outros contam em dias úteis, e o aniversário é sempre folga paga
+    var n = 0, m = X.EM[id] || {};
+    Object.keys(m).forEach(function (d) {
+      var e = m[d], iso = X.M + "-" + String(d).padStart(2, "0"), w = new Date(iso + "T12:00:00").getDay();
+      if (e.tipo === "aniversario" || (e.tipo !== "ferias" && w > 0 && w < 6 && !X.fer[iso])) n++;
+    });
+    return n;
+  }
+  function aplicarEsp() {
+    var n = 0;
+    X.ESP.forEach(function (e) {
+      var id = e.colaborador_id, k = TIPOS[e.tipo][1];
+      if (!X.P.some(function (l) { return l.colaborador_id === id; })) return;
+      diasDe(e).forEach(function (d) { if ((X.G[id] || {})[d] !== k || !(X.FX[id] || {})[d]) { pôr(id, d, k, true); n++; } });
+    });
+    if (n) X.ed = true;
+    return n;
+  }
+  async function lerEsp(ids) {
+    var r = await sb.from("msb_horario_especiais").select("id,colaborador_id,tipo,de,ate,nota").in("colaborador_id", ids).lte("de", X.M + "-" + String(X.dias.length).padStart(2, "0")).gte("ate", X.M + "-01").order("de");
+    if (r.error) throw r.error;
+    X.ESP = r.data; mapaEsp();
+  }
+  function cartaoEsp() {
+    var f = X.espF, op = X.P.map(function (l) { var c = X.C[l.colaborador_id] || {}; return "<option value='" + l.colaborador_id + "'" + (+f.c === l.colaborador_id ? " selected" : "") + ">" + esc(c.curto || "") + "</option>"; }).join(""), ti = Object.keys(TIPOS).map(function (k) { return "<option value='" + k + "'" + (f.t === k ? " selected" : "") + ">" + TIPOS[k][0] + "</option>"; }).join("");
+    return "<div class='bl'><h3>Especiais</h3><div class='ff'><label>Funcionário<select id='espC'><option value=''></option>" + op + "</select></label><label>Tipo<select id='espT'>" + ti + "</select></label><label>De<input type='date' id='espDe' value='" + esc(f.de) + "'></label><label>Até<input type='date' id='espAte' value='" + esc(f.ate) + "'></label><label>Nota<input id='espN' value='" + esc(f.n) + "'></label></div>" +
+      "<div class='bar' style='margin-top:8px'><button class='btn p' id='espOk'>" + (f.id ? "Guardar alteração" : "Marcar") + "</button>" + (f.id ? "<button class='btn' id='espLimpa'>Cancelar</button><button class='btn' id='espDel'>Apagar</button>" : "") + "</div>" +
+      (X.ESP.length ? "<div class='sc' style='margin-top:8px'><table><thead><tr><th class='l'>Funcionário</th><th class='l'>Tipo</th><th>De</th><th>Até</th><th class='l'>Nota</th></tr></thead><tbody>" + X.ESP.map(function (e) { return "<tr><td class='l'><a href='#' data-esp='" + e.id + "'>" + esc((X.C[e.colaborador_id] || {}).curto || "") + "</a></td><td class='l'>" + TIPOS[e.tipo][0] + "</td><td>" + dmy(e.de) + "</td><td>" + dmy(e.ate) + "</td><td class='l'>" + esc(e.nota || "") + "</td></tr>"; }).join("") + "</tbody></table></div><p class='rod'>Toca no nome para mudar ou apagar.</p>" : "<p class='rod'>Sem dias especiais neste mês.</p>") + "</div>";
+  }
+  function novoEspF() { return {id: null, c: "", t: "ferias", de: "", ate: "", n: ""}; }
+  function ligarEsp() {
+    var f = X.espF, liga = function (id, k) { var x = $(id); x.onchange = x.oninput = function () { f[k] = x.value; if (k === "de" && (!f.ate || f.ate < f.de)) { f.ate = f.de; $("#espAte").value = f.de; } }; };
+    liga("#espC", "c"); liga("#espT", "t"); liga("#espDe", "de"); liga("#espAte", "ate"); liga("#espN", "n");
+    $("#espOk").onclick = guardarEsp;
+    var e = function (id, g) { var x = $(id); if (x) x.onclick = g; };
+    e("#espLimpa", function () { X.espF = novoEspF(); pintar(); }); e("#espDel", apagarEsp);
+    [].forEach.call(document.querySelectorAll("#v-hor a[data-esp]"), function (a) { a.onclick = function (ev) { ev.preventDefault(); editarEsp(X.ESP.find(function (q) { return q.id === +a.dataset.esp; })); }; });
+  }
+  function editarEsp(e) { X.esp = true; X.espF = {id: e.id, c: e.colaborador_id, t: e.tipo, de: e.de, ate: e.ate, n: e.nota || "", old: e}; pintar(); $("#espOk").scrollIntoView({block: "center"}); }
+  async function soltarOutrosMeses(e) {   // nos outros meses a folga fica, mas deixa de estar presa; ajusta-se ao abrir esse mês
+    var ini = X.M + "-01", fim = addMes(X.M, 1) + "-01";
+    if (e.de < ini) await sb.from("msb_horario_dias").update({fixo: false}).eq("colaborador_id", e.colaborador_id).gte("dia", e.de).lte("dia", e.ate).lt("dia", ini);
+    if (e.ate >= fim) await sb.from("msb_horario_dias").update({fixo: false}).eq("colaborador_id", e.colaborador_id).gte("dia", e.de).lte("dia", e.ate).gte("dia", fim);
+  }
+  function depoisEsp(antes) {   // antes = dias do período antigo neste mês: os que deixaram de ser especiais voltam a ficar livres
+    mapaEsp();
+    var n = 0, id = antes.id;
+    antes.d.forEach(function (d) { if (!(X.EM[id] || {})[d]) { pôr(id, d, "", false); n++; } });
+    n += aplicarEsp(); X.espF = novoEspF();
+    if (n) { X.ed = true; ajustar(); } else pintar();
+  }
+  async function guardarEsp() {
+    var f = X.espF, de = f.de, ate = f.ate || f.de, c = +f.c;
+    if (!c) return msbAviso("Erro: escolhe o funcionário.");
+    if (!de) return msbAviso("Erro: escolhe a data.");
+    if (ate < de) return msbAviso("Erro: a data final é anterior à inicial.");
+    try {
+      var q = await sb.from("msb_horario_especiais").select("id").eq("colaborador_id", c).lte("de", ate).gte("ate", de);
+      if (q.error) throw q.error;
+      if (q.data.some(function (x) { return x.id !== f.id; })) return msbAviso("Erro: essa pessoa já tem um dia especial nesse período.");
+      var dados = {colaborador_id: c, tipo: f.t, de: de, ate: ate, nota: f.n.trim() || null};
+      var r = f.id ? await sb.from("msb_horario_especiais").update(dados).eq("id", f.id) : await sb.from("msb_horario_especiais").insert(Object.assign({criado_por: EU && EU.id}, dados));
+      if (r.error) throw r.error;
+      var antes = {id: f.old ? f.old.colaborador_id : c, d: f.old ? diasDe(f.old) : []};
+      if (f.old) await soltarOutrosMeses(f.old);
+      await lerEsp(X.P.map(function (l) { return l.colaborador_id; }));
+      depoisEsp(antes);
+    } catch (e) { msbAviso("Erro: " + falhou(e)); }
+  }
+  async function apagarEsp() {
+    var f = X.espF, e = f.old; if (!e) return;
+    if (!await msbConfirma("Apagar " + TIPOS[e.tipo][0] + " de " + ((X.C[e.colaborador_id] || {}).curto || "") + "? Esses dias voltam a ficar livres no horário.", "Apagar")) return;
+    try {
+      var r = await sb.from("msb_horario_especiais").delete().eq("id", e.id);
+      if (r.error) throw r.error;
+      var antes = {id: e.colaborador_id, d: diasDe(e)};
+      await soltarOutrosMeses(e);
+      await lerEsp(X.P.map(function (l) { return l.colaborador_id; }));
+      depoisEsp(antes);
+    } catch (x) { msbAviso("Erro: " + falhou(x)); }
   }
   /* Projetar o resto: fica o que está fixado, as férias e os dias que já passaram; o resto do mês sai das regras */
   var HIGHS = "https://cdn.jsdelivr.net/npm/highs@1.15.4/build/";
@@ -123,7 +217,7 @@
         if (fx[d] || c === "F" || c === "FD" || iso < hj) fixos[d] = c;
         var w = new Date(iso + "T12:00:00").getDay(); if (c === "F" && w > 0 && w < 6 && !X.fer[iso]) fu++;
       });
-      return {id: l.colaborador_id, fixos: fixos, ant: (X.ANT[l.colaborador_id] || []).slice(-6).map(function (x) { return x[1]; }), fdsAnt: X.FDS[l.colaborador_id] || "", meta: base - fu, off: {M: a.M - minM, T: a.T - minT}, reforco: l.codigo === X.reforco, atual: auto ? Object.assign({}, g) : null};
+      return {id: l.colaborador_id, fixos: fixos, ant: (X.ANT[l.colaborador_id] || []).slice(-6).map(function (x) { return x[1]; }), fdsAnt: X.FDS[l.colaborador_id] || "", meta: base - fu - abate(l.colaborador_id), off: {M: a.M - minM, T: a.T - minT}, reforco: l.codigo === X.reforco, atual: auto ? Object.assign({}, g) : null};
     });
     var oM = {}, oT = {}, fora = 0;
     X.P.forEach(function (l) { if (l.escala || l.espelho) return; X.dias.forEach(function (d) { var c = (X.G[l.colaborador_id] || {})[d]; if (c === "M" || c === "MT") { oM[d] = (oM[d] || 0) + 1; fora++; } if (c === "T" || c === "MT") { oT[d] = (oT[d] || 0) + 1; fora++; } }); });
@@ -143,7 +237,7 @@
       D.P.forEach(function (p, i) { X.dias.forEach(function (d) {
         if (p.fixos[d]) return;
         if ((X.G[p.id] || {})[d] !== S[i][d]) mudou++;
-        pôr(p.id, d, S[i][d], false); X.P.forEach(function (l) { if (l.espelho === p.id) pôr(l.colaborador_id, d, S[i][d], false); });
+        pôr(p.id, d, S[i][d], false); X.P.forEach(function (l) { if (l.espelho === p.id && !(X.EM[l.colaborador_id] || {})[d]) pôr(l.colaborador_id, d, S[i][d], false); });
       }); });
       X.calc = false; pintar();
       var er = X.R.erros;
@@ -166,7 +260,7 @@
       if (P.length) { var r = await sb.from("msb_horario_dias").upsert(P, {onConflict: "estacao,dia,colaborador_id"}); if (r.error) throw r.error; }
       for (var i = 0; i < D.length; i++) { var q = await sb.from("msb_horario_dias").delete().eq("estacao", est).eq("dia", D[i].dia).eq("colaborador_id", D[i].c); if (q.error) throw q.error; }
       await sb.from("msb_horario_meses").update({atualizado_em: new Date().toISOString(), origem: "Editado na app"}).eq("estacao", est).eq("mes", X.M);
-      msbAviso("Horário gravado"); X.ALT = {}; abrir(X.M);
+      delete ADIAR[est + X.M]; msbAviso("Horário gravado"); X.ALT = {}; abrir(X.M);
     } catch (e) { msbAviso("Erro: " + falhou(e)); }
   }
   function fotografia(G, F) {
@@ -275,8 +369,10 @@
       Object.keys(ANT).forEach(function (i) { ANT[i].sort(function (a, b) { return a[0] < b[0] ? -1 : 1; }); });
       var FDS = {}; Object.keys(ANT).forEach(function (i) { ANT[i].forEach(function (a) { var w = new Date(a[0] + "T12:00:00").getDay(); if (w === 6 || w === 0) FDS[i] = a[1]; }); });
       var existe = !!R[3].data, P = existe ? R[1].data.filter(function (l) { return G[l.colaborador_id] || (C[l.colaborador_id] || {}).ativo; }) : [];
-      X = {M: M, dias: dias, fer: feriados(ano), G: G, ORI: ORI, ANT: ANT, FX: FX, FXO: FXO, reforco: cfg.reforco, INI: R[5].data, LJ: R[1].data, FDS: FDS, C: C, P: P, ALT: {}, ed: !!(X && X.criado), rolar: true, estado: existe ? R[3].data.estado : "simulacao", semMT: existe && R[3].data.sem_mt, mt: !!cfg.mt, leg: cfg.legenda || []};
-      pintar();
+      X = {M: M, dias: dias, fer: feriados(ano), G: G, ORI: ORI, ANT: ANT, FX: FX, FXO: FXO, reforco: cfg.reforco, INI: R[5].data, LJ: R[1].data, ESP: [], EM: {}, esp: !!(X && X.esp && X.M === M), espF: novoEspF(), FDS: FDS, C: C, P: P, ALT: {}, ed: !!(X && X.criado), rolar: true, estado: existe ? R[3].data.estado : "simulacao", semMT: existe && R[3].data.sem_mt, mt: !!cfg.mt, leg: cfg.legenda || []};
+      var nEsp = 0;
+      if (ADMIN) { await lerEsp(R[1].data.map(function (l) { return l.colaborador_id; })); if (est !== EST || M !== MES) return; if (!ADIAR[est + M]) nEsp = aplicarEsp(); }
+      if (nEsp) ajustar(); else pintar();
     } catch (e) { box.innerHTML = "<div class='aviso'><p>" + esc(falhou(e)) + "</p></div>"; }
   }
   MSB_NAV.horario = function () { abrir(); };

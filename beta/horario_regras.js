@@ -50,7 +50,8 @@
     var base = meta(y, m, n, fer);
     var metas = L.filter(function (p) { return p.escala !== false; }).map(function (p) {
       var fu = 0, tur = 0; p.dias.forEach(function (c, i) { if (TRAB[c]) tur++; var w = dt(y, m, i + 1).getUTCDay(); if (c === "F" && w > 0 && w < 6 && !fer[iso(dt(y, m, i + 1))]) fu++; });
-      return {nome: p.nome, turnos: tur, meta: base - fu, ferias: fu, extra: (tur - (base - fu)) * 8};
+      var ab = p.abate || 0;   // dias especiais pagos (baixa, formação, aniversário, outros)
+      return {nome: p.nome, turnos: tur, meta: base - fu - ab, ferias: fu, ausencias: fu + ab, extra: (tur - (base - fu - ab)) * 8};
     });
     return {erros: E, avisos: A, metas: metas, base: base};
   }
