@@ -23,19 +23,27 @@
   }
   function celulas() {
     var t = function (d) { var iso = X.M + "-" + String(d).padStart(2, "0"), w = new Date(iso + "T12:00:00").getDay(); return {w: w, cl: (X.fer[iso] ? "fer " : (w === 0 || w === 6) ? "fds " : "") + (iso === hoje() ? "hj" : "")}; };
-    var eu = ((PERFIL && PERFIL.display_name) || "").trim().split(/\s+/)[0];
+    var eu = ((PERFIL && PERFIL.display_name) || "").trim().split(/\s+/)[0], EX = mapaExtras();
     var h = "<div class='sc' id='horSc'><table class='hor" + (X.ed ? " aeditar" : "") + "'><thead><tr><th class='l'>Colaborador</th>" + X.dias.map(function (d) { var k = t(d); return "<th class='" + k.cl + "'>" + d + "<small>" + SEM[k.w] + "</small></th>"; }).join("") + "<th>Turnos</th></tr></thead><tbody>";
     X.P.forEach(function (l) {
       var c = X.C[l.colaborador_id] || {}, g = X.G[l.colaborador_id] || {}, tur = 0, fixo = !!l.espelho;
       h += "<tr" + (c.curto === eu ? " class='eu'" : "") + "><td class='l' title='" + esc(c.nome || "") + "'>" + esc(c.curto || "") + (fixo && X.ed ? "<small>segue " + esc((X.C[l.espelho] || {}).curto || "") + "</small>" : "") + "</td>" + X.dias.map(function (d) {
         var v = g[d] || ""; if (v === "M" || v === "T" || v === "MT") tur++;
         var mudou = X.ALT[l.colaborador_id + "|" + d] != null, fx = (X.FX[l.colaborador_id] || {})[d], es = (X.EM[l.colaborador_id] || {})[d];
-        return "<td class='" + t(d).cl + (mudou ? " alt" : "") + (fx ? " fx" : "") + "'" + (es ? " title='" + esc(TIPOS[es.tipo][0] + (es.nota ? ": " + es.nota : "")) + "'" : fx ? " title='Escolhido por ti'" : "") + (X.ed && (!fixo || es) ? " data-c='" + l.colaborador_id + "' data-d='" + d + "' tabindex='0' role='button' aria-label='" + esc(c.curto || "") + " dia " + d + "'" : "") + ">" + v + (es && TIPOS[es.tipo][2] ? "<small>" + TIPOS[es.tipo][2] + "</small>" : "") + "</td>";
+        return "<td class='" + t(d).cl + (mudou ? " alt" : "") + (fx ? " fx" : "") + ((EX[l.colaborador_id] || []).indexOf(d) >= 0 ? " ex" : "") + "'" + (es ? " title='" + esc(TIPOS[es.tipo][0] + (es.nota ? ": " + es.nota : "")) + "'" : fx ? " title='Escolhido por ti'" : "") + (X.ed && (!fixo || es) ? " data-c='" + l.colaborador_id + "' data-d='" + d + "' tabindex='0' role='button' aria-label='" + esc(c.curto || "") + " dia " + d + "'" : "") + ">" + v + (es && TIPOS[es.tipo][2] ? "<small>" + TIPOS[es.tipo][2] + "</small>" : "") + "</td>";
       }).join("") + "<td class='n'>" + tur + "</td></tr>";
     });
     return h + "</tbody></table></div>";
   }
-  function verif() { return HOR.verificar(linhas(), {y: +X.M.slice(0, 4), m: +X.M.slice(5), fer: X.fer, mt: X.mt, semMT: X.semMT}); }
+  function opRegras() { return {y: +X.M.slice(0, 4), m: +X.M.slice(5), fer: X.fer, mt: X.mt, semMT: X.semMT}; }
+  function mapaExtras() {   // só para o administrador: sem os dias especiais a conta sairia errada. Quem segue outra pessoa leva as mesmas marcas
+    var M = {}; if (!ADMIN) return M;
+    var E = HOR.extras(linhas(), opRegras());
+    X.P.forEach(function (l) { var d = E[(X.C[l.colaborador_id] || {}).curto || ""]; if (d && d.length) M[l.colaborador_id] = d; });
+    X.P.forEach(function (l) { if (l.espelho && M[l.espelho]) M[l.colaborador_id] = M[l.espelho]; });
+    return M;
+  }
+  function verif() { return HOR.verificar(linhas(), opRegras()); }
   function inviavel() {   // só o que a mudança estragou: erros que o mês já tinha ao abrir ficam nas Regras
     if (!X.ed || X.calc) return "";
     var novos = verif().erros.filter(function (e) { return (X.ER0 || []).indexOf(e.msg) < 0; }), L = novos.map(function (e) { return e.msg; });
@@ -58,7 +66,7 @@
     if (ADMIN && X.P.length) b += X.ed
       ? "<button class='btn az' id='horProj'" + (X.calc ? " disabled" : "") + ">" + (X.calc ? "A ajustar…" : "Projetar o resto") + "</button><button class='btn' id='horIni'" + (X.INI ? "" : " disabled") + ">Horário inicial</button><button class='btn' id='horEsp'>Especiais</button><button class='btn p' id='horGrava'" + (n && !X.calc ? "" : " disabled") + ">Gravar" + (n ? " " + n : "") + "</button><button class='btn' id='horFim'>Sair da edição</button>"
       : "<button class='btn' id='horEd'>Editar</button><button class='btn' id='horEsp'>Especiais</button><button class='btn' id='horDefIni'>Guardar como inicial</button><button class='btn' id='horEst'>" + (X.estado === "simulacao" ? "Passar a real" : "Passar a simulação") + "</button><button class='btn' id='horXls'>Excel Picaponto</button><button class='btn' id='horPdf'>PDF</button>";
-    box.innerHTML = b + "</div>" + (X.esp ? cartaoEsp() : "") + inviavel() + (X.P.length ? celulas() + "<p class='rod'>M manhã · T tarde · MT turno M/T · FG folga · F férias · FD feriado. Fundo azul: fim de semana; creme: feriado." + (X.ESP.length ? " Especiais: B baixa · Fr formação · A aniversário · O outros."  : "") + (X.ed ? " Toca numa célula e escolhe o turno: a app ajusta o resto do mês às regras e mantém o que escolheste (sublinhado). Se não der, avisa e diz porquê. Projetar o resto refaz tudo menos o que escolheste. Horário inicial volta à versão de partida do mês." : "") + "</p>" + regras()
+    box.innerHTML = b + "</div>" + (X.esp ? cartaoEsp() : "") + inviavel() + (X.P.length ? celulas() + "<p class='rod'>M manhã · T tarde · MT turno M/T · FG folga · F férias · FD feriado. Fundo azul: fim de semana; creme: feriado." + (ADMIN ? " Verde e negrito: turno extra." : "") + (X.ESP.length ? " Especiais: B baixa · Fr formação · A aniversário · O outros."  : "") + (X.ed ? " Toca numa célula e escolhe o turno: a app ajusta o resto do mês às regras e mantém o que escolheste (sublinhado). Se não der, avisa e diz porquê. Projetar o resto refaz tudo menos o que escolheste. Horário inicial volta à versão de partida do mês." : "") + "</p>" + regras()
       : "<div class='vazio'>Ainda não há horário de " + nomeMes(X.M) + " nesta loja." + (ADMIN ? "<p><button class='btn p' id='horNovo'>Criar horário do mês</button></p>" : "") + "</div>");
     $("#horAnt").onclick = function () { sair(function () { abrir(addMes(X.M, -1)); }); };
     $("#horSeg").onclick = function () { sair(function () { abrir(addMes(X.M, 1)); }); };
@@ -338,14 +346,14 @@
     X.dias.forEach(function (d) { fundo(d, y - 8, alt + 4); centro(String(d), M + nome + (d - 1) * col, y + 8, B, 9); centro(SEM[new Date(X.M + "-" + String(d).padStart(2, "0") + "T12:00:00").getDay()], M + nome + (d - 1) * col, y - 3, F, 6.5); });
     pg.drawText("Colaborador", {x: M + 3, y: y + 3, size: 9, font: B, color: tx}); y -= 8;
     pg.drawLine({start: {x: M, y: y}, end: {x: W - M, y: y}, thickness: 0.8, color: az});
-    var linhas = X.P.filter(function (l) { return Object.keys(X.G[l.colaborador_id] || {}).length; });
+    var EX = mapaExtras(), ver = P.rgb(0.875, 0.949, 0.882), linhas = X.P.filter(function (l) { return Object.keys(X.G[l.colaborador_id] || {}).length; });
     linhas.forEach(function (l) {
       var c = X.C[l.colaborador_id] || {}; y -= alt;
-      X.dias.forEach(function (d) { fundo(d, y, alt); var v = (X.G[l.colaborador_id] || {})[d] || ""; if (v) centro(v, M + nome + (d - 1) * col, y + 9, F, 9); });
+      X.dias.forEach(function (d) { fundo(d, y, alt); var v = (X.G[l.colaborador_id] || {})[d] || "", e = (EX[l.colaborador_id] || []).indexOf(d) >= 0; if (e) pg.drawRectangle({x: M + nome + (d - 1) * col, y: y, width: col, height: alt, color: ver}); if (v) centro(v, M + nome + (d - 1) * col, y + 9, e ? B : F, 9); });
       pg.drawText(c.nome || "", {x: M + 3, y: y + 9, size: 9, font: B, color: tx});
       pg.drawLine({start: {x: M, y: y}, end: {x: W - M, y: y}, thickness: 0.4, color: lin});
     });
-    pg.drawText("M manhã · T tarde" + (X.mt ? " · MT turno M/T" : "") + " · FG folga · F férias · FD feriado", {x: M, y: y - 16, size: 8, font: F, color: tx});
+    pg.drawText("M manhã · T tarde" + (X.mt ? " · MT turno M/T" : "") + " · FG folga · F férias · FD feriado · verde e negrito: turno extra", {x: M, y: y - 16, size: 8, font: F, color: tx});
     await marcaPdf(doc, pg, F, B, M, 18);
     descarregar(new Blob([await doc.save()], {type: "application/pdf"}), ficheiro("pdf"));
   }

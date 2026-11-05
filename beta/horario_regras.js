@@ -55,6 +55,28 @@
     });
     return {erros: E, avisos: A, metas: metas, base: base};
   }
-  var H = {verificar: verificar, meta: meta, semanasMT: semanasMT, CODIGOS: ["M", "T", "MT", "FG", "F", "FD"]};
+  /* Turnos acima da meta em dias úteis, 1 por semana quando possível, a começar pelas semanas com mais turnos (escolher_extras do horarios.py) → {nome: [dias]} */
+  function extras(L, op) {
+    var y = op.y, m = op.m, fer = op.fer || {}, M = verificar(L, op).metas, E = L.filter(function (p) { return p.escala !== false; }), res = {};
+    var util = function (d) { var w = dt(y, m, d).getUTCDay(); return w > 0 && w < 6 && !fer[iso(dt(y, m, d))]; };
+    E.forEach(function (p, i) {
+      var k = M[i].turnos - M[i].meta, r = res[p.nome] = [], S = {}, ch = [];
+      if (k <= 0) return;
+      p.dias.forEach(function (c, j) { var d = j + 1, x = dt(y, m, d), s = iso(new Date(x.getTime() - ((x.getUTCDay() + 6) % 7) * 864e5)); if (!S[s]) { S[s] = []; ch.push(s); } S[s].push(d); });
+      var peso = function (s) { return S[s].filter(function (d) { return TRAB[p.dias[d - 1]]; }).length - S[s].filter(util).length; };
+      var ord = ch.map(function (s, a) { return [s, a, peso(s)]; }).sort(function (a, b) { return b[2] - a[2] || a[1] - b[1]; }).map(function (a) { return a[0]; });
+      for (;;) {
+        var antes = r.length;
+        ord.forEach(function (s) {
+          if (r.length >= k) return;
+          var c = S[s].filter(function (d) { return (p.dias[d - 1] === "M" || p.dias[d - 1] === "T") && util(d) && r.indexOf(d) < 0; });
+          if (c.length) r.push(c[c.length - 1]);
+        });
+        if (r.length >= k || r.length === antes) break;
+      }
+    });
+    return res;
+  }
+  var H = {verificar: verificar, extras: extras, meta: meta, semanasMT: semanasMT, CODIGOS: ["M", "T", "MT", "FG", "F", "FD"]};
   if (typeof module !== "undefined") module.exports = H; else raiz.HOR = H;
 })(typeof window !== "undefined" ? window : this);
