@@ -199,6 +199,13 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
     <div id="preCorpo" style="display:grid;gap:12px"></div>
   </div>
 
+  <!-- COMPRAS: DIGITALIZAR FATURAS DE FORNECEDORES -->
+  <div id="v-dig" class="v" hidden>
+    <div class="bar"><button class="btn p" id="bDigFoto">📷 Fotografar fatura</button><button class="btn" id="bDig">📄 Escolher PDF ou imagem</button><input type="file" id="fDigFoto" accept="image/*" capture="environment" hidden><input type="file" id="fDig" accept="application/pdf,.pdf,image/*" hidden></div>
+    <p class="mut" style="margin:0;font-size:13px">M.Cunha e Vendeiro. Uma fatura de cada vez, inteira, direita e com boa luz.</p>
+    <div id="digCorpo" style="display:grid;gap:12px"></div>
+  </div>
+
   <!-- GESTÃO: AVISOS DO OCTAN AI -->
   <div id="v-avi" class="v" hidden>
     <div id="aviCorpo" style="display:grid;gap:12px"></div>
@@ -485,6 +492,8 @@ entrar().catch(function(e){$("#vLogin").hidden=false;$("#lErro").textContent=fal
 <script src="relpdf.js"></script>
 <script src="precos.js"></script>
 <script src="avisos.js"></script>
+<script src="faturas_ler.js"></script>
+<script src="faturas.js"></script>
 <script src="areas.js"></script>
 <script>$$("#tabSub button").forEach(function(b){b.onclick=function(){tabaco(b.dataset.t)}});$("#eqBtnNovo").onclick=formNovo;</script>
 </body>

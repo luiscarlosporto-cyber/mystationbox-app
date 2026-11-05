@@ -7,7 +7,7 @@ var AREAS = [   // ordem aprovada a 05/11/2026: decisão, operação e controlo,
   {id: "ini", n: "🏠 Painel", p: [["ini", "Painel de Gestão"], ["avi", "OCTAN AI", {adm: 1}]]},
   {id: "des", n: "📊 Desempenho", adm: 1, p: [["luc", "Lucro", {g: "Resultados"}], ["mes", "Resultado mensal", {g: "Resultados"}], ["ven", "Vendas e margens", {g: "Vendas"}], ["va", "Relatório de vendas", {g: "Vendas"}], ["maq", "Máquina de tabaco", {g: "Vendas"}], ["fun", "Por funcionário", {g: "Análise"}]]},
   {id: "tes", n: "💶 Tesouraria", p: [["reg", "Registo diário", {g: "Caixa"}], ["sai", "Saídas de caixa", {g: "Caixa"}], ["his", "Histórico", {g: "Caixa"}], ["rep", "Repsol e Multibanco", {g: "Conferências", adm: 1}], ["tms", "Fecho mensal TMS", {g: "Conferências", adm: 1}]]},
-  {id: "cst", n: "🛒 Compras e Stocks", c: "Compras", p: [["enc", "Por aprovar", {g: "Compras", adm: 1}], ["nova", "Nova encomenda", {g: "Compras", adm: 1}], ["comh", "Encomendas feitas", {g: "Compras", adm: 1}], ["ent", "Entrada de mercadoria", {g: "Receções", adm: 1}], ["comb", "Entrada de combustível", {g: "Receções", adm: 1}], ["contar", "Contar", {g: "Stock"}], ["ler", "Ler código", {g: "Stock"}], ["stock", "Stock atual", {g: "Stock"}], ["inv", "Inventário", {g: "Stock"}], ["mov", "Movimentos", {g: "Stock"}]]},
+  {id: "cst", n: "🛒 Compras e Stocks", c: "Compras", p: [["enc", "Por aprovar", {g: "Compras", adm: 1}], ["nova", "Nova encomenda", {g: "Compras", adm: 1}], ["comh", "Encomendas feitas", {g: "Compras", adm: 1}], ["ent", "Entrada de mercadoria", {g: "Receções", adm: 1}], ["dig", "Digitalizar fatura", {g: "Receções", adm: 1}], ["comb", "Entrada de combustível", {g: "Receções", adm: 1}], ["contar", "Contar", {g: "Stock"}], ["ler", "Ler código", {g: "Stock"}], ["stock", "Stock atual", {g: "Stock"}], ["inv", "Inventário", {g: "Stock"}], ["mov", "Movimentos", {g: "Stock"}]]},
   {id: "con", n: "📋 Conformidade", adm: 1, p: [["pre", "Preços ENSE", {g: "ENSE"}], ["ense", "Reporte mensal", {g: "ENSE"}], ["kms", "Mapa de kms do gerente", {g: "Contabilidade"}]]},
   {id: "adm", n: "⚙️ Administração", adm: 1, p: [["eq", "Equipa e acessos", {g: "Pessoas"}], ["mrg", "Margens e custos", {g: "Regras"}], ["prod", "Produtos e códigos", {g: "Regras"}], ["cfg", "Configuração do stock", {g: "Regras"}]]}
 ];
@@ -23,7 +23,7 @@ var NEXP = {
   prod: {tab: "settings", only: ["Gestão de produtos"]},
   cfg: {tab: "settings", only: ["Configuração da base de dados central", "Importante"]}
 };
-var VISTA_DA = {avi: "avi", ini: "ini", reg: "reg", sai: "sai", his: "his", ven: "tab", comh: "tab", mov: "tab", rep: "rep", tms: "tms", mes: "mes", fun: "fun", eq: "ges", luc: "luc", mrg: "mrg", comb: "comb", ense: "ense", va: "va", kms: "kms", pre: "pre"};
+var VISTA_DA = {avi: "avi", ini: "ini", reg: "reg", sai: "sai", his: "his", ven: "tab", comh: "tab", mov: "tab", rep: "rep", tms: "tms", mes: "mes", fun: "fun", eq: "ges", luc: "luc", mrg: "mrg", comb: "comb", ense: "ense", va: "va", kms: "kms", pre: "pre", dig: "dig"};
 var PAGINA = "ini";
 function areasVisiveis() { return AREAS.filter(function (a) { return ADMIN || !a.adm; }); }
 function paginasDe(a) { return a.p.filter(function (x) { return ADMIN || !(x[2] && x[2].adm); }); }
@@ -60,6 +60,7 @@ window.msbIr = ir;
 var vistaBase = vista;
 vista = function (v) { var pg = Object.keys(VISTA_DA).find(function (k) { return VISTA_DA[k] === v; }) || v; vistaBase(v); if (areaDe(pg)) marcar(pg); };
 window.depoisVista = function (v) {
+  if (v === "dig" && !FD) carregarFaturasDig();
   if (v === "ini") carregarInicio();
   if (v === "tms") carregarTMS();
   if (v === "ges") carregarEquipa();
@@ -183,7 +184,10 @@ async function carregarInicio() {
 async function tipoFicheiro(f) {
   var b = new Uint8Array(await f.slice(0, 64).arrayBuffer()), ini = String.fromCharCode.apply(null, b);
   if (/^image\//.test(f.type) || /\.(jpe?g|png|heic|webp)$/i.test(f.name)) return "foto";
-  if (ini.slice(0, 4) === "%PDF") {   // relatório de vendas do CBOS (título "CBOS | Resultado turno…") ou documento Repsol
+  if (ini.slice(0, 4) === "%PDF") {
+    var todo = new TextDecoder("latin1").decode(new Uint8Array(await f.arrayBuffer()));
+    if (!/\/Font\b|\/ObjStm\b/.test(todo) && /\/Image\b/.test(todo)) return "fatura";   // PDF digitalizado: só imagem, sem texto
+    // relatório de vendas do CBOS (título "CBOS | Resultado turno…") ou documento Repsol
     var txt = new TextDecoder("latin1").decode(new Uint8Array(await f.slice(0, 200000).arrayBuffer()));
     if (ehPrecosPdf(txt)) return "precos";                                                                      // tabela semanal de preços (ENSE)
     if (/Folhas de turno|0046006F006C0068006100730020006400650020007400750072006E006F/i.test(txt)) return "folha";   // FOLHA DE FECHO TURNO MENSAL
@@ -222,8 +226,15 @@ function escolherVendas(f) {
     } catch (e) { status(false, "⚠ " + e.message); }
   }; });
 }
+function escolherFoto(f) {
+  if (!ADMIN) { ir("reg"); $("#fFecho").onchange.call({files: [f], value: ""}); return; }
+  ir("reg");
+  painel("<h3>📷 " + esc(f.name) + "</h3><p class='mut' style='margin:0'>O que é esta fotografia?</p><div class='bar'><button class='btn p' data-f='fecho'>🧾 Fecho MB ou Solred</button><button class='btn az' data-f='fatura'>📄 Fatura de fornecedor</button><button class='btn' data-f=''>Cancelar</button></div>");
+  $$("#painel [data-f]").forEach(function (b) { b.onclick = function () { var o = b.dataset.f; fecharPainel();
+    if (o === "fecho") $("#fFecho").onchange.call({files: [f], value: ""}); else if (o === "fatura") digitalizarFatura(f); }; });
+}
 async function carregarFicheiros(fs) {
-  var g = {pdf: [], precos: [], cbos: [], folha: [], foto: [], xls: [], tms: [], vendas: [], csv: [], "": []};
+  var g = {pdf: [], precos: [], cbos: [], folha: [], foto: [], fatura: [], xls: [], tms: [], vendas: [], csv: [], "": []};
   for (var i = 0; i < fs.length; i++) g[await tipoFicheiro(fs[i])].push(fs[i]);
   /* Excel de créditos MB/Solred por transferência: reconhece-se pelo cabeçalho (N.º doc. · Mont. em MI) */
   var trf = []; for (var k = g.vendas.length - 1; k >= 0; k--) if (await ehTransferencias(g.vendas[k])) trf.push(g.vendas.splice(k, 1)[0]);
@@ -236,7 +247,8 @@ async function carregarFicheiros(fs) {
   if (g.cbos.length) await importarVendasCBOS(g.cbos[0]);
   if (g.folha.length) await importarFolhaFecho(g.folha[0]);
   if (g.xls.length) { ir("reg"); $("#fXls").onchange.call({files: [g.xls[0]], value: ""}); }
-  if (g.foto.length) { ir("reg"); $("#fFecho").onchange.call({files: [g.foto[0]], value: ""}); }
+  if (g.fatura.length) digitalizarFatura(g.fatura[0]);
+  if (g.foto.length) escolherFoto(g.foto[0]);
   if (trf.length) await importarTransferencias(trf[0]);
   if (g.vendas.length) escolherVendas(g.vendas[0]);
   var varios = g.xls.length + g.foto.length + g.vendas.length > (g.xls.length ? 1 : 0) + (g.foto.length ? 1 : 0) + (g.vendas.length ? 1 : 0);
