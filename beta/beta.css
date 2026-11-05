@@ -95,6 +95,9 @@ h2{font:600 18px var(--f-body);letter-spacing:-.01em}
 .fl input,.ff input.n,.enseIn{font:600 15px var(--f-num);font-variant-numeric:tabular-nums}
 .fl input:focus,.ff input:focus,.ff select:focus,.sai input:focus{outline:2px solid var(--azul);outline-offset:0;border-color:var(--azul)}
 .fl label,.ff label{font-size:13px}
+main input:not([type=checkbox]):not([type=radio]):not([type=file]),main select{border:1px solid var(--bd);border-radius:var(--r);background:var(--in);color:var(--fg);padding:7px 9px;min-height:36px;max-width:100%}
+main label:has(>input:not([type=checkbox]):not([type=radio])),main label:has(>select){display:grid;gap:3px;font-size:13px;color:var(--mut);min-width:0}
+main label>input:not([type=checkbox]):not([type=radio]),main label>select{width:100%}
 .ch,.ch.t1,.ch.t2{background:var(--soft);color:var(--fg);font:600 15px var(--f-body);border-bottom:1px solid var(--bd);padding:10px 14px}
 .ch.t1{box-shadow:inset 3px 0 0 var(--t1)}.ch.t2{box-shadow:inset 3px 0 0 var(--t2)}
 .ch .dif{background:var(--card);border:1px solid var(--bd);font:600 14px var(--f-num)}
