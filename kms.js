@@ -61,7 +61,7 @@ function desenharKms() {
   $("#kmsEur").onchange = function () { var v = Number(String(this.value).replace(",", ".")); if (v > 0) KMS.eur = v; mudou(); };
   $$("#kmsCorpo .kmsVai").forEach(function (i) { i.onchange = function () { if (i.checked) KMS.dias[i.dataset.d] = Math.random() < 0.5 ? "m" : "t"; else delete KMS.dias[i.dataset.d]; mudou(); }; });
   $$("#kmsCorpo .kmsPer").forEach(function (s) { s.onchange = function () { KMS.dias[s.dataset.d] = s.value; mudou(); }; });
-  $("#kmsSorteio").onclick = function () { if (KMS.gravado && !confirm("Substituir o mapa gravado por uma nova proposta? (só fica gravada se carregar em Gravar)")) return; KMS.dias = propostaKms(KMS.mes); KMS.viatura = viaturaDoMes(KMS.mes, KMS.cfg); mudou(); };
+  $("#kmsSorteio").onclick = async function () { if (KMS.gravado && !await msbConfirma("Substituir o mapa gravado por uma nova proposta? (só fica gravada se carregar em Gravar)", "Substituir")) return; KMS.dias = propostaKms(KMS.mes); KMS.viatura = viaturaDoMes(KMS.mes, KMS.cfg); mudou(); };
   $("#kmsGravar").onclick = gravarKms;
   $("#kmsPdf").onclick = pdfKms;
   $("#kmsAssBtn").onclick = function () { $("#kmsAss").click(); };

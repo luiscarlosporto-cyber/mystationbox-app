@@ -15,6 +15,9 @@
     r: '<path d="M15 6l-6 6 6 6"/>',
     s: '<path d="M10 4H5v16h5M15 8l4 4-4 4M19 12H9"/>'
   };
+  /* páginas que no menu são uma só, com separadores em cima */
+  var GRUPOS = [{n: "Receções", p: ["ent", "dig", "comb"]}, {n: "Vendas", p: ["ven", "va", "maq"]}];
+  function grupoDe(pg) { return GRUPOS.find(function (g) { return g.p.indexOf(pg) >= 0; }); }
   var IC_AREA = {ini: "p", des: "d", tes: "t", cst: "c", con: "f", adm: "a"};
   function ic(n) { return '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">' + ICONES[n] + "</svg>"; }
   function nomeArea(a) { return a.n.slice(a.n.indexOf(" ") + 1); }
@@ -47,6 +50,10 @@
       if (b.dataset.p) return ir(b.dataset.p);
       var a = AREAS.find(function (x) { return x.id === b.dataset.a; }); ir(paginasDe(a)[0][0]);
     };
+    var tabs = document.createElement("div"); tabs.id = "bTabs"; tabs.setAttribute("role", "tablist"); main.querySelector(".wrap").prepend(tabs);
+    tabs.onclick = function (e) { var b = e.target.closest("button"); if (b) ir(b.dataset.p); };
+    limpar(main); new MutationObserver(function (L) { L.forEach(function (m) { m.addedNodes.forEach(limpar); }); }).observe(main, {childList: true, subtree: true});
+    main.addEventListener("input", validar);
     chips.onclick = function (e) { var b = e.target.closest("button"); if (b) ir(b.dataset.p); };
     barra.onclick = function (e) {
       var b = e.target.closest("button"); if (!b) return;
@@ -66,18 +73,23 @@
   }
 
   function marcar(pg, a) {
-    var ps = paginasDe(a), gr = "", atual = a.p.find(function (x) { return x[0] === pg; });
+    var ps = paginasDe(a), gr = "", atual = a.p.find(function (x) { return x[0] === pg; }), grp = grupoDe(pg);
+    var vistos = {}, itens = ps.filter(function (p) { var g = grupoDe(p[0]); if (!g) return true; if (vistos[g.n]) return false; return vistos[g.n] = 1; });
+    function emFoco(p) { var g = grupoDe(p[0]); return p[0] === pg || (g && g === grp); }
+    function rotulo(p) { var g = grupoDe(p[0]); return g ? g.n : p[1]; }
     $("#bAreas").innerHTML = areasVisiveis().map(function (x) {
       var on = x.id === a.id, h = "<button data-a='" + x.id + "' title='" + nomeArea(x) + "'" + (on ? " class='on' aria-current='true'" : "") + ">" + ic(IC_AREA[x.id]) + "<span class='tx'>" + nomeArea(x) + "</span>" + seloH(x) + "</button>";
-      if (on && ps.length > 1) h += "<div class='sub'>" + ps.map(function (p) {
-        var g = (p[2] && p[2].g) || "", t = g && g !== gr ? "<b>" + g + "</b>" : ""; gr = g || gr;
-        return t + "<button data-p='" + p[0] + "'" + (p[0] === pg ? " class='on' aria-current='page'" : "") + ">" + p[1] + "</button>";
+      if (on && ps.length > 1) h += "<div class='sub'>" + itens.map(function (p) {
+        var g = (p[2] && p[2].g) || "", t = g && g !== gr && !grupoDe(p[0]) ? "<b>" + g + "</b>" : ""; if (!grupoDe(p[0])) gr = g || gr;
+        return t + "<button data-p='" + p[0] + "'" + (emFoco(p) ? " class='on' aria-current='page'" : "") + ">" + rotulo(p) + "</button>";
       }).join("") + "</div>";
       return h;
     }).join("");
-    $("#bCam").innerHTML = "<span class='ar'>" + nomeArea(a) + "</span><span class='sep ar'> › </span><b>" + (atual ? atual[1] : "") + "</b>";
+    $("#bCam").innerHTML = "<span class='ar'>" + nomeArea(a) + "</span><span class='sep ar'> › </span>" + (grp ? "<span class='ar'>" + grp.n + "</span><span class='sep ar'> › </span>" : "") + "<b>" + (atual ? atual[1] : "") + "</b>";
+    var tabs = $("#bTabs"), noG = grp ? grp.p.filter(function (k) { return ps.some(function (p) { return p[0] === k; }); }) : [];
+    tabs.innerHTML = noG.length > 1 ? noG.map(function (k) { var p = ps.find(function (x) { return x[0] === k; }); return "<button data-p='" + k + "' role='tab' aria-selected='" + (k === pg) + "'" + (k === pg ? " class='on'" : "") + ">" + p[1] + "</button>"; }).join("") : "";
     var chips = $("#bChips");
-    chips.innerHTML = ps.length > 1 ? ps.map(function (p) { return "<button data-p='" + p[0] + "'" + (p[0] === pg ? " class='on'" : "") + ">" + p[1] + "</button>"; }).join("") : "";
+    chips.innerHTML = ps.length > 1 ? itens.map(function (p) { return "<button data-p='" + p[0] + "'" + (emFoco(p) ? " class='on'" : "") + ">" + rotulo(p) + "</button>"; }).join("") : "";
     var on = chips.querySelector(".on"); if (on) chips.scrollLeft = Math.max(0, on.offsetLeft - 40);
     var vis = areasVisiveis(), noTel = vis.filter(function (x) { return AREAS_TEL.indexOf(x.id) >= 0; });
     var fora = AREAS_TEL.indexOf(a.id) < 0;
@@ -87,6 +99,46 @@
   }
 
   function fecharTudo() { ["#bNovoM", "#bPesq", "#bMais"].forEach(function (s) { var e = $(s); if (e) e.remove(); }); }
+
+  /* ---- sem emoji no conteúdo: tira-os do texto que as páginas escrevem. Fica ✔ e ⚠, que dizem o estado;
+     um botão que só tem o emoji fica como está, para não ficar vazio. ---- */
+  var EMO = /(?:\p{Emoji_Presentation}|[\u2600\u2601\u270F\u2709\u2699\u2328\u23F1\u231A\u2702\u{1F5A8}\u{1F5D1}\u{1F5C4}\u{1F5BC}\u{1F3F7}\u{1F58A}\u{1F4FD}\u{1F6E2}\u{1F321}])\uFE0F?\s*/gu;
+  function trocarTexto(t) { return t.replace(/\u2705\s*/g, "\u2714 ").replace(/\u274C\s*/g, "\u2716 ").replace(EMO, ""); }
+  function limpar(n) {
+    if (!n || n.nodeType === 8) return;
+    var w = n.nodeType === 3 ? null : (n.ownerDocument || document).createTreeWalker(n, 4), T = n.nodeType === 3 ? [n] : [], x;
+    while (w && (x = w.nextNode())) T.push(x);
+    T.forEach(function (t) {
+      var p = t.parentNode; if (!p || /^(SCRIPT|STYLE|TEXTAREA)$/.test(p.nodeName)) return;
+      var v = t.nodeValue, r = trocarTexto(v); if (r === v) return;
+      if (!r.trim() && !p.textContent.replace(v, "").trim() && !p.querySelector("img,svg")) return;
+      t.nodeValue = r;
+    });
+    if (n.nodeType === 3) return;
+    /* o módulo de stock escreve depois de abrir: vigia-se o documento dele uma só vez */
+    var d = n.ownerDocument; if (d && d !== document && !d.__msbLimpo) { d.__msbLimpo = 1; new d.defaultView.MutationObserver(function (L) { L.forEach(function (m) { m.addedNodes.forEach(limpar); }); }).observe(d.body, {childList: true, subtree: true}); }
+  }
+
+  /* ---- erro junto do campo do Registo, enquanto se escreve ---- */
+  function validar(e) {
+    var c = e.target; if (!c.matches || !c.matches("#turnos .fl input[data-k]") || c.dataset.k === "func") return;
+    var v = c.value.trim(), mau = !!v && (/[^0-9.,\s+\-]/.test(v) || isNaN(num(v))), m = c.parentNode.querySelector(".m");
+    c.classList.toggle("err", mau); c.setAttribute("aria-invalid", mau);
+    if (mau && !m) { m = document.createElement("span"); m.className = "m"; m.textContent = "Valor inválido. Só números, ex.: 1367,88"; c.parentNode.appendChild(m); }
+    if (!mau && m) m.remove();
+  }
+
+  /* ---- confirmação com o aspeto da app ---- */
+  function confirma(texto, acao) {
+    return new Promise(function (fim) {
+      var d = document.createElement("dialog"); d.id = "bConf";
+      d.innerHTML = "<p></p><div><button class='btn' value='n'>Cancelar</button><button class='btn p' value='s'></button></div>";
+      d.querySelector("p").textContent = texto; d.querySelector(".p").textContent = acao || "Confirmar";
+      d.onclick = function (e) { var b = e.target.closest("button"); if (b) { d.close(b.value); } };
+      d.onclose = function () { d.remove(); fim(d.returnValue === "s"); };
+      document.body.appendChild(d); d.showModal(); d.querySelector("button").focus();
+    });
+  }
 
   /* ---- Mais (telemóvel) ---- */
   function abrirMais() {
@@ -176,7 +228,8 @@
   }
 
   window.MSB_NAV = {
-    montar: montar, marcar: marcar,
+    montar: montar, marcar: marcar, limpar: limpar, confirma: confirma,
+    fechado: function (t, h) { return h ? "<details class='card' style='padding:12px 14px'><summary><b>" + t + "</b></summary><div style='display:grid;gap:10px;margin-top:10px'>" + h + "</div></details>" : ""; },
     selo: function (n) { if (n === SELO) return; SELO = n; marcar(PAGINA, areaDe(PAGINA) || AREAS[0]); },
     nexCss: ":root{--g:#003B5C;--g2:#003B5C;--acc:#D9570F;--txt:#172430;--mut:#566878;--bd:#DCE3E9}" +
       "body{font-family:Inter,'Segoe UI',system-ui,sans-serif!important;font-size:15px}.card{border-radius:10px}.btn,input,select{border-radius:8px}.btn.acc{color:#fff}" +

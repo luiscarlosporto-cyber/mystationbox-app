@@ -25,6 +25,8 @@ var NEXP = {
 };
 var VISTA_DA = {avi: "avi", ini: "ini", reg: "reg", sai: "sai", his: "his", ven: "tab", comh: "tab", mov: "tab", rep: "rep", tms: "tms", mes: "mes", fun: "fun", eq: "ges", luc: "luc", mrg: "mrg", comb: "comb", ense: "ense", va: "va", kms: "kms", pre: "pre", dig: "dig"};
 var PAGINA = "ini";
+/* confirmação: na beta é uma janela da app; na versão atual continua a do navegador */
+function msbConfirma(t, acao) { return window.MSB_NAV ? MSB_NAV.confirma(t, acao) : Promise.resolve(confirm(t)); }
 function areasVisiveis() { return AREAS.filter(function (a) { return ADMIN || !a.adm; }); }
 function paginasDe(a) { return a.p.filter(function (x) { return ADMIN || !(x[2] && x[2].adm); }); }
 function areaDe(pg) { return AREAS.find(function (a) { return a.p.some(function (x) { return x[0] === pg; }); }); }
@@ -100,6 +102,7 @@ function nexAjustar() {
   var st = d.createElement("style"); st.id = "msb-embed";
   st.textContent = "header,nav,footer{display:none!important}main{padding-top:4px!important}body{background:transparent!important}" + (window.MSB_NAV ? MSB_NAV.nexCss : "");
   d.head.appendChild(st);
+  if (window.MSB_NAV) MSB_NAV.limpar(d.body);
 }
 function nexMostrar(pg) {
   var box = $("#nexBox");

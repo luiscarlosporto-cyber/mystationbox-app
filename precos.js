@@ -102,14 +102,14 @@ function octanBotao(x) {
   return x.aprovado_em ? "" : "<button class='btn p' data-apr='" + x.dia + "'>🤖 Aprovar: OCTAN AI grava na ENSE</button>";
 }
 async function aprovarOctan(dia) {
-  if (!confirm("Aprovas estes preços? O OCTAN AI vai gravá-los na ENSE com a data em vigor de " + dmy(dia) + ".")) return;
+  if (!await msbConfirma("Aprovas estes preços? O OCTAN AI vai gravá-los na ENSE com a data em vigor de " + dmy(dia) + ".", "Aprovar")) return;
   var r = await sb.from("msb_precos").update({aprovado_em: new Date().toISOString(), aprovado_por: (PERFIL && PERFIL.display_name) || "", ense_tentado_em: null, ense_erro: null}).eq("estacao", EST).eq("dia", dia).eq("estado", "lido");
   if (r.error) { status(false, falhou(r.error)); return; }
   status(true, "Aprovado ✓"); carregarPrecos();
 }
 
 async function marcarComunicado(dia, x) {
-  if (!confirm("Confirma que os preços em vigor a " + dmy(dia) + " já foram gravados na ENSE, iguais ao quadro?")) return;
+  if (!await msbConfirma("Confirma que os preços em vigor a " + dmy(dia) + " já foram gravados na ENSE, iguais ao quadro?", "Confirmar")) return;
   var r = await sb.from("msb_precos").update({estado: "comunicado", comunicado_em: new Date().toISOString(), comunicado_por: (PERFIL && PERFIL.display_name) || "", ense: {combustiveis: porCampo(x.produtos)}}).eq("estacao", EST).eq("dia", dia);
   if (r.error) { status(false, falhou(r.error)); return; }
   status(true, "Preços de " + dmy(dia) + " marcados como comunicados à ENSE ✓"); carregarPrecos();

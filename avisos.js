@@ -53,7 +53,7 @@ function aviHistorico() {
   }).join("");
 }
 async function aviAprovar(est, dia) {
-  if (!confirm("Aprovas estes preços de " + aviLoja(est) + "? O OCTAN AI vai gravá-los na ENSE.")) return;
+  if (!await msbConfirma("Aprovas estes preços de " + aviLoja(est) + "? O OCTAN AI vai gravá-los na ENSE.", "Aprovar")) return;
   var r = await sb.from("msb_precos").update({aprovado_em: new Date().toISOString(), aprovado_por: (PERFIL && PERFIL.display_name) || "", ense_tentado_em: null, ense_erro: null}).eq("estacao", est).eq("dia", dia).eq("estado", "lido");
   if (r.error) return status(false, "⚠ " + falhou(r.error));
   carregarAvisos(); aviSelo();
@@ -156,7 +156,7 @@ async function carregarAvisos() {
     if (L.length && !porLer.length) h += "<div class='mut'>Nada por ver. Os avisos já vistos estão no arquivo.</div>";
     var nArq = arq.length + pArq.length;
     var arquivo = nArq ? "<details class='card' style='padding:12px 14px'><summary><b>🗄️ Arquivo (" + nArq + ")</b></summary><div style='display:grid;gap:10px;margin-top:10px'>" + aviPedidos(pArq) + arq.map(cartaoAviso).join("") + "</div></details>" : "";
-    box.innerHTML = aviForm() + aviPedidos(pAbertos) + h + aviHistorico() + arquivo;
+    box.innerHTML = window.MSB_NAV ? h + aviPedidos(pAbertos) + aviForm() + MSB_NAV.fechado("Histórico de preços", aviHistorico()) + arquivo : aviForm() + aviPedidos(pAbertos) + h + aviHistorico() + arquivo;
     /* enquanto houver pedido em espera, a resposta aparece sozinha */
     clearTimeout(AVI_ESPERA);
     if (PD.some(function (x) { return x.estado === "pendente" || x.estado === "a_ler"; })) AVI_ESPERA = setTimeout(function () { if (PAGINA === "avi") carregarAvisos(); }, 20000);

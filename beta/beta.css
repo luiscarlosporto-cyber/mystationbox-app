@@ -158,6 +158,19 @@ body.b-rec #nexFrame{height:calc(100dvh - 146px)!important}
 @media (prefers-reduced-motion:reduce){.ske{animation:none}}
 @media (max-width:900px){.painel{grid-template-columns:minmax(0,1fr)}}
 
+/* ---- páginas diárias (Etapa 4) ---- */
+#bTabs{display:flex;gap:2px;border-bottom:1px solid var(--bd);overflow-x:auto;scrollbar-width:none}
+#bTabs:empty{display:none}
+#bTabs button{flex:none;background:none;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;padding:8px 12px;font:500 14px var(--f-body);color:var(--mut);cursor:pointer}
+#bTabs button.on{color:var(--fg);font-weight:600;border-bottom-color:var(--azul)}
+.fl label .m{color:var(--bad);font-size:12px}
+.fl input.err{border-color:var(--bad);outline-color:var(--bad)}
+#bConf{border:1px solid var(--bd);border-radius:12px;background:var(--card);color:var(--fg);padding:18px;width:min(420px,calc(100vw - 32px))}
+#bConf::backdrop{background:rgba(5,20,32,.45)}
+#bConf p{margin:0 0 16px;font-size:15px;line-height:1.45}
+#bConf div{display:flex;gap:8px;justify-content:flex-end}
+details.card summary{cursor:pointer}
+
 /* ---- telemóvel ---- */
 @media (max-width:700px){
   :root,body.b-rec{--lat:0px}
