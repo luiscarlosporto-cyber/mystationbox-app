@@ -62,25 +62,37 @@ async function carregarMargens() {
       "<b>Bónus My Repsol (até 5 €/m³)</b>" + sel("myrepsol", BONUS_MR) +
       "<b>Bónus de dinamização (só conta consignação, até 22 €/m³)</b><p class='mut' style='margin:0;font-size:13px'>Só para postos com volume conta consignação + My Repsol + desconto imediato do ano anterior abaixo de 1 750 m³.</p>" + sel("dinam", BONUS_DIN) +
       "<b>Taxas</b>" + chk("taxa_mr", 0.8, "Descontar a taxa My Repsol (sobre consignação, My Repsol e desconto imediato)").replace("<b>0,8 €/m³</b>", "<b>−0,8 €/m³</b>") +
-      "<p class='mut' style='margin:0;font-size:13px'>A taxa da loja (50 € a 350 € por mês, conforme as vendas da loja) é um custo fixo: acrescente-a em «Custos fixos por mês».</p></div>";
+      "<p class='mut' style='margin:0;font-size:13px'>A taxa da loja, a da lavagem e o valor real da My Repsol ficam no quadro «Taxas de exploração».</p></div>";
     var linhas = []; F.forEach(function (f) { linhas.push([f, ""]); LOJA_SUB.forEach(function (s) { if (s[0] === f) linhas.push([f, s[1]]); }); });
     h += "<div class='card' style='padding:14px;display:grid;gap:10px'><h2 style='margin:0'>🛍️ Loja · margem por categoria (% sobre a venda sem IVA)</h2><p class='mut' style='margin:0'>Até 99 % = margem sobre a venda. 100 % ou mais = margem sobre o custo (ex.: 150 % → custo 1 €, venda 2,50 €, ou seja 60 % da venda).</p>" +
       "<p class='mut' style='margin:0;font-size:13px'>Deixe vazio o que não sabe: no relatório de lucro aparece como \"margem por definir\" e não entra na conta. Tabaco: 6,8 % é a média das faturas da Adelaide.</p>" +
       "<div class='sc'><table><thead><tr><th class='l'>Categoria (família do relatório de vendas)</th><th>Margem</th></tr></thead><tbody>" +
       linhas.map(function (l) { var k = chaveLoja(l[0], l[1]); return "<tr><td class='l'>" + esc(l[0]) + (l[1] ? " · <span class='mut'>" + esc(l[1]) + "</span>" : "") + "</td><td class='n'><input class='mg' data-k='" + esc(k) + "' data-u='pct' inputmode='decimal' value='" + num4(M[k]) + "' style='width:80px;text-align:right'> %</td></tr>"; }).join("") +
       "</tbody></table></div></div>";
+    h += "<div class='card' style='padding:14px;display:grid;gap:10px'><h2 style='margin:0'>🧾 Taxas de exploração · fatura mensal da Repsol</h2>" +
+      "<p class='mut' style='margin:0;font-size:13px'>Valores sem IVA. Loja e Lavagem são fixas e contam todos os meses. A My Repsol varia: escreva o valor de cada fatura. Nesse mês, o Lucro usa este valor em vez da estimativa em €/m³ do quadro de bónus.</p>" +
+      "<b>Fixas (€ por mês)</b><div id='taxasLista' style='display:grid;gap:6px'>" + TAXAS_FIXAS.map(function (n) { var c = C.find(function (x) { return x.nome === n; }); return linhaCusto(n, c ? c.valor_c / 100 : null, true); }).join("") + "</div>" +
+      "<b>My Repsol (variável)</b><div class='ff'><label>Mês<input type='month' id='txMes' value='" + addMes(MES, -1) + "'></label><label>Valor € sem IVA<input id='txMr' inputmode='decimal' autocomplete='off'></label><label>Nº da fatura<input id='txFt' autocomplete='off'></label></div></div>";
     h += "<div class='card' style='padding:14px;display:grid;gap:10px'><h2 style='margin:0'>🧾 Custos fixos por mês</h2>" +
       "<p class='mut' style='margin:0;font-size:13px'>Valor por mês; valores aproximados chegam. Os que deixar em branco não contam. Para outros (manutenção, combustível próprio, limpeza…), use «+ Acrescentar custo».</p>" +
       "<div id='custosLista' style='display:grid;gap:6px'>" + CUSTOS_BASE.map(function (n) { var c = C.find(function (x) { return x.nome.toLowerCase() === n.toLowerCase(); }); return linhaCusto(n, c ? c.valor_c / 100 : null, true); }).join("") +
-        C.filter(function (c) { return !CUSTOS_BASE.some(function (n) { return n.toLowerCase() === c.nome.toLowerCase(); }); }).map(function (c) { return linhaCusto(c.nome, c.valor_c / 100); }).join("") + "</div>" +
+        C.filter(function (c) { return TAXAS_FIXAS.indexOf(c.nome) < 0 && !CUSTOS_BASE.some(function (n) { return n.toLowerCase() === c.nome.toLowerCase(); }); }).map(function (c) { return linhaCusto(c.nome, c.valor_c / 100); }).join("") + "</div>" +
       "<div class='bar'><button class='btn' id='custoMais'>+ Acrescentar custo</button></div></div>";
     h += "<div class='bar'><button class='btn p' id='mrgGravar'>Gravar margens e custos</button><span class='st' id='mrgSt'></span></div>";
     box.innerHTML = h; if (window.MSB_NAV) MSB_NAV.seccoes(box);
+    $("#txMes").onchange = function () { lerTaxaMes().catch(function (e) { $("#mrgSt").textContent = "⚠ " + falhou(e); }); }; await lerTaxaMes();
     $("#custoMais").onclick = function () { $("#custosLista").insertAdjacentHTML("beforeend", linhaCusto("", null)); var u = $$("#custosLista .cn"); u[u.length - 1].focus(); };
     $("#mrgGravar").onclick = gravarMargens;
   } catch (e) { box.innerHTML = "<div class='bad'>" + esc(falhouLucro(e)) + "</div>"; }
 }
 /* custos fixos sempre à vista (02/11/2026, pedido do utilizador); os que ficarem sem valor não contam. Outros acrescentam-se com "+ Acrescentar custo". */
+var TAXAS_FIXAS = ["Taxa de exploração · Loja", "Taxa de exploração · Lavagem"];
+async function lerTaxaMes() {   // preenche o valor My Repsol do mês escolhido
+  var m = $("#txMes").value; $("#txMr").value = ""; $("#txFt").value = ""; if (!m) return;
+  var r = await sb.from("msb_taxas_mes").select("myrepsol_c,fatura").eq("estacao", EST).eq("mes", m).maybeSingle();
+  if (r.error) throw r.error;
+  if (r.data && $("#txMes").value === m) { $("#txMr").value = String(r.data.myrepsol_c / 100).replace(".", ","); $("#txFt").value = r.data.fatura || ""; }
+}
 var CUSTOS_BASE = ["Salários", "Renda", "Luz", "Água", "Comunicações", "Seguros", "Contabilidade"];
 function linhaCusto(nome, v, base) { return "<div class='bar custo" + (base ? " base" : "") + "'><input class='cn' placeholder='Nome do custo' value='" + esc(nome || "") + "'" + (base ? " readonly tabindex='-1' style='flex:1;min-width:0;border-color:transparent;background:transparent;font-weight:600'" : " style='flex:1;min-width:0'") + "><input class='cv' inputmode='decimal' placeholder='0,00' value='" + (v == null ? "" : num4(v.toFixed(2))) + "' style='width:110px;text-align:right'> €" + (base ? "<span style='width:34px'></span>" : "<button class='mini' onclick='this.parentElement.remove()'>✕</button>") + "</div>"; }
 async function gravarMargens() {
@@ -88,11 +100,16 @@ async function gravarMargens() {
   try {
     var up = [], del = [], erro = "";
     $$("#mrgCorpo input.mg").forEach(function (i) { var v = lerNum(i.value); if (v === null) del.push(i.dataset.k); else if (isNaN(v) || v < 0 || (i.dataset.u === "pct" && v >= 1000)) erro = "Valor inválido: " + i.value; else up.push({estacao: EST, chave: i.dataset.k, valor: v, unidade: i.dataset.u, atualizado: new Date().toISOString()}); });
-    var custos = []; $$("#custosLista .custo").forEach(function (d) { var n = d.querySelector(".cn").value.trim(), v = lerNum(d.querySelector(".cv").value); if ((!n || d.classList.contains("base")) && v === null) return; if (!n || v === null || isNaN(v) || v < 0) erro = "Custo incompleto: " + (n || "sem nome"); else custos.push({estacao: EST, nome: n.slice(0, 80), valor_c: Math.round(v * 100)}); });
+    var custos = []; $$("#custosLista .custo, #taxasLista .custo").forEach(function (d) { var n = d.querySelector(".cn").value.trim(), v = lerNum(d.querySelector(".cv").value); if ((!n || d.classList.contains("base")) && v === null) return; if (!n || v === null || isNaN(v) || v < 0) erro = "Custo incompleto: " + (n || "sem nome"); else custos.push({estacao: EST, nome: n.slice(0, 80), valor_c: Math.round(v * 100)}); });
     $$("#mrgCorpo .bn").forEach(function (i) { var v = i.type === "checkbox" ? (i.checked ? Number(i.dataset.v) : null) : (i.value === "" ? null : Number(i.value));
       if (v == null) del.push(i.dataset.k); else up.push({estacao: EST, chave: i.dataset.k, valor: Math.round(v * 1e7) / 1e7, unidade: "eur_litro", atualizado: new Date().toISOString()}); });
+    var txM = $("#txMes").value, txV = lerNum($("#txMr").value);
+    if (txV !== null && (isNaN(txV) || txV < 0)) erro = "Valor inválido na My Repsol: " + $("#txMr").value;
+    if (txV !== null && !txM) erro = "Escolha o mês da fatura My Repsol.";
     if (erro) throw new Error(erro);
     b.disabled = true;
+    if (txM && txV !== null) { var r5 = await sb.from("msb_taxas_mes").upsert({estacao: EST, mes: txM, myrepsol_c: Math.round(txV * 100), fatura: $("#txFt").value.trim() || null, atualizado_em: new Date().toISOString(), atualizado_por: EU && EU.id}, {onConflict: "estacao,mes"}); if (r5.error) throw r5.error; }
+    else if (txM) { var r6 = await sb.from("msb_taxas_mes").delete().eq("estacao", EST).eq("mes", txM); if (r6.error) throw r6.error; }
     if (up.length) { var r1 = await sb.from("msb_margens").upsert(up, {onConflict: "estacao,chave"}); if (r1.error) throw r1.error; }
     if (del.length) { var r2 = await sb.from("msb_margens").delete().eq("estacao", EST).in("chave", del); if (r2.error) throw r2.error; }
     var r3 = await sb.from("msb_custos").delete().eq("estacao", EST); if (r3.error) throw r3.error;
@@ -132,6 +149,9 @@ async function carregarLucro() {
     var h = "", totM = 0, falta = [];
     /* combustível */
     var BL = bonusLitro(M), tBon = 0;
+    var rx = await sb.from("msb_taxas_mes").select("myrepsol_c,fatura").eq("estacao", EST).eq("mes", m).maybeSingle(); if (rx.error) throw rx.error;
+    var TMR = rx.data, txEstimada = BL.tx;
+    if (TMR) { BL.cons += BL.tx; BL.desc += BL.tx; BL.tx = 0; }   // há valor real da fatura: sai a estimativa em €/m³
     var prods = Object.keys(Object.assign({}, D.comb.consigna || {}, D.comb.solred || {})).sort(), linhas = "", tl = {cons: 0, desc: 0, sol: 0}, mC = 0;
     prods.forEach(function (p) {
       var t = premium(p) ? "premium" : "simples", cons = ((D.comb.consigna || {})[p] || [0])[0], sol = ((D.comb.solred || {})[p] || [0])[0];
@@ -162,18 +182,18 @@ async function carregarLucro() {
     h += "<div class='card' style='padding:14px;display:grid;gap:8px'><h2 style='margin:0'>🛍️ Loja</h2><div class='sc'><table><thead><tr><th class='l'>Categoria</th><th>Vendas sem IVA €</th><th>Margem</th><th>Margem €</th></tr></thead><tbody>" + lj +
       "</tbody><tfoot><tr><td class='l'>Total</td><td class='n'>" + fmt(Object.keys(fams).reduce(function (s, c) { return s + fams[c].base; }, 0)) + "</td><td></td><td class='n'><b>" + fmt(Math.round(mL)) + "</b></td></tr></tfoot></table></div></div>";
     /* resultado e projeção */
-    var custos = C.reduce(function (s, c) { return s + c.valor_c; }, 0) / 100;
+    var custos = (C.reduce(function (s, c) { return s + c.valor_c; }, 0) + (TMR ? TMR.myrepsol_c : 0)) / 100;
     var diasMes = new Date(+m.slice(0, 4), +m.slice(5, 7), 0).getDate(), dias = V.de && V.ate ? diasEntre(V.de, V.ate) : diasMes, fator = dias < diasMes ? diasMes / dias : 1;
     var c2 = function (v) { return fmt(Math.round(v * 100)); };
     var res = totM - custos * Math.min(1, dias / diasMes), proj = totM * fator - custos;
     h = "<section class='totem'><div class='t'>Lucro estimado · " + esc(new Date(m + "-15").toLocaleDateString("pt-PT", {month: "long", year: "numeric"})) + " · " + dmy(V.de) + " a " + dmy(V.ate) + "</div>" +
       "<div><div class='k'>Margem combustível</div><div class='v'>" + c2(mC) + "<small>€</small></div></div>" +
       "<div><div class='k'>Margem loja</div><div class='v'>" + c2(mL / 100) + "<small>€</small></div></div>" +
-      "<div><div class='k'>Custos fixos</div><div class='v'>" + c2(custos) + "<small>€/mês</small></div></div>" +
+      "<div><div class='k'>Custos fixos" + (TMR ? " e My Repsol" : "") + "</div><div class='v'>" + c2(custos) + "<small>€/mês</small></div></div>" +
       "<div><div class='k'>" + (fator > 1 ? "Resultado até " + dmy(V.ate).slice(0, 5) : "Resultado do mês") + "</div><div class='v' style='color:" + (res >= 0 ? "#7CE3A0" : "#FF9B85") + "'>" + c2(res) + "<small>€</small></div></div>" +
       (fator > 1 ? "<div><div class='k'>Projeção do mês (" + diasMes + " dias)</div><div class='v' style='color:" + (proj >= 0 ? "#7CE3A0" : "#FF9B85") + "'>" + c2(proj) + "<small>€</small></div></div>" : "") +
       "</section>" + (falta.length ? "<div class='aviso'><p>⚠ Margens por definir (não entram na conta): " + esc(falta.join(", ")) + ". <a href='#' data-ir='mrg'>Definir em Gestão → Margens e custos</a>.</p></div>" : "") +
-      (!C.length ? "<div class='aviso'><p>ℹ️ Sem custos fixos: o valor acima é só a margem bruta. <a href='#' data-ir='mrg'>Acrescentar custos</a>.</p></div>" : "") + h +
+      (TMR ? "<p class='mut' style='margin:0;font-size:13px'>Taxa My Repsol: " + fmt(TMR.myrepsol_c) + " € da fatura" + (TMR.fatura ? " " + esc(TMR.fatura) : "") + (txEstimada ? ", em vez da estimativa em €/m³." : ".") + "</p>" : "") + (!C.length && !TMR ? "<div class='aviso'><p>ℹ️ Sem custos fixos: o valor acima é só a margem bruta. <a href='#' data-ir='mrg'>Acrescentar custos</a>.</p></div>" : "") + h +
       "<p class='mut' style='font-size:12px;margin:0'>Estimativa: margens por categoria definidas em Gestão; sem IVA. Fonte das vendas: " + esc(V.fonte || "relatório de vendas") + (fator > 1 ? ". Projeção = margem até agora × " + diasMes + "/" + dias + " dias − custos fixos do mês." : ".") + "</p>";
     box.innerHTML = h;
     $$("#lucCorpo [data-ir]").forEach(function (a) { a.onclick = function (ev) { ev.preventDefault(); ir(a.dataset.ir); }; });
