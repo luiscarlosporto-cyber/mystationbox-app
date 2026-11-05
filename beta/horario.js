@@ -226,7 +226,7 @@
     descarregar(new Blob([await doc.save()], {type: "application/pdf"}), ficheiro("pdf"));
   }
   async function abrir(M) {
-    var box = $("#v-hor"); M = M || MES || hoje().slice(0, 7); MES = M; var est = EST;
+    var box = $("#v-hor"); M = M || MES || hoje().slice(0, 7); MES = M; var est = EST; if (X) clearTimeout(X.tm);
     box.innerHTML = "<div class='bl ske' style='height:260px'></div>";
     try {
       var ini = addDia(M + "-01", -14), fim = addMes(M, 1) + "-01";
@@ -256,4 +256,8 @@
     } catch (e) { box.innerHTML = "<div class='aviso'><p>" + esc(falhou(e)) + "</p></div>"; }
   }
   MSB_NAV.horario = function () { abrir(); };
+  MSB_NAV.antesLoja = function () {   // mudar de loja com alterações por gravar perdia-as
+    if (PAGINA !== "hor" || !X || !Object.keys(X.ALT).length) return Promise.resolve(true);
+    return msbConfirma("Há alterações por gravar. Mudar de loja sem gravar?", "Mudar sem gravar");
+  };
 })();
