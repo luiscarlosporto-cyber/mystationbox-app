@@ -167,7 +167,8 @@ body.b-rec #nexFrame{height:calc(100dvh - 146px)!important}
 .fl input.err{border-color:var(--bad);outline-color:var(--bad)}
 #bConf{border:1px solid var(--bd);border-radius:12px;background:var(--card);color:var(--fg);padding:18px;width:min(420px,calc(100vw - 32px))}
 #bConf::backdrop{background:rgba(5,20,32,.45)}
-#bConf p{margin:0 0 16px;font-size:15px;line-height:1.45}
+#bConf p{margin:0 0 16px;font-size:15px;line-height:1.45;white-space:pre-line;max-height:60vh;overflow-y:auto}
+#bConf input{width:100%;margin-bottom:14px;padding:9px 10px;border:1px solid var(--bd);border-radius:var(--r);background:var(--in);color:var(--fg);font:inherit}
 #bConf div{display:flex;gap:8px;justify-content:flex-end}
 details.card summary{cursor:pointer}
 

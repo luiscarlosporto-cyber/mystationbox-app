@@ -127,7 +127,41 @@
     });
     if (n.nodeType === 3) return;
     /* o módulo de stock escreve depois de abrir: vigia-se o documento dele uma só vez */
-    var d = n.ownerDocument; if (d && d !== document && !d.__msbLimpo) { d.__msbLimpo = 1; new d.defaultView.MutationObserver(function (L) { L.forEach(function (m) { m.addedNodes.forEach(limpar); }); }).observe(d.body, {childList: true, subtree: true}); }
+    var d = n.ownerDocument; if (d && d !== document && !d.__msbLimpo) { d.__msbLimpo = 1; new d.defaultView.MutationObserver(function (L) { L.forEach(function (m) { m.addedNodes.forEach(limpar); }); }).observe(d.body, {childList: true, subtree: true}); ligarNex(d); }
+  }
+
+  /* ---- módulo de stock (Etapa 6): tudo por fora, o código dele não muda e a versão atual fica igual ---- */
+  function ligarNex(d) {
+    var w = d.defaultView, l = d.createElement("link"); l.rel = "stylesheet"; l.href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"; d.head.appendChild(l);
+    /* As janelas do navegador pedem a resposta na hora; a da app só responde depois. Por isso, num clique, a primeira passagem
+       para ali e abre a janela da app; com a resposta, o mesmo botão volta a correr e recebe-a. Fora de um clique fica a do navegador. */
+    var R = {}, nConf = w.confirm, nPrompt = w.prompt;
+    function botao() { var e = w.event; return e && e.type === "click" && e.target && e.target.closest && e.target.closest("button"); }
+    function repetir(b, chave, valor) {
+      if (!b.isConnected) return window.msbAviso("A lista mudou entretanto. Carrega outra vez no botão.");
+      R[chave] = {v: valor}; try { b.click(); } finally { R = {}; }
+    }
+    w.confirm = function (t) {
+      if (R[t]) return R[t].v;
+      var b = botao(); if (!b) return nConf.call(w, t);
+      confirma(t).then(function (ok) { if (ok) repetir(b, t, true); });
+      return false;
+    };
+    w.prompt = function (t, val) {
+      if (R[t]) return R[t].v;
+      var b = botao(); if (!b) return nPrompt.call(w, t, val);
+      confirma(t, "Confirmar", val == null ? "" : String(val)).then(function (v) { if (v !== false) repetir(b, t, v); });
+      return null;
+    };
+    /* Stock atual: 20 artigos de cada vez; os outros continuam na lista, para a procura do módulo os encontrar */
+    var L = d.getElementById("stockList"), lim = 20; if (!L) return;
+    var mais = d.createElement("button"); mais.type = "button"; mais.className = "btn alt"; mais.style.cssText = "width:100%;margin-top:10px"; L.parentNode.insertBefore(mais, L.nextSibling);
+    function cortar() {
+      var C = [].slice.call(L.children); C.forEach(function (c, i) { c.style.display = i < lim ? "" : "none"; });
+      mais.hidden = C.length <= lim; mais.style.display = mais.hidden ? "none" : ""; mais.textContent = "Ver mais " + Math.min(20, C.length - lim) + " · " + Math.min(lim, C.length) + " de " + C.length;
+    }
+    mais.onclick = function () { lim += 20; cortar(); };
+    new w.MutationObserver(function () { lim = 20; cortar(); }).observe(L, {childList: true}); cortar();
   }
 
   /* ---- erro junto do campo do Registo, enquanto se escreve ---- */
@@ -140,14 +174,15 @@
   }
 
   /* ---- confirmação com o aspeto da app ---- */
-  function confirma(texto, acao) {
+  function confirma(texto, acao, campo) {   // com campo: pede um valor e devolve-o, ou false
     return new Promise(function (fim) {
       var d = document.createElement("dialog"); d.id = "bConf";
       d.innerHTML = "<p></p><div><button class='btn' value='n'>Cancelar</button><button class='btn p' value='s'></button></div>";
       d.querySelector("p").textContent = texto; d.querySelector(".p").textContent = acao || "Confirmar";
+      var c = null; if (campo != null) { c = document.createElement("input"); c.value = campo; d.insertBefore(c, d.lastChild); c.onkeydown = function (e) { if (e.key === "Enter") { e.preventDefault(); d.close("s"); } }; }
       d.onclick = function (e) { var b = e.target.closest("button"); if (b) { d.close(b.value); } };
-      d.onclose = function () { d.remove(); fim(d.returnValue === "s"); };
-      document.body.appendChild(d); d.showModal(); d.querySelector("button").focus();
+      d.onclose = function () { d.remove(); fim(c ? (d.returnValue === "s" ? c.value : false) : d.returnValue === "s"); };
+      document.body.appendChild(d); d.showModal(); (c || d.querySelector("button")).focus(); if (c) c.select();
     });
   }
 
@@ -243,7 +278,9 @@
     fechado: function (t, h) { return h ? "<details class='card' style='padding:12px 14px'><summary><b>" + t + "</b></summary><div style='display:grid;gap:10px;margin-top:10px'>" + h + "</div></details>" : ""; },
     selo: function (n) { if (n === SELO) return; SELO = n; marcar(PAGINA, areaDe(PAGINA) || AREAS[0]); },
     nexCss: ":root{--g:#003B5C;--g2:#003B5C;--acc:#D9570F;--txt:#172430;--mut:#566878;--bd:#DCE3E9}" +
-      "body{font-family:Inter,'Segoe UI',system-ui,sans-serif!important;font-size:15px}.card{border-radius:10px}.btn,input,select{border-radius:8px}.btn.acc{color:#fff}" +
-      "@media(prefers-color-scheme:dark){body{background:#F5F7F9!important;border-radius:10px}}"
+      "body{font-family:Inter,'Segoe UI',system-ui,sans-serif!important;font-size:15px}main{max-width:900px!important;margin:0!important}" +
+      ".card{border-radius:10px;padding:12px 14px}h2{font-size:16px;font-weight:600}.btn,input,select{border-radius:8px}.btn{font-weight:600}.btn.acc{color:#fff}.stat{border-radius:10px}.bigscan{font-size:20px;padding:14px}.ordCat{border-radius:6px;font-weight:600}.product{border-radius:8px}" +
+      "@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--g:#8CC3E3;--g2:#8CC3E3;--acc:#F47A33;--bg:#0F171E;--card:#172330;--txt:#E8EEF3;--mut:#9DB0BF;--bd:#2B3C4B;--red:#FF8B7B;--amber:#EDB65B;color-scheme:dark}" +
+      "input,select,.stat,.ordRes,.product,textarea{background:#121C26!important;color:#E8EEF3!important;border-color:#2B3C4B!important}.btn,.ordCat{color:#0F171E!important}.btn.alt{background:#1E2C3A!important;color:#E8EEF3!important}.btn.red{background:#3B1E1A!important;color:#FF8B7B!important;border-color:#5A2A24!important}.btn.acc{color:#fff!important}}"
   };
 })();
