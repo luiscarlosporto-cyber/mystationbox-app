@@ -130,15 +130,16 @@
   var espera = null;
   function agendar() { clearTimeout(espera); espera = setTimeout(rever, 120); }
 
-  var ABRIR = {cmp: function () { comparar(); }, doc: function () { documentos(); }};
+  var ABRIR = {cmp: function () { comparar(); }, doc: function () { documentos(); }, hor: function () { MSB_NAV.horario(); }};
   MSB_NAV.seccoes = seccoes;
   MSB_NAV.paginas = function () {
     var D = AREAS.find(function (a) { return a.id === "des"; }), C = AREAS.find(function (a) { return a.id === "con"; });
     var i = D.p.findIndex(function (p) { return p[0] === "fun"; });
     D.p.splice(i, 0, ["cmp", "Comparar lojas", {g: "Análise"}]); C.p.push(["doc", "Documentos", {g: "Contabilidade"}]);
-    VISTA_DA.cmp = "cmp"; VISTA_DA.doc = "doc";
+    AREAS[0].p.splice(1, 0, ["hor", "Horário"]);
+    VISTA_DA.cmp = "cmp"; VISTA_DA.doc = "doc"; VISTA_DA.hor = "hor";
     var w = $("main .wrap");
-    ["cmp", "doc"].forEach(function (k) { var v = document.createElement("div"); v.id = "v-" + k; v.className = "v"; v.hidden = true; w.appendChild(v); });
+    ["cmp", "doc", "hor"].forEach(function (k) { var v = document.createElement("div"); v.id = "v-" + k; v.className = "v"; v.hidden = true; w.appendChild(v); });
     new MutationObserver(agendar).observe($("main"), {childList: true, subtree: true});
   };
   MSB_NAV.abrirPagina = function (pg) { if (ABRIR[pg]) ABRIR[pg](); };

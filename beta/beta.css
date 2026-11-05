@@ -181,6 +181,20 @@ details.card summary{cursor:pointer}
 #v-cmp .sc,#v-doc .sc{max-width:860px}
 #v-cmp td:not(:first-child),#v-cmp th:not(:first-child){text-align:right}
 
+/* ---- Horário ---- */
+:root{--fds:#EAF0F7;--fer:#FBF1E3}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--fds:#1C2A38;--fer:#3A2F1C}}
+table.hor{border-collapse:separate;border-spacing:0;font-size:13px}
+table.hor th,table.hor td{padding:5px 2px;min-width:30px;text-align:center;background:var(--card);border-bottom:1px solid var(--bd)}
+table.hor th small{display:block;font-weight:400;font-size:10.5px;font-style:normal}
+table.hor .l{position:sticky;left:0;z-index:2;text-align:left;min-width:84px;padding:5px 8px;font-weight:600;box-shadow:1px 0 0 var(--bd)}
+table.hor .fds{background:var(--fds)}table.hor .fds small{font-style:italic}table.hor .fer{background:var(--fer)}
+table.hor th.hj{box-shadow:inset 0 -2px 0 var(--laranja)}
+table.hor tr.eu td{font-weight:700}
+table.hor tfoot td{color:var(--wn);font-weight:600;border-bottom:0}
+table.hor tbody tr:hover td{background:revert-layer}
+#horEst{margin-left:4px}
+
 /* ---- telemóvel ---- */
 @media (max-width:700px){
   :root,body.b-rec{--lat:0px}
