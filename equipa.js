@@ -45,7 +45,14 @@ function desenharEquipa() {
       "<label style='display:grid;gap:4px;margin-top:10px;font-size:13px;color:var(--mut)'>Nova palavra-passe <span>(deixe vazio para manter a atual; mínimo 8 caracteres)</span>" +
       "<span style='display:flex;gap:6px'><input id='eqS' autocomplete='new-password' autocapitalize='off' spellcheck='false' style='flex:1;min-width:0;padding:10px;border:1px solid var(--bd);border-radius:9px;background:var(--in);font:600 17px var(--f-num)'><button type='button' class='btn' id='eqGer'>🎲 Gerar</button></span></label>" +
       "<div id='eqEdErr' class='bad' style='font-size:14px;margin-top:6px' hidden></div>" +
-      "<div class='bar' style='margin-top:10px'><button class='btn p' id='eqGuardar'>✔ Guardar</button><button class='btn' id='eqCancelar'>Cancelar</button></div>";
+      "<div class='bar' style='margin-top:10px'><button class='btn p' id='eqGuardar'>✔ Guardar</button><button class='btn' id='eqCancelar'>Cancelar</button>" + (eu ? "" : "<button class='btn' id='eqEliminar' style='margin-left:auto;color:var(--bad)'>Eliminar conta</button>") + "</div>";
+    if (!eu) $("#eqEliminar").onclick = async function () {
+      var b = this, err = $("#eqEdErr"); err.hidden = true;
+      if (!await msbConfirma("Eliminar a conta de " + (p.display_name || "") + "? Deixa de poder entrar e não se pode desfazer. Fica o registo no histórico.", "Eliminar conta")) return;
+      b.disabled = true;
+      try { await equipa("eliminar", {user_id: p.user_id}); EQ.edita = null; $("#eqMsg").textContent = "Conta de " + (p.display_name || "") + " eliminada."; carregarEquipa(); }
+      catch (e) { b.disabled = false; err.hidden = false; err.textContent = "⚠ Não foi eliminada: " + e.message; }
+    };
     $("#eqGer").onclick = function () { $("#eqS").value = senhaSugerida(); };
     $("#eqCancelar").onclick = function () { EQ.edita = null; desenharEquipa(); };
     $("#eqGuardar").onclick = async function () {
