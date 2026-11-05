@@ -94,7 +94,7 @@
     pintar();
   }
   /* Projetar o resto: fica o que está fixado, as férias e os dias que já passaram; o resto do mês sai das regras */
-  var HIGHS = "https://cdn.jsdelivr.net/npm/highs@1.8.0/build/";
+  var HIGHS = "https://cdn.jsdelivr.net/npm/highs@1.15.4/build/";
   function calcular(lp) {
     var src = "importScripts('" + HIGHS + "highs.js');onmessage=async function(e){try{var h=await Module({locateFile:function(f){return '" + HIGHS + "'+f}});postMessage({ok:h.solve(e.data,{time_limit:75,mip_rel_gap:0.03})})}catch(x){postMessage({erro:String(x)})}}";
     return new Promise(function (ok, ko) {
