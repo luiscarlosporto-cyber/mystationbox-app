@@ -59,7 +59,7 @@ async function aviAprovar(est, dia) {
   carregarAvisos(); aviSelo();
 }
 /* ---- pedir vendas ao OCTAN AI: o PC lê no CBOS e devolve aqui ---- */
-var AVI_PASTAS = [["TODAS", "Tudo"], ["TABACO", "Tabaco"], ["GAS", "Gás"], ["LOJA", "Loja"], ["IMPRENSA", "Imprensa"], ["JOGO", "Jogo"], ["LAVAGEM", "Lavagem"], ["LUBRIFICANTES", "Lubrificantes"], ["OUTROS COMBUSTIVEIS", "Outros combustíveis"]];
+var AVI_PASTAS = [["TODAS", "Tudo"], ["ADBLUE EMBALADO", "AdBlue embalado"], ["CAFETARIA", "Cafetaria"], ["COMBUSTIVEIS", "Combustíveis"], ["COMISSOES", "Comissões"], ["DESCATALOGADOS", "Descatalogados"], ["GAS", "Gás"], ["IMPRENSA", "Imprensa"], ["JOGO", "Jogo"], ["LAVAGEM", "Lavagem"], ["LOJA", "Loja"], ["LUBRIFICANTES", "Lubrificantes"], ["OUTROS COMBUSTIVEIS", "Outros combustíveis"], ["PROMOCOES REPSOL", "Promoções Repsol"], ["TABACO", "Tabaco"]];   // o primeiro valor é o nome exato da pasta no CBOS: o OCTAN AI procura-o letra a letra
 function aviForm() {
   return "<div class='card' style='padding:12px 14px'><b>🔎 Pedir vendas ao OCTAN AI</b>" +
     "<div style='display:grid;gap:8px;margin-top:8px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))'>" +
