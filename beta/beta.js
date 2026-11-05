@@ -22,6 +22,8 @@
   function ler(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function gravar(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* sem armazenamento: vale só nesta sessão */ } }
 
+  var SELO = 0;
+  function seloH(x) { return x.id === "ini" && SELO ? "<i class='selo'>" + SELO + "</i>" : ""; }
   var recolhido = ler("msb_lat") === "1";
   function acertarLargura() { document.body.classList.toggle("b-rec", recolhido || innerWidth <= 1024); }
 
@@ -66,7 +68,7 @@
   function marcar(pg, a) {
     var ps = paginasDe(a), gr = "", atual = a.p.find(function (x) { return x[0] === pg; });
     $("#bAreas").innerHTML = areasVisiveis().map(function (x) {
-      var on = x.id === a.id, h = "<button data-a='" + x.id + "' title='" + nomeArea(x) + "'" + (on ? " class='on' aria-current='true'" : "") + ">" + ic(IC_AREA[x.id]) + "<span class='tx'>" + nomeArea(x) + "</span></button>";
+      var on = x.id === a.id, h = "<button data-a='" + x.id + "' title='" + nomeArea(x) + "'" + (on ? " class='on' aria-current='true'" : "") + ">" + ic(IC_AREA[x.id]) + "<span class='tx'>" + nomeArea(x) + "</span>" + seloH(x) + "</button>";
       if (on && ps.length > 1) h += "<div class='sub'>" + ps.map(function (p) {
         var g = (p[2] && p[2].g) || "", t = g && g !== gr ? "<b>" + g + "</b>" : ""; gr = g || gr;
         return t + "<button data-p='" + p[0] + "'" + (p[0] === pg ? " class='on' aria-current='page'" : "") + ">" + p[1] + "</button>";
@@ -79,7 +81,7 @@
     var on = chips.querySelector(".on"); if (on) chips.scrollLeft = Math.max(0, on.offsetLeft - 40);
     var vis = areasVisiveis(), noTel = vis.filter(function (x) { return AREAS_TEL.indexOf(x.id) >= 0; });
     var fora = AREAS_TEL.indexOf(a.id) < 0;
-    $("#bBarra").innerHTML = noTel.map(function (x) { return "<button data-a='" + x.id + "'" + (x.id === a.id ? " class='on'" : "") + ">" + ic(IC_AREA[x.id]) + (x.c || nomeArea(x)) + "</button>"; }).join("") +
+    $("#bBarra").innerHTML = noTel.map(function (x) { return "<button data-a='" + x.id + "'" + (x.id === a.id ? " class='on'" : "") + ">" + ic(IC_AREA[x.id]) + (x.c || nomeArea(x)) + seloH(x) + "</button>"; }).join("") +
       "<button data-a='mais'" + (fora ? " class='on'" : "") + ">" + ic("x") + "Mais</button>";
     document.title = (atual ? atual[1] + " · " : "") + "mystationbox beta";
   }
@@ -175,6 +177,7 @@
 
   window.MSB_NAV = {
     montar: montar, marcar: marcar,
+    selo: function (n) { if (n === SELO) return; SELO = n; marcar(PAGINA, areaDe(PAGINA) || AREAS[0]); },
     nexCss: ":root{--g:#003B5C;--g2:#003B5C;--acc:#D9570F;--txt:#172430;--mut:#566878;--bd:#DCE3E9}" +
       "body{font-family:Inter,'Segoe UI',system-ui,sans-serif!important;font-size:15px}.card{border-radius:10px}.btn,input,select{border-radius:8px}.btn.acc{color:#fff}" +
       "@media(prefers-color-scheme:dark){body{background:#F5F7F9!important;border-radius:10px}}"

@@ -113,6 +113,7 @@ async function aviSelo() {
   if (typeof ADMIN === "undefined" || !ADMIN) return;
   try {
     var P = await precosPorAprovar(), L = await avisosRecentes(60), n = P.length + L.filter(function (a) { return !a.lido_em && a.nivel !== "info"; }).length;
+    if (window.MSB_NAV) return MSB_NAV.selo(n);
     var b = document.querySelector("#areas button[data-a='ini']"); if (!b) return;
     var s = b.querySelector(".aviSelo");
     if (!s) { s = document.createElement("b"); s.className = "aviSelo"; s.style.cssText = "background:var(--laranja);color:#fff;border-radius:9px;padding:0 6px;margin-left:4px;font-size:12px"; b.appendChild(s); }

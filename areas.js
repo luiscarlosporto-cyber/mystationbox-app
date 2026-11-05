@@ -144,6 +144,7 @@ function nexVis(pg) {
 function hojeISO(n) { var d = new Date(); d.setDate(d.getDate() + (n || 0)); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
 function cartao(pg, titulo, grande, texto, tom) { return "<button class='c " + (tom || "") + "' data-p='" + pg + "'><h3>" + titulo + "</h3>" + (grande != null ? "<div class='g'>" + grande + "</div>" : "") + (texto ? "<p>" + texto + "</p>" : "") + "</button>"; }
 async function carregarInicio() {
+  if (ADMIN && window.MSB_NAV && MSB_NAV.painel) return MSB_NAV.painel();   // painel novo da beta
   var box = $("#iniCorpo"); box.innerHTML = "<div class='mut'>A carregar…</div>";
   try {
     var hoje = hojeISO(0), mes = hoje.slice(0, 7), L = await linhasMes(mes), h = "";
