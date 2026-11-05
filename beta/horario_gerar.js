@@ -7,7 +7,7 @@
   function iso(x) { return x.toISOString().slice(0, 10); }
   function sem(y, m, d) { return dt(y, m, d).getUTCDay(); }
   function estadoDe(c) { return c === "MT" ? "X" : c === "M" || c === "T" ? c : "G"; }
-  /* p = {id, fixos: {dia: código}, ant: [códigos], fdsAnt, alvo, off: {M, T}, reforco} · op = {y, m, fer, mtSemanas, outrosM: {dia: n}, outrosT: {dia: n}} */
+  /* p = {id, fixos: {dia: código}, ant: [códigos], fdsAnt, alvo, off: {M, T}, reforco, atual: {dia: código}} · atual = o que está no ecrã: mudar custa, para o ajuste mexer só no necessário · op = {y, m, fer, mtSemanas, outrosM: {dia: n}, outrosT: {dia: n}} */
   function modelo(P, op) {
     var y = op.y, m = op.m, n = new Date(y, m, 0).getDate(), fer = op.fer || {}, R = [], O = [], NUM = 0, BIN = {}, CONT = [];
     var v = function (p, d, s) { return "x" + p + "_" + d + "_" + s; };
@@ -25,22 +25,22 @@
         var f = fixo(a, d);
         if (f) eq([[v(a, d, f), 1]], 1);
         else if (a !== C || !mtDias[d]) eq([[v(a, d, "X"), 1]], 0);
+        if (!f && p.atual && p.atual[d]) { var s0 = estadoDe(p.atual[d]); ESTADOS.forEach(function (s) { if (s !== s0) O.push("6 " + v(a, d, s)); }); }
       });
       var dif1 = aux(25), dif2 = aux(25);
       eq(dias.reduce(function (T, d) { return T.concat([[v(a, d, "M"), 1], [v(a, d, "T"), 1], [v(a, d, "X"), 1]]); }, []).concat([[dif1, 1], [dif2, -1]]), p.alvo);
     });
     var outM = op.outrosM || {}, outT = op.outrosT || {}, F = P.map(function (p, a) { return a; });
     dias.forEach(function (d) {
-      var mts = C >= 0 ? [[v(C, d, "X"), 1]] : [], M = F.map(function (a) { return [v(a, d, "M"), 1]; }), T = F.map(function (a) { return [v(a, d, "T"), 1]; });
+      var mts = F.filter(function (a) { return a === C || fixo(a, d) === "X"; }).map(function (a) { return [v(a, d, "X"), 1]; }), livre = F.some(function (a) { return !fixo(a, d); }), M = F.map(function (a) { return [v(a, d, "M"), 1]; }), T = F.map(function (a) { return [v(a, d, "T"), 1]; });
       var fxM = F.filter(function (a) { return fixo(a, d) === "M"; }).length, fxT = F.filter(function (a) { return fixo(a, d) === "T"; }).length;
-      if (!outM[d]) ge(M.concat(mts), 1);
-      if (!outT[d]) ge(T.concat(mts), 1);
+      if (!outM[d] && livre) ge(M.concat(mts), 1);   // dia todo fixado: fica como está e as Regras avisam
+      if (!outT[d] && livre) ge(T.concat(mts), 1);
       le(M, Math.max(2 - (outM[d] || 0), fxM));
       le(T, Math.max(1 - (outT[d] || 0), fxT));
       if (C >= 0 && mtDias[d]) {
         var o = F.filter(function (a) { return a !== C; });
-        le([[v(C, d, "X"), 1]].concat(o.map(function (a) { return [v(a, d, "M"), -1]; })), 0);
-        le([[v(C, d, "X"), 1]].concat(o.map(function (a) { return [v(a, d, "T"), -1]; })), 0);
+        if (livre) ["M", "T"].forEach(function (s) { le([[v(C, d, "X"), 1], [aux(60), -1]].concat(o.map(function (a) { return [v(a, d, s), -1]; })), 0); });
       }
       var w = sem(y, m, d); if (w === 0 || w === 6) le(M.concat([[aux(1), -1]]), 1);   // dupla manhã: de preferência em dia útil
     });
@@ -55,20 +55,24 @@
       fds.forEach(function (s) {
         var f1 = p.fixos[s], f2 = p.fixos[s + 1];
         if (f1 === "F" || f2 === "F") { prev = ""; return; }
-        if (!(f1 && f2 && estadoDe(f1) !== estadoDe(f2))) ["M", "T", "G"].forEach(function (k) { eq([[v(a, s, k), 1], [v(a, s + 1, k), -1]], 0); });
+        var mexido = P.some(function (q) { return q.fixos[s] || q.fixos[s + 1]; });   // com turnos fixados no fim de semana, sábado = domingo deixa de ser obrigatório
+        if (!(f1 && f2 && estadoDe(f1) !== estadoDe(f2))) ["M", "T", "G"].forEach(function (k) {
+          if (!mexido) eq([[v(a, s, k), 1], [v(a, s + 1, k), -1]], 0);
+          else { var u = aux(30); le([[v(a, s, k), 1], [v(a, s + 1, k), -1], [u, -1]], 0); le([[v(a, s + 1, k), 1], [v(a, s, k), -1], [u, -1]], 0); }
+        });
         var alvo = f1 ? estadoDe(f1) : f2 ? estadoDe(f2) : seq[prev];
         if (alvo && !f1 && !f2) ge([[v(a, s, alvo), 1], [aux(40), 1]], 1);
         prev = alvo || "";
       });
-      if ((ult === "T" || ult === "X") && (p.ant || []).length && !p.fixos[1]) eq([[v(a, 1, "M"), 1]], 0);
+      if ((ult === "T" || ult === "X") && (p.ant || []).length && !p.fixos[1]) le([[v(a, 1, "M"), 1], [aux(100), -1]], 0);
       dias.forEach(function (d) {
-        if (d > 1 && !(["T", "X"].indexOf(fixo(a, d - 1)) >= 0 && fixo(a, d) === "M")) le([[v(a, d - 1, "T"), 1], [v(a, d - 1, "X"), 1], [v(a, d, "M"), 1]], 1);
+        if (d > 1 && !(["T", "X"].indexOf(fixo(a, d - 1)) >= 0 && fixo(a, d) === "M")) le([[v(a, d - 1, "T"), 1], [v(a, d - 1, "X"), 1], [v(a, d, "M"), 1], [aux(100), -1]], 1);
         var T = [], k = 0, ant = (p.ant || []).map(function (c) { return estadoDe(c); });
         for (var j = d - 5; j <= d; j++) {
           if (j >= 1) { if (!(fixo(a, j) && fixo(a, j) !== "G")) T.push([v(a, j, "G"), 1]); }
           else { var q = ant[ant.length + j - 1]; if (q === undefined || q === "G") k = 1; }
         }
-        if (!k && T.length) ge(T, 1);
+        if (!k && T.length) ge(T.concat([[aux(100), 1]]), 1);
         if (d > 1) [["M", "T"], ["T", "M"]].forEach(function (par) { le([[v(a, d - 1, par[0]), 1], [v(a, d, par[1]), 1], [aux(3), -1]], 1); });
         if (d > 1 && d < n) {
           le([[v(a, d, "G"), 1], [v(a, d - 1, "G"), -1], [v(a, d + 1, "G"), -1], [aux(2), -1]], 0);

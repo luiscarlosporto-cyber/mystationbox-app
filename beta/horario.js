@@ -48,9 +48,9 @@
     var box = $("#v-hor"), n = Object.keys(X.ALT).length, b = "<div class='bar'><button class='btn' id='horAnt' aria-label='Mês anterior'>‹</button><input type='month' id='horMes' value='" + X.M + "'><button class='btn' id='horSeg' aria-label='Mês seguinte'>›</button>" +
       "<span class='tag " + (X.estado === "simulacao" ? "t-at'>Simulação" : "t-ok'>Horário real") + "</span>";
     if (ADMIN && X.P.length) b += X.ed
-      ? "<button class='btn az' id='horProj'>Projetar o resto</button><button class='btn p' id='horGrava'" + (n ? "" : " disabled") + ">Gravar" + (n ? " " + n : "") + "</button><button class='btn' id='horFim'>Sair da edição</button>"
+      ? "<button class='btn az' id='horProj'" + (X.calc ? " disabled" : "") + ">" + (X.calc ? "A ajustar…" : "Projetar o resto") + "</button><button class='btn p' id='horGrava'" + (n && !X.calc ? "" : " disabled") + ">Gravar" + (n ? " " + n : "") + "</button><button class='btn' id='horFim'>Sair da edição</button>"
       : "<button class='btn' id='horEd'>Editar</button><button class='btn' id='horEst'>" + (X.estado === "simulacao" ? "Passar a real" : "Passar a simulação") + "</button><button class='btn' id='horXls'>Excel Picaponto</button><button class='btn' id='horPdf'>PDF</button>";
-    box.innerHTML = b + "</div>" + (X.P.length ? celulas() + "<p class='rod'>M manhã · T tarde · MT turno M/T · FG folga · F férias · FD feriado. Fundo azul: fim de semana; creme: feriado." + (X.ed ? " Toca numa célula para fixar o turno (fica sublinhado). Projetar o resto preenche o que não está fixado." : "") + "</p>" + regras()
+    box.innerHTML = b + "</div>" + (X.P.length ? celulas() + "<p class='rod'>M manhã · T tarde · MT turno M/T · FG folga · F férias · FD feriado. Fundo azul: fim de semana; creme: feriado." + (X.ed ? " Toca numa célula e escolhe o turno: fica fixado (sublinhado) e a app ajusta o resto do mês às regras. Projetar o resto refaz tudo o que não está fixado." : "") + "</p>" + regras()
       : "<div class='vazio'>Ainda não há horário de " + nomeMes(X.M) + " nesta loja." + (ADMIN ? "<p><button class='btn p' id='horNovo'>Criar horário do mês</button></p>" : "") + "</div>");
     $("#horAnt").onclick = function () { sair(function () { abrir(addMes(X.M, -1)); }); };
     $("#horSeg").onclick = function () { sair(function () { abrir(addMes(X.M, 1)); }); };
@@ -73,7 +73,7 @@
     var id = +td.dataset.c, d = +td.dataset.d, c = X.C[id] || {}, m = document.createElement("div"); m.id = "horPop";
     var cods = HOR.CODIGOS.filter(function (k) { return k !== "MT" || X.mt; });
     var fx = (X.FX[id] || {})[d];
-    m.innerHTML = "<b>Fixar turno · " + esc(c.curto || "") + " · dia " + d + "</b><div>" + cods.map(function (k) { return "<button data-k='" + k + "'>" + k + "</button>"; }).join("") + "<button data-k=''>Limpar</button>" + (fx ? "<button data-s='1'>Soltar</button>" : "") + "</div>";
+    m.innerHTML = "<b>Fixar turno · " + esc(c.curto || "") + " · dia " + d + "</b><div>" + cods.map(function (k) { return "<button data-k='" + k + "'>" + k + "</button>"; }).join("") + "<button data-k=''>Limpar</button>" + (fx && "F FD".indexOf((X.G[id] || {})[d]) < 0 ? "<button data-s='1'>Soltar</button>" : "") + "</div>";
     m.onclick = function (e) {
       var b = e.target.closest("button"); if (!b) return; m.remove();
       if (b.dataset.s) definir(id, d, (X.G[id] || {})[d] || "", false); else definir(id, d, b.dataset.k, !!b.dataset.k);
@@ -91,7 +91,8 @@
   }
   function definir(id, d, k, fx) {
     pôr(id, d, k, fx); X.P.forEach(function (l) { if (l.espelho === id) pôr(l.colaborador_id, d, k, fx); });
-    pintar();
+    X.calc = true; pintar();
+    clearTimeout(X.tm); X.tm = setTimeout(function () { projetar(true); }, 500);   // vários toques seguidos dão um só ajuste
   }
   /* Projetar o resto: fica o que está fixado, as férias e os dias que já passaram; o resto do mês sai das regras */
   var HIGHS = "https://cdn.jsdelivr.net/npm/highs@1.15.4/build/";
@@ -104,12 +105,16 @@
       w.postMessage(lp);
     });
   }
-  async function dadosProjecao() {
+  async function dadosProjecao(auto) {
     var ano = +X.M.slice(0, 4), mes = +X.M.slice(5), hj = hoje(), base = HOR.meta(ano, mes, X.dias.length, X.fer);
     var ES = X.P.filter(function (l) { return l.escala && !l.espelho; });
-    var h = await sb.from("msb_horario_dias").select("colaborador_id,codigo").eq("estacao", EST).gte("dia", addMes(X.M, -6) + "-01").lt("dia", X.M + "-01").in("codigo", ["M", "T", "MT"]).limit(3000);
-    if (h.error) throw h.error;
-    var AC = {}; h.data.forEach(function (x) { var a = AC[x.colaborador_id] = AC[x.colaborador_id] || {M: 0, T: 0}; if (x.codigo !== "T") a.M++; if (x.codigo !== "M") a.T++; });
+    var AC = X.AC;
+    if (!AC) {
+      var h = await sb.from("msb_horario_dias").select("colaborador_id,codigo").eq("estacao", EST).gte("dia", addMes(X.M, -6) + "-01").lt("dia", X.M + "-01").in("codigo", ["M", "T", "MT"]).limit(3000);
+      if (h.error) throw h.error;
+      AC = {}; h.data.forEach(function (x) { var a = AC[x.colaborador_id] = AC[x.colaborador_id] || {M: 0, T: 0}; if (x.codigo !== "T") a.M++; if (x.codigo !== "M") a.T++; });
+      X.AC = AC;
+    }
     var minM = Infinity, minT = Infinity; ES.forEach(function (l) { var a = AC[l.colaborador_id] || {M: 0, T: 0}; minM = Math.min(minM, a.M); minT = Math.min(minT, a.T); });
     var P = ES.map(function (l) {
       var g = X.G[l.colaborador_id] || {}, fx = X.FX[l.colaborador_id] || {}, fixos = {}, fu = 0, a = AC[l.colaborador_id] || {M: 0, T: 0};
@@ -118,7 +123,7 @@
         if (fx[d] || c === "F" || c === "FD" || iso < hj) fixos[d] = c;
         var w = new Date(iso + "T12:00:00").getDay(); if (c === "F" && w > 0 && w < 6 && !X.fer[iso]) fu++;
       });
-      return {id: l.colaborador_id, fixos: fixos, ant: (X.ANT[l.colaborador_id] || []).slice(-6).map(function (x) { return x[1]; }), fdsAnt: X.FDS[l.colaborador_id] || "", meta: base - fu, off: {M: a.M - minM, T: a.T - minT}, reforco: l.codigo === X.reforco};
+      return {id: l.colaborador_id, fixos: fixos, ant: (X.ANT[l.colaborador_id] || []).slice(-6).map(function (x) { return x[1]; }), fdsAnt: X.FDS[l.colaborador_id] || "", meta: base - fu, off: {M: a.M - minM, T: a.T - minT}, reforco: l.codigo === X.reforco, atual: auto ? Object.assign({}, g) : null};
     });
     var oM = {}, oT = {}, fora = 0;
     X.P.forEach(function (l) { if (l.escala || l.espelho) return; X.dias.forEach(function (d) { var c = (X.G[l.colaborador_id] || {})[d]; if (c === "M" || c === "MT") { oM[d] = (oM[d] || 0) + 1; fora++; } if (c === "T" || c === "MT") { oT[d] = (oT[d] || 0) + 1; fora++; } }); });
@@ -126,17 +131,24 @@
     HORG.alvos(P, 2 * X.dias.length + sem.length - fora);
     return {P: P, op: {y: ano, m: mes, fer: X.fer, mtSemanas: sem, outrosM: oM, outrosT: oT}};
   }
-  async function projetar() {
-    var b = $("#horProj"), ES = X.P.filter(function (l) { return l.escala && !l.espelho; });
-    if (!ES.length) return msbAviso("Erro: não há pessoas na escala deste mês.");
-    b.disabled = true; b.textContent = "A projetar…";
+  async function projetar(auto) {   // auto = ajuste depois de uma edição: mexe só no necessário
+    var ES = X.P.filter(function (l) { return l.escala && !l.espelho; }), ctx = X, nr = X.nr = (X.nr || 0) + 1;
+    if (!ES.length) { X.calc = false; pintar(); return msbAviso("Erro: não há pessoas na escala deste mês."); }
+    clearTimeout(X.tm); X.calc = true; pintar();
     try {
-      var D = await dadosProjecao(), r = await calcular(HORG.modelo(D.P, D.op));
-      if (!r || !r.Columns || /infeasible/i.test(r.Status || "")) throw new Error("Não há solução com estes turnos fixados. Solta algum turno e tenta outra vez.");
-      var S = HORG.ler(D.P, D.op, r.Columns);
-      D.P.forEach(function (p, i) { X.dias.forEach(function (d) { if (p.fixos[d]) return; var fx = false; pôr(p.id, d, S[i][d], fx); X.P.forEach(function (l) { if (l.espelho === p.id) pôr(l.colaborador_id, d, S[i][d], fx); }); }); });
-      pintar(); msbAviso("Proposta pronta. Ajusta o que quiseres e grava.");
-    } catch (e) { pintar(); msbAviso("Erro: " + falhou(e)); }
+      var D = await dadosProjecao(auto === true), r = await calcular(HORG.modelo(D.P, D.op));
+      if (ctx !== X || nr !== X.nr) return;   // entretanto mudou de mês ou voltou a editar
+      if (!r || !r.Columns || /infeasible/i.test(r.Status || "")) throw new Error("Não há solução com estes turnos fixados. Solta algum turno.");
+      var S = HORG.ler(D.P, D.op, r.Columns), mudou = 0;
+      D.P.forEach(function (p, i) { X.dias.forEach(function (d) {
+        if (p.fixos[d]) return;
+        if ((X.G[p.id] || {})[d] !== S[i][d]) mudou++;
+        pôr(p.id, d, S[i][d], false); X.P.forEach(function (l) { if (l.espelho === p.id) pôr(l.colaborador_id, d, S[i][d], false); });
+      }); });
+      X.calc = false; pintar();
+      var er = X.R.erros;
+      msbAviso(er.length ? "Atenção: " + er[0].msg + (er.length > 1 ? " (+" + (er.length - 1) + ")" : "") : auto === true ? (mudou ? "Ajustei " + mudou + " turno(s). Confere e grava." : "Não foi preciso mudar mais nada.") : "Proposta pronta. Ajusta o que quiseres e grava.");
+    } catch (e) { if (ctx !== X || nr !== X.nr) return; X.calc = false; pintar(); msbAviso("Erro: " + falhou(e)); }
   }
   async function gravar() {
     var n = X.R.erros.length;
