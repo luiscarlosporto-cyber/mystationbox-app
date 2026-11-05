@@ -179,9 +179,11 @@
       var d = document.createElement("dialog"); d.id = "bConf";
       d.innerHTML = "<p></p><div><button class='btn' value='n'>Cancelar</button><button class='btn p' value='s'></button></div>";
       d.querySelector("p").textContent = texto; d.querySelector(".p").textContent = acao || "Confirmar";
-      var c = null; if (campo != null) { c = document.createElement("input"); c.value = campo; d.insertBefore(c, d.lastChild); c.onkeydown = function (e) { if (e.key === "Enter") { e.preventDefault(); d.close("s"); } }; }
-      d.onclick = function (e) { var b = e.target.closest("button"); if (b) { d.close(b.value); } };
-      d.onclose = function () { d.remove(); fim(c ? (d.returnValue === "s" ? c.value : false) : d.returnValue === "s"); };
+      var c = null; if (campo != null) { c = document.createElement("input"); c.value = campo; d.insertBefore(c, d.lastChild); c.onkeydown = function (e) { if (e.key === "Enter") { e.preventDefault(); acabar("s"); } }; }
+      var feito = false;
+      function acabar(v) { if (feito) return; feito = true; d.close(); d.remove(); fim(c ? (v === "s" ? c.value : false) : v === "s"); }
+      d.onclick = function (e) { var b = e.target.closest("button"); if (b) acabar(b.value); };
+      d.onclose = function () { acabar("n"); };   // Esc
       document.body.appendChild(d); d.showModal(); (c || d.querySelector("button")).focus(); if (c) c.select();
     });
   }
