@@ -46,7 +46,7 @@
     });
     (op.mtSemanas || []).forEach(function (S) {
       var L = S.filter(function (d) { return !fer[iso(dt(y, m, d))]; }); if (C < 0 || !L.length) return;
-      eq(L.map(function (d) { return [v(C, d, "X"), 1]; }).concat([[aux(30), 1], [aux(30), -1]]), 1);
+      eq(L.map(function (d) { return [v(C, d, "X"), 1]; }).concat([[aux(150), 1], [aux(150), -1]]), 1);
     });
     var fds = dias.filter(function (d) { return sem(y, m, d) === 6 && d < n; });
     P.forEach(function (p, a) {
