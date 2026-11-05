@@ -17,7 +17,7 @@ function aviParado(L) {
   return !!c && (Date.now() - new Date(c.criado).getTime()) / 36e5 > AVI_HORAS ? c : null;
 }
 /* ---- preços da ENSE, de todas as lojas: aprovar aqui e ver o histórico ---- */
-var AVI_PRECOS = [];
+var AVI_PRECOS = [], AVI_ESPERA = null;
 async function aviTodosPrecos() {
   var r = await sb.from("msb_precos").select("estacao,dia,hora,produtos,estado,comunicado_em,comunicado_por,aprovado_em,aprovado_por,ense_tentado_em,ense_erro").order("dia", {ascending: false}).limit(60);
   if (r.error) throw r.error;
@@ -36,7 +36,7 @@ function aviQuadro(x) {
     "<div class='bar' style='margin-top:8px'><button class='btn p' data-aprova='" + x.estacao + "|" + x.dia + "'>" + (x.ense_erro ? "↻ Verifiquei: tentar outra vez" : "✔ Aprovar e gravar na ENSE") + "</button></div></div>";
 }
 function aviEspera(x) {
-  return "<div class='aviso'>⏳ " + esc(aviLoja(x.estacao)) + " · preços de " + dmy(x.dia) + (x.ense_tentado_em ? ": a gravar na ENSE." : ": aprovados. O OCTAN AI grava nos próximos 15 minutos.") + "</div>";
+  return "<div class='aviso'>⏳ " + esc(aviLoja(x.estacao)) + " · preços de " + dmy(x.dia) + (x.ense_tentado_em ? ": a gravar na ENSE." : ": aprovados. O OCTAN AI grava nos próximos minutos.") + "</div>";
 }
 function aviHistorico() {
   return (ESTS || []).map(function (e) {
@@ -72,7 +72,7 @@ function aviForm() {
 function aviPedidos(L) {
   return L.map(function (p) {
     var t = "<b>" + esc(aviLoja(p.estacao)) + " · " + esc((AVI_PASTAS.find(function (x) { return x[0] === p.pasta; }) || [0, p.pasta])[1]) + (p.artigo ? " · " + esc(p.artigo) : "") + "</b><div class='mut'>" + dmy(p.de) + " a " + dmy(p.ate) + "</div>";
-    if (p.estado === "pendente" || p.estado === "a_ler") return "<div class='aviso'>⏳ " + t + "O OCTAN AI responde nos próximos 15 minutos.</div>";
+    if (p.estado === "pendente" || p.estado === "a_ler") return "<div class='aviso'>⏳ " + t + "O OCTAN AI responde nos próximos minutos.</div>";
     var vi = p.visto_em ? "" : "<div style='margin-top:8px'><button class='btn' data-pv='" + p.id + "'>✔ Visto</button></div>";
     if (p.estado === "erro") return "<div class='card' style='padding:12px 14px'>❌ " + t + "<div class='bad'>" + esc(p.erro) + "</div>" + vi + "</div>";
     var L2 = p.linhas || [], q = L2.reduce(function (s, x) { return s + x[2]; }, 0), v = L2.reduce(function (s, x) { return s + x[3]; }, 0);
@@ -136,6 +136,9 @@ async function carregarAvisos() {
     var nArq = arq.length + pArq.length;
     var arquivo = nArq ? "<details class='card' style='padding:12px 14px'><summary><b>🗄️ Arquivo (" + nArq + ")</b></summary><div style='display:grid;gap:10px;margin-top:10px'>" + aviPedidos(pArq) + arq.map(cartaoAviso).join("") + "</div></details>" : "";
     box.innerHTML = aviForm() + aviPedidos(pAbertos) + h + aviHistorico() + arquivo;
+    /* enquanto houver pedido em espera, a resposta aparece sozinha */
+    clearTimeout(AVI_ESPERA);
+    if (PD.some(function (x) { return x.estado === "pendente" || x.estado === "a_ler"; })) AVI_ESPERA = setTimeout(function () { if (PAGINA === "avi") carregarAvisos(); }, 20000);
     $("#pvPedir").onclick = aviPedir;
     $$("#aviCorpo [data-aprova]").forEach(function (b) { b.onclick = function () { var k = b.dataset.aprova.split("|"); aviAprovar(k[0], k[1]); }; });
     $$("#aviCorpo [data-avi]").forEach(function (b) { b.onclick = function () { aviVisto([Number(b.dataset.avi)]); }; });
