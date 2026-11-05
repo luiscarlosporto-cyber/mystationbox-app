@@ -265,8 +265,9 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
     <div class="sc"><table><thead><tr><th>Funcionário</th><th>Turnos</th><th>Vendas</th><th>Diferença</th><th>Maior falta</th></tr></thead><tbody id="fT"></tbody></table></div>
     <section id="equipa" hidden style="display:grid;gap:10px">
       <div class="bar"><h2 style="margin-right:auto">🔐 Contas de acesso</h2><button class="btn p" id="eqBtnNovo">+ Novo funcionário</button></div>
-      <p class="mut" style="margin:0;font-size:14px">Cada pessoa entra com o seu email e palavra-passe, no mystationbox (caixa, stock e encomendas). <b>Funcionário</b>: consulta e conta tabaco. <b>Administrador</b>: regista, corrige, importa e aprova.</p>
+      <p class="mut" style="margin:0;font-size:14px">Cada pessoa entra com o seu email e palavra-passe, no mystationbox (caixa, stock e encomendas). <b>Funcionário</b>: consulta e conta tabaco. <b>Administrador</b>: regista, corrige, importa e aprova. Toque no nome de uma pessoa para mudar os dados ou criar uma palavra-passe nova.</p>
       <div id="eqNovo" class="card" hidden style="padding:12px"></div>
+      <div id="eqEdita" class="card" hidden style="padding:12px;border:2px solid var(--laranja)"></div>
       <div id="eqMsg" style="font-size:14px"></div>
       <div class="sc"><table class="hist"><thead><tr><th>Nome</th><th>Email</th><th>Função</th><th>Estação</th><th>Estado</th><th></th></tr></thead><tbody id="eqLista"></tbody></table></div>
     </section>

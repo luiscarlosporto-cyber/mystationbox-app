@@ -29,21 +29,39 @@ function nomeEst(id) { var e = EQ.estacoes.find(function (x) { return x.id === i
 function optsEst(sel) { return EQ.estacoes.map(function (e) { return "<option value='" + e.id + "'" + (e.id === sel ? " selected" : "") + ">" + esc(e.short_name || e.name) + "</option>"; }).join(""); }
 function optsPapel(sel) { return "<option value='staff'" + (sel !== "admin" ? " selected" : "") + ">Funcionário</option><option value='admin'" + (sel === "admin" ? " selected" : "") + ">Administrador</option>"; }
 function desenharEquipa() {
+  /* A edição abre num cartão por cima da tabela (e não dentro dela): no telemóvel a tabela desliza para o lado e
+   * os campos ficavam fora do ecrã, incluindo a palavra-passe e a mensagem de erro. */
   $("#eqLista").innerHTML = EQ.lista.map(function (p) {
-    var eu = p.user_id === EQ.eu;
-    if (EQ.edita === p.user_id) return "<tr><td colspan='6'><div class='ff'><label>Nome<input id='eqN' value='" + esc(p.display_name || "") + "'></label><label>Função<select id='eqP'" + (eu ? " disabled" : "") + ">" + optsPapel(p.role) + "</select></label><label>Estação<select id='eqE'>" + optsEst(p.company_id) + "</select></label><label>Nova palavra-passe (opcional)<span style='display:flex;gap:6px'><input id='eqS' placeholder='vazio = manter a atual' autocomplete='new-password' style='flex:1;min-width:0'><button type='button' class='mini' id='eqGer'>🎲 Gerar</button></span></label></div><div class='bar' style='margin-top:8px'><button class='btn p' data-ok='" + p.user_id + "'>Guardar</button><button class='btn' data-cancel='1'>Cancelar</button></div></td></tr>";
-    return "<tr><td>" + esc(p.display_name || "—") + (eu ? " <span class='b ok'>você</span>" : "") + "</td><td class='l'>" + esc(p.email || "") + "</td><td class='l'>" + (p.role === "admin" ? "Administrador" : "Funcionário") + "</td><td class='l'>" + esc(nomeEst(p.company_id)) + "</td><td class='l'>" + (p.banido ? "<span class='b bad'>desativada</span>" : p.ultimo ? "entrou " + new Date(p.ultimo).toLocaleDateString("pt-PT") : "<span class='mut'>nunca entrou</span>") + "</td><td><button class='mini' data-ed='" + p.user_id + "'>Editar</button>" + (eu ? "" : " <button class='mini' data-ban='" + p.user_id + "' data-x='" + (p.banido ? "ativar" : "desativar") + "'>" + (p.banido ? "Reativar" : "Desativar") + "</button>") + "</td></tr>";
+    var eu = p.user_id === EQ.eu, ed = EQ.edita === p.user_id;
+    return "<tr" + (ed ? " style='background:var(--soft)'" : "") + "><td><a href='#' data-ed='" + p.user_id + "' style='font-weight:600'>" + esc(p.display_name || "—") + "</a>" + (eu ? " <span class='b ok'>você</span>" : "") + (ed ? " <span class='b'>a editar</span>" : "") + "</td><td class='l'>" + esc(p.email || "") + "</td><td class='l'>" + (p.role === "admin" ? "Administrador" : "Funcionário") + "</td><td class='l'>" + esc(nomeEst(p.company_id)) + "</td><td class='l'>" + (p.banido ? "<span class='b bad'>desativada</span>" : p.ultimo ? "entrou " + new Date(p.ultimo).toLocaleDateString("pt-PT") : "<span class='mut'>nunca entrou</span>") + "</td><td><button class='mini' data-ed='" + p.user_id + "'>Editar</button>" + (eu ? "" : " <button class='mini' data-ban='" + p.user_id + "' data-x='" + (p.banido ? "ativar" : "desativar") + "'>" + (p.banido ? "Reativar" : "Desativar") + "</button>") + "</td></tr>";
   }).join("") || "<tr><td colspan='6' class='mut'>Sem contas.</td></tr>";
-  if ($("#eqGer")) $("#eqGer").onclick = function () { $("#eqS").value = senhaSugerida(); };
-  $$("#eqLista [data-ed]").forEach(function (b) { b.onclick = function () { EQ.edita = b.dataset.ed; desenharEquipa(); }; });
-  $$("#eqLista [data-cancel]").forEach(function (b) { b.onclick = function () { EQ.edita = null; desenharEquipa(); }; });
-  $$("#eqLista [data-ok]").forEach(function (b) { b.onclick = async function () {
-    b.disabled = true; var id = b.dataset.ok, s = $("#eqS").value.trim();
-    try { await equipa("atualizar", {user_id: id, nome: $("#eqN").value, role: $("#eqP").disabled ? undefined : $("#eqP").value, company_id: $("#eqE").value});
-      if (s) await equipa("palavra_passe", {user_id: id, password: s});
-      var pp = EQ.lista.find(function (x) { return x.user_id === id; }) || {};
-      EQ.edita = null; status(true, "Conta atualizada ✓"); if (s) mostrarCredenciais("Palavra-passe nova de " + (pp.display_name || ""), pp.display_name, pp.email || "", s); else $("#eqMsg").textContent = ""; carregarEquipa(); }
-    catch (e) { b.disabled = false; $("#eqMsg").textContent = "⚠ " + e.message; } }; });
+  var box = $("#eqEdita"), p = EQ.lista.find(function (x) { return x.user_id === EQ.edita; });
+  if (!p) { box.hidden = true; box.innerHTML = ""; }
+  else {
+    var eu = p.user_id === EQ.eu;
+    box.hidden = false;
+    box.innerHTML = "<h3 style='margin:0 0 4px'>✏️ " + esc(p.display_name || "—") + "</h3><div class='mut' style='font-size:13px;margin-bottom:8px'>" + esc(p.email || "") + "</div>" +
+      "<div class='ff'><label>Nome<input id='eqN' value='" + esc(p.display_name || "") + "'></label><label>Função<select id='eqP'" + (eu ? " disabled" : "") + ">" + optsPapel(p.role) + "</select></label><label>Estação<select id='eqE'>" + optsEst(p.company_id) + "</select></label></div>" +
+      "<label style='display:grid;gap:4px;margin-top:10px;font-size:13px;color:var(--mut)'>Nova palavra-passe <span>(deixe vazio para manter a atual; mínimo 8 caracteres)</span>" +
+      "<span style='display:flex;gap:6px'><input id='eqS' autocomplete='new-password' autocapitalize='off' spellcheck='false' style='flex:1;min-width:0;padding:10px;border:1px solid var(--bd);border-radius:9px;background:var(--in);font:600 17px var(--f-num)'><button type='button' class='btn' id='eqGer'>🎲 Gerar</button></span></label>" +
+      "<div id='eqEdErr' class='bad' style='font-size:14px;margin-top:6px' hidden></div>" +
+      "<div class='bar' style='margin-top:10px'><button class='btn p' id='eqGuardar'>✔ Guardar</button><button class='btn' id='eqCancelar'>Cancelar</button></div>";
+    $("#eqGer").onclick = function () { $("#eqS").value = senhaSugerida(); };
+    $("#eqCancelar").onclick = function () { EQ.edita = null; desenharEquipa(); };
+    $("#eqGuardar").onclick = async function () {
+      var b = this, err = $("#eqEdErr"), s = $("#eqS").value.trim(), id = p.user_id;
+      err.hidden = true;
+      if (s && s.length < 8) { err.hidden = false; err.textContent = "⚠ A palavra-passe tem de ter pelo menos 8 caracteres (tem " + s.length + "). Use 🎲 Gerar para criar uma."; return; }
+      b.disabled = true; b.textContent = "A guardar…";
+      try { await equipa("atualizar", {user_id: id, nome: $("#eqN").value, role: $("#eqP").disabled ? undefined : $("#eqP").value, company_id: $("#eqE").value});
+        if (s) await equipa("palavra_passe", {user_id: id, password: s});
+        EQ.edita = null; status(true, "Conta atualizada ✓");
+        if (s) mostrarCredenciais("Palavra-passe nova de " + (p.display_name || ""), p.display_name, p.email || "", s); else $("#eqMsg").textContent = "";
+        carregarEquipa(); $("#equipa").scrollIntoView({behavior: "smooth", block: "start"}); }
+      catch (e) { b.disabled = false; b.textContent = "✔ Guardar"; err.hidden = false; err.textContent = "⚠ Não ficou guardado: " + e.message; }
+    };
+  }
+  $$("#eqLista [data-ed]").forEach(function (b) { b.onclick = function (ev) { ev.preventDefault(); EQ.edita = b.dataset.ed; $("#eqMsg").textContent = ""; desenharEquipa(); $("#eqEdita").scrollIntoView({behavior: "smooth", block: "start"}); }; });
   $$("#eqLista [data-ban]").forEach(function (b) { b.onclick = async function () {
     if (b.dataset.conf !== "1") { b.dataset.conf = "1"; b.textContent = b.dataset.x === "desativar" ? "Confirmar: desativar" : "Confirmar: reativar"; return; }
     b.disabled = true; try { await equipa(b.dataset.x, {user_id: b.dataset.ban}); carregarEquipa(); } catch (e) { b.disabled = false; $("#eqMsg").textContent = "⚠ " + e.message; } }; });
