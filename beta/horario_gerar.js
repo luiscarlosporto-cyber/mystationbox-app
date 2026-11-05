@@ -25,9 +25,9 @@
         var f = fixo(a, d);
         if (f) eq([[v(a, d, f), 1]], 1);
         else if (a !== C || !mtDias[d]) eq([[v(a, d, "X"), 1]], 0);
-        if (!f && p.atual && p.atual[d]) { var s0 = estadoDe(p.atual[d]); ESTADOS.forEach(function (s) { if (s !== s0) O.push("6 " + v(a, d, s)); }); }
+        if (!f && p.atual && p.atual[d]) { var s0 = estadoDe(p.atual[d]); ESTADOS.forEach(function (s) { if (s !== s0) O.push("20 " + v(a, d, s)); }); }
       });
-      var dif1 = aux(25), dif2 = aux(25);
+      var pesoT = p.atual ? 100 : 25, dif1 = aux(pesoT), dif2 = aux(pesoT);
       eq(dias.reduce(function (T, d) { return T.concat([[v(a, d, "M"), 1], [v(a, d, "T"), 1], [v(a, d, "X"), 1]]); }, []).concat([[dif1, 1], [dif2, -1]]), p.alvo);
     });
     var outM = op.outrosM || {}, outT = op.outrosT || {}, F = P.map(function (p, a) { return a; });
@@ -64,15 +64,15 @@
         if (alvo && !f1 && !f2) ge([[v(a, s, alvo), 1], [aux(40), 1]], 1);
         prev = alvo || "";
       });
-      if ((ult === "T" || ult === "X") && (p.ant || []).length && !p.fixos[1]) le([[v(a, 1, "M"), 1], [aux(100), -1]], 0);
+      if ((ult === "T" || ult === "X") && (p.ant || []).length && !p.fixos[1]) le([[v(a, 1, "M"), 1], [aux(300), -1]], 0);
       dias.forEach(function (d) {
-        if (d > 1 && !(["T", "X"].indexOf(fixo(a, d - 1)) >= 0 && fixo(a, d) === "M")) le([[v(a, d - 1, "T"), 1], [v(a, d - 1, "X"), 1], [v(a, d, "M"), 1], [aux(100), -1]], 1);
+        if (d > 1 && !(["T", "X"].indexOf(fixo(a, d - 1)) >= 0 && fixo(a, d) === "M")) le([[v(a, d - 1, "T"), 1], [v(a, d - 1, "X"), 1], [v(a, d, "M"), 1], [aux(300), -1]], 1);
         var T = [], k = 0, ant = (p.ant || []).map(function (c) { return estadoDe(c); });
         for (var j = d - 5; j <= d; j++) {
           if (j >= 1) { if (!(fixo(a, j) && fixo(a, j) !== "G")) T.push([v(a, j, "G"), 1]); }
           else { var q = ant[ant.length + j - 1]; if (q === undefined || q === "G") k = 1; }
         }
-        if (!k && T.length) ge(T.concat([[aux(100), 1]]), 1);
+        if (!k && T.length) ge(T.concat([[aux(300), 1]]), 1);
         if (d > 1) [["M", "T"], ["T", "M"]].forEach(function (par) { le([[v(a, d - 1, par[0]), 1], [v(a, d, par[1]), 1], [aux(3), -1]], 1); });
         if (d > 1 && d < n) {
           le([[v(a, d, "G"), 1], [v(a, d - 1, "G"), -1], [v(a, d + 1, "G"), -1], [aux(2), -1]], 0);

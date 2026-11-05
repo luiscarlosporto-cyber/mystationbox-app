@@ -96,8 +96,8 @@
   }
   /* Projetar o resto: fica o que está fixado, as férias e os dias que já passaram; o resto do mês sai das regras */
   var HIGHS = "https://cdn.jsdelivr.net/npm/highs@1.15.4/build/";
-  function calcular(lp) {
-    var src = "importScripts('" + HIGHS + "highs.js');onmessage=async function(e){try{var h=await Module({locateFile:function(f){return '" + HIGHS + "'+f}});postMessage({ok:h.solve(e.data,{time_limit:75,mip_rel_gap:0.03})})}catch(x){postMessage({erro:String(x)})}}";
+  function calcular(lp, auto) {
+    var src = "importScripts('" + HIGHS + "highs.js');onmessage=async function(e){try{var h=await Module({locateFile:function(f){return '" + HIGHS + "'+f}});postMessage({ok:h.solve(e.data,{time_limit:" + (auto ? 25 : 75) + ",mip_rel_gap:" + (auto ? 0.005 : 0.03) + "})})}catch(x){postMessage({erro:String(x)})}}";
     return new Promise(function (ok, ko) {
       var w = new Worker(URL.createObjectURL(new Blob([src], {type: "text/javascript"}))), t = setTimeout(function () { w.terminate(); ko(new Error("O cálculo demorou demasiado.")); }, 120000);
       w.onmessage = function (e) { clearTimeout(t); w.terminate(); if (e.data.erro) ko(new Error(e.data.erro)); else ok(e.data.ok); };
@@ -136,7 +136,7 @@
     if (!ES.length) { X.calc = false; pintar(); return msbAviso("Erro: não há pessoas na escala deste mês."); }
     clearTimeout(X.tm); X.calc = true; pintar();
     try {
-      var D = await dadosProjecao(auto === true), r = await calcular(HORG.modelo(D.P, D.op));
+      var D = await dadosProjecao(auto === true), r = await calcular(HORG.modelo(D.P, D.op), auto === true);
       if (ctx !== X || nr !== X.nr) return;   // entretanto mudou de mês ou voltou a editar
       if (!r || !r.Columns || /infeasible/i.test(r.Status || "")) throw new Error("Não há solução com estes turnos fixados. Solta algum turno.");
       var S = HORG.ler(D.P, D.op, r.Columns), mudou = 0;
