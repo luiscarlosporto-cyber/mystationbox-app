@@ -195,6 +195,7 @@ table.hor tfoot td{color:var(--wn);font-weight:600;border-bottom:0}
 table.hor tbody tr:hover td{background:revert-layer}
 table.hor.aeditar td[data-c]{cursor:pointer}table.hor.aeditar td[data-c]:hover{outline:1px solid var(--azul);outline-offset:-1px}
 table.hor td small{display:block;font-size:9px;font-weight:600;line-height:1;color:var(--mut)}
+.hinv{border:2px solid var(--bad);background:var(--badb);padding:10px 12px;border-radius:var(--r);margin:8px 0}.hinv b{color:var(--bad)}.hinv p{margin:4px 0 0;font-size:14px}
 table.hor td.fx{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px;font-weight:700}
 table.hor td.alt{box-shadow:inset 0 0 0 2px var(--laranja);font-weight:700}
 table.hor .l small{display:block;font-weight:400;font-size:10.5px;color:var(--mut)}
