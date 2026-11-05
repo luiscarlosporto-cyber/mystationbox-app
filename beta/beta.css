@@ -193,7 +193,14 @@ table.hor th.hj{box-shadow:inset 0 -2px 0 var(--laranja)}
 table.hor tr.eu td{font-weight:700}
 table.hor tfoot td{color:var(--wn);font-weight:600;border-bottom:0}
 table.hor tbody tr:hover td{background:revert-layer}
-#horEst{margin-left:4px}
+table.hor.ed td[data-c]{cursor:pointer}table.hor.ed td[data-c]:hover{outline:1px solid var(--azul);outline-offset:-1px}
+table.hor td.alt{box-shadow:inset 0 0 0 2px var(--laranja);font-weight:700}
+table.hor .l small{display:block;font-weight:400;font-size:10.5px;color:var(--mut)}
+#horPop{position:fixed;z-index:60;background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:8px 10px;box-shadow:0 8px 28px rgba(0,30,50,.2);font-size:13px}
+#horPop div{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap;max-width:260px}
+#horPop button{min-width:40px;min-height:40px;border:1px solid var(--bd);border-radius:var(--r);background:var(--soft);color:var(--fg);font:600 14px var(--f-body);cursor:pointer}
+.hl{margin:6px 0;padding-left:18px;font-size:14px}.t-er{background:var(--badb);color:var(--bad)}
+.btn:disabled{opacity:.5;cursor:default}
 
 /* ---- telemóvel ---- */
 @media (max-width:700px){
