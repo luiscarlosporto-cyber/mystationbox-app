@@ -155,6 +155,7 @@ async function carregarInicio() {
     h += cartao("sai", "Saídas por entregar", ns ? fmt(vs) + "<small> €</small>" : "0", ns ? ns + " saída(s) de caixa ainda por entregar" : "Tudo entregue", ns ? "al" : "ok");
     if (ADMIN) {
       try { h = (await cartaoAvisos()) + h; } catch (e) { /* os avisos nunca impedem o Início de abrir */ }
+      aviSelo();
       var dias = new Date().getDate() - 1, tem = {}; L.forEach(function (r) { if (r.dia < hoje) tem[r.dia + r.turno] = 1; });
       var falta = 0; for (var i = 1; i <= dias; i++) { var k = mes + "-" + String(i).padStart(2, "0"); if (!tem[k + "t1"]) falta++; if (!tem[k + "t2"]) falta++; }
       h += cartao("mes", "Turnos em falta este mês", String(falta), falta ? "Até ontem, sem registo" : "Todos registados até ontem", falta ? "al" : "ok");
