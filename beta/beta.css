@@ -193,7 +193,7 @@ table.hor th.hj{box-shadow:inset 0 -2px 0 var(--laranja)}
 table.hor tr.eu td{font-weight:700}
 table.hor tfoot td{color:var(--wn);font-weight:600;border-bottom:0}
 table.hor tbody tr:hover td{background:revert-layer}
-table.hor.ed td[data-c]{cursor:pointer}table.hor.ed td[data-c]:hover{outline:1px solid var(--azul);outline-offset:-1px}
+table.hor.aeditar td[data-c]{cursor:pointer}table.hor.aeditar td[data-c]:hover{outline:1px solid var(--azul);outline-offset:-1px}
 table.hor td.fx{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px;font-weight:700}
 table.hor td.alt{box-shadow:inset 0 0 0 2px var(--laranja);font-weight:700}
 table.hor .l small{display:block;font-weight:400;font-size:10.5px;color:var(--mut)}

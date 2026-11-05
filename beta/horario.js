@@ -24,7 +24,7 @@
   function celulas() {
     var t = function (d) { var iso = X.M + "-" + String(d).padStart(2, "0"), w = new Date(iso + "T12:00:00").getDay(); return {w: w, cl: (X.fer[iso] ? "fer " : (w === 0 || w === 6) ? "fds " : "") + (iso === hoje() ? "hj" : "")}; };
     var eu = ((PERFIL && PERFIL.display_name) || "").trim().split(/\s+/)[0];
-    var h = "<div class='sc' id='horSc'><table class='hor" + (X.ed ? " ed" : "") + "'><thead><tr><th class='l'>Colaborador</th>" + X.dias.map(function (d) { var k = t(d); return "<th class='" + k.cl + "'>" + d + "<small>" + SEM[k.w] + "</small></th>"; }).join("") + "<th>Turnos</th></tr></thead><tbody>";
+    var h = "<div class='sc' id='horSc'><table class='hor" + (X.ed ? " aeditar" : "") + "'><thead><tr><th class='l'>Colaborador</th>" + X.dias.map(function (d) { var k = t(d); return "<th class='" + k.cl + "'>" + d + "<small>" + SEM[k.w] + "</small></th>"; }).join("") + "<th>Turnos</th></tr></thead><tbody>";
     X.P.forEach(function (l) {
       var c = X.C[l.colaborador_id] || {}, g = X.G[l.colaborador_id] || {}, tur = 0, fixo = !!l.espelho;
       h += "<tr" + (c.curto === eu ? " class='eu'" : "") + "><td class='l' title='" + esc(c.nome || "") + "'>" + esc(c.curto || "") + (fixo && X.ed ? "<small>segue " + esc((X.C[l.espelho] || {}).curto || "") + "</small>" : "") + "</td>" + X.dias.map(function (d) {
