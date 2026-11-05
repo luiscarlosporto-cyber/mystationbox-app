@@ -139,8 +139,9 @@ body.b-rec #nexFrame{height:calc(100dvh - 146px)!important}
 .fila small{display:block;font-size:12.5px;font-weight:400;color:var(--mut);margin-top:1px}
 .fila>div{min-width:0}.fila .btn{flex:none;min-height:34px;padding:5px 12px}
 .vz{margin:10px 0 4px;color:var(--mut);font-size:14px}
-.pnT{display:grid;grid-template-columns:minmax(0,1.15fr) repeat(var(--n),minmax(0,1fr));gap:0 10px;font-size:14px;align-items:center}
-.pnT>*{padding:7px 0;border-top:1px solid var(--bd);min-width:0}
+.pnT{display:grid;grid-template-columns:minmax(0,1.15fr) repeat(var(--n),minmax(0,1fr));font-size:14px;align-items:stretch}
+.pnT>*{padding:7px 0 7px 8px;border-top:1px solid var(--bd);min-width:0;display:flex;align-items:center;justify-content:flex-end;text-align:right}
+.pnT>.rot,.pnT>.cab:first-child{padding-left:0;justify-content:flex-start;text-align:left}
 .pnT .cab{font:600 12.5px var(--f-body);color:var(--mut);border-top:0;background:none;text-align:right;cursor:default}
 .pnT .cab:first-child{text-align:left}
 .pnT button.cab{border:0;cursor:pointer;color:var(--azul)}

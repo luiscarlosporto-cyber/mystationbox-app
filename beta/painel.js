@@ -47,7 +47,7 @@
   }
 
   function porDecidir(X) {
-    var L = [], loja = function (id) { return aviLoja(id); };
+    var L = [], loja = function (id) { var e = ESTS.find(function (x) { return x.id === id; }); return e ? nomeLoja(e) : id; };
     (X.avi || []).filter(function (a) { return !a.lido_em && (a.nivel === "erro" || a.nivel === "atencao"); }).forEach(function (a) {
       L.push({o: a.nivel === "erro" ? 0 : 2, t: a.titulo, s: loja(a.estacao) + " · OCTAN AI", e: a.estacao, p: "avi", b: "Ver"});
     });
