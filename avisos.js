@@ -91,7 +91,8 @@ async function aviUsar(id, sup) {
   for (; d <= fim; d.setDate(d.getDate() + 1)) dias.push(dmy(d.toISOString().slice(0, 10)) + " - Quantidade");
   ir("nova");
   try {
-    var w = await esperarNex(function (x) { return typeof x.salesChange === "function" && typeof x.carregarXlsx === "function"; });
+    /* o módulo de stock demora a confirmar quem entrou: sem isto recusa a encomenda logo que abre */
+    var w = await esperarNex(function (x) { try { return typeof x.salesChange === "function" && typeof x.carregarXlsx === "function" && x.eval("typeof currentRole !== 'undefined' && currentRole === 'admin'"); } catch (e) { return false; } });
     await w.carregarXlsx();
     var cab = ["Código", "Artigos"].concat(dias, ["Total quantidade", "Total Montante"]), L = [["Posto", e.posto_repsol + " - " + e.name], cab];
     (p.linhas || []).forEach(function (l) { L.push([l[0], l[1]].concat(dias.map(function () { return 0; }), [l[2], l[3]])); });
