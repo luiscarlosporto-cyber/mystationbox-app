@@ -9,7 +9,7 @@
 <link rel="icon" href="icone-64.png">
 <link rel="apple-touch-icon" href="icone-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
 <style>
 /* mystationbox na cloud · cores do logótipo (31/10/2026): caixa laranja (#FFB27A → #F36C21 → #A93A0B) sobre azul (#00507A → #003B5C → #00253B), branco, grafite #202B36 */
 :root{
@@ -156,6 +156,7 @@ details.grp summary{cursor:pointer;font-weight:700}
 details.grp div{font-size:14px;margin:4px 0}
 textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px;background:var(--in);font:12px monospace;color:var(--fg)}
 </style>
+<link rel="stylesheet" href="beta/beta.css?v=2395d752">
 </head>
 <body>
 <!-- ecrã de entrada -->
@@ -494,6 +495,9 @@ entrar().catch(function(e){$("#vLogin").hidden=false;$("#lErro").textContent=fal
 <script src="avisos.js"></script>
 <script src="faturas_ler.js"></script>
 <script src="faturas.js"></script>
+<script src="beta/beta.js?v=773696ca"></script>
+<script src="beta/painel.js?v=a414a064"></script>
+<script src="beta/paginas.js?v=813851e4"></script>
 <script src="areas.js"></script>
 <script>$$("#tabSub button").forEach(function(b){b.onclick=function(){tabaco(b.dataset.t)}});$("#eqBtnNovo").onclick=formNovo;</script>
 </body>

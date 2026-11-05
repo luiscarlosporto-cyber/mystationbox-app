@@ -40,8 +40,8 @@
     MSB_NAV.paginas();
     var app = $("#vApp"), lat = document.createElement("aside"), topo = document.createElement("div");
     lat.id = "bLat"; lat.setAttribute("aria-label", "Menu");
-    lat.innerHTML = "<div class='marca'><img src='logo.svg' alt=''><img class='wm' src='marca_clara.png' alt='mystationbox'><em>beta</em></div><div id='bAreas'></div>" +
-      "<div class='fim'><span id='bQuem'></span><button id='bVolta' title='Voltar à versão atual'>" + ic("s") + "<span class='tx'>Versão atual</span></button><button id='bRec' title='Recolher o menu'>" + ic("r") + "<span class='tx'>Recolher menu</span></button></div>";
+    lat.innerHTML = "<div class='marca'><img src='logo.svg' alt=''><img class='wm' src='marca_clara.png' alt='mystationbox'></div><div id='bAreas'></div>" +
+      "<div class='fim'><span id='bQuem'></span><button id='bVolta' title='Abrir a versão anterior da app'>" + ic("s") + "<span class='tx'>Versão anterior</span></button><button id='bRec' title='Recolher o menu'>" + ic("r") + "<span class='tx'>Recolher menu</span></button></div>";
     topo.id = "bTopo";
     topo.innerHTML = "<div id='bCam'></div><button id='bBusca' aria-label='Procurar'>" + ic("b") + "<span>Procurar</span><kbd>Ctrl K</kbd></button><button id='bNovo' aria-haspopup='menu'>" + ic("m") + "<span>Novo</span></button>";
     var main = app.querySelector("main"), chips = document.createElement("div"), barra = document.createElement("nav");
@@ -67,7 +67,7 @@
       fecharTudo(); var a = AREAS.find(function (x) { return x.id === b.dataset.a; }); ir(paginasDe(a)[0][0]);
     };
     $("#bRec").onclick = function () { recolhido = !recolhido; gravar("msb_lat", recolhido ? "1" : "0"); acertarLargura(); };
-    $("#bVolta").onclick = function () { location.href = "../"; };
+    $("#bVolta").onclick = function () { location.href = "anterior/"; };
     $("#bBusca").onclick = abrirPesquisa;
     $("#bNovo").onclick = function (e) { e.stopPropagation(); alternarNovo(); };
     addEventListener("resize", acertarLargura); acertarLargura();
@@ -105,7 +105,7 @@
     var fora = AREAS_TEL.indexOf(a.id) < 0;
     $("#bBarra").innerHTML = noTel.map(function (x) { return "<button data-a='" + x.id + "'" + (x.id === a.id ? " class='on'" : "") + ">" + ic(IC_AREA[x.id]) + (x.c || nomeArea(x)) + seloH(x) + "</button>"; }).join("") +
       "<button data-a='mais'" + (fora ? " class='on'" : "") + ">" + ic("x") + "Mais</button>";
-    document.title = (atual ? atual[1] + " · " : "") + "mystationbox beta";
+    document.title = (atual ? atual[1] + " · " : "") + "mystationbox";
   }
 
   function fecharTudo() { ["#bNovoM", "#bPesq", "#bMais"].forEach(function (s) { var e = $(s); if (e) e.remove(); }); }
@@ -194,10 +194,10 @@
     fecharTudo();
     var el = document.createElement("div"); el.id = "bMais";
     el.innerHTML = "<div>" + areasVisiveis().filter(function (a) { return AREAS_TEL.indexOf(a.id) < 0; }).map(function (a) { return "<button data-a='" + a.id + "'>" + ic(IC_AREA[a.id]) + nomeArea(a) + "</button>"; }).join("") +
-      "<button data-x='volta'>" + ic("s") + "Voltar à versão atual</button><button data-x='sair'>" + ic("s") + "Sair</button></div>";
+      "<button data-x='volta'>" + ic("s") + "Versão anterior</button><button data-x='sair'>" + ic("s") + "Sair</button></div>";
     el.onclick = function (e) {
       var b = e.target.closest("button"); fecharTudo(); if (!b) return;
-      if (b.dataset.x === "volta") location.href = "../";
+      if (b.dataset.x === "volta") location.href = "anterior/";
       else if (b.dataset.x === "sair") $("#bSair").click();
       else { var a = AREAS.find(function (x) { return x.id === b.dataset.a; }); ir(paginasDe(a)[0][0]); }
     };
