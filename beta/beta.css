@@ -138,7 +138,7 @@ body.b-rec #nexFrame{height:calc(100dvh - 146px)!important}
   #bNovoM{top:auto;bottom:calc(68px + env(safe-area-inset-bottom,0px));left:8px;right:8px;width:auto;position:fixed}
   #bNovoM button{padding:13px 12px}
   #bPesq{padding:0}#bPesq>div{border-radius:0;height:100%;max-height:none;width:100%;border:0}
-  #bBarra{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;position:fixed;left:0;right:0;bottom:0;z-index:55;background:var(--card);border-top:1px solid var(--bd);padding-bottom:env(safe-area-inset-bottom,0px)}
+  #bBarra{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;position:fixed;top:auto;left:0;right:0;bottom:0;z-index:55;background:var(--card);border-top:1px solid var(--bd);padding-bottom:env(safe-area-inset-bottom,0px)}
   #bBarra button{all:unset;display:grid;justify-items:center;gap:2px;padding:7px 0 8px;font:500 11px var(--f-body);color:var(--mut);cursor:pointer}
   #bBarra .ic{width:21px;height:21px}#bBarra button.on{color:var(--azul);font-weight:600}
   main .wrap{padding:12px 12px 92px}
