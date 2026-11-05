@@ -29,8 +29,8 @@
       var c = X.C[l.colaborador_id] || {}, g = X.G[l.colaborador_id] || {}, tur = 0, fixo = !!l.espelho;
       h += "<tr" + (c.curto === eu ? " class='eu'" : "") + "><td class='l' title='" + esc(c.nome || "") + "'>" + esc(c.curto || "") + (fixo && X.ed ? "<small>segue " + esc((X.C[l.espelho] || {}).curto || "") + "</small>" : "") + "</td>" + X.dias.map(function (d) {
         var v = g[d] || ""; if (v === "M" || v === "T" || v === "MT") tur++;
-        var mudou = X.ALT[l.colaborador_id + "|" + d] != null;
-        return "<td class='" + t(d).cl + (mudou ? " alt" : "") + "'" + (X.ed && !fixo ? " data-c='" + l.colaborador_id + "' data-d='" + d + "' tabindex='0' role='button' aria-label='" + esc(c.curto || "") + " dia " + d + "'" : "") + ">" + v + "</td>";
+        var mudou = X.ALT[l.colaborador_id + "|" + d] != null, fx = (X.FX[l.colaborador_id] || {})[d];
+        return "<td class='" + t(d).cl + (mudou ? " alt" : "") + (fx ? " fx" : "") + "'" + (fx ? " title='Turno fixado'" : "") + (X.ed && !fixo ? " data-c='" + l.colaborador_id + "' data-d='" + d + "' tabindex='0' role='button' aria-label='" + esc(c.curto || "") + " dia " + d + "'" : "") + ">" + v + "</td>";
       }).join("") + "<td class='n'>" + tur + "</td></tr>";
     });
     return h + "</tbody></table></div>";
@@ -48,9 +48,9 @@
     var box = $("#v-hor"), n = Object.keys(X.ALT).length, b = "<div class='bar'><button class='btn' id='horAnt' aria-label='Mês anterior'>‹</button><input type='month' id='horMes' value='" + X.M + "'><button class='btn' id='horSeg' aria-label='Mês seguinte'>›</button>" +
       "<span class='tag " + (X.estado === "simulacao" ? "t-at'>Simulação" : "t-ok'>Horário real") + "</span>";
     if (ADMIN && X.P.length) b += X.ed
-      ? "<button class='btn p' id='horGrava'" + (n ? "" : " disabled") + ">Gravar" + (n ? " " + n : "") + "</button><button class='btn' id='horFim'>Sair da edição</button>"
+      ? "<button class='btn az' id='horProj'>Projetar o resto</button><button class='btn p' id='horGrava'" + (n ? "" : " disabled") + ">Gravar" + (n ? " " + n : "") + "</button><button class='btn' id='horFim'>Sair da edição</button>"
       : "<button class='btn' id='horEd'>Editar</button><button class='btn' id='horEst'>" + (X.estado === "simulacao" ? "Passar a real" : "Passar a simulação") + "</button><button class='btn' id='horXls'>Excel Picaponto</button><button class='btn' id='horPdf'>PDF</button>";
-    box.innerHTML = b + "</div>" + (X.P.length ? celulas() + "<p class='rod'>M manhã · T tarde · MT turno M/T · FG folga · F férias · FD feriado. Fundo azul: fim de semana; creme: feriado." + (X.ed ? " Toca numa célula para mudar." : "") + "</p>" + regras()
+    box.innerHTML = b + "</div>" + (X.P.length ? celulas() + "<p class='rod'>M manhã · T tarde · MT turno M/T · FG folga · F férias · FD feriado. Fundo azul: fim de semana; creme: feriado." + (X.ed ? " Toca numa célula para fixar o turno (fica sublinhado). Projetar o resto preenche o que não está fixado." : "") + "</p>" + regras()
       : "<div class='vazio'>Ainda não há horário de " + nomeMes(X.M) + " nesta loja." + (ADMIN ? "<p><button class='btn p' id='horNovo'>Criar horário do mês</button></p>" : "") + "</div>");
     $("#horAnt").onclick = function () { sair(function () { abrir(addMes(X.M, -1)); }); };
     $("#horSeg").onclick = function () { sair(function () { abrir(addMes(X.M, 1)); }); };
@@ -58,7 +58,7 @@
     var e = function (id, f) { var x = $(id); if (x) x.onclick = f; };
     e("#horEd", function () { X.ed = true; pintar(); });
     e("#horFim", function () { sair(function () { abrir(X.M); }); });
-    e("#horGrava", gravar); e("#horEst", mudarEstado); e("#horXls", excel); e("#horPdf", pdf); e("#horNovo", criar);
+    e("#horProj", projetar); e("#horGrava", gravar); e("#horEst", mudarEstado); e("#horXls", excel); e("#horPdf", pdf); e("#horNovo", criar);
     var sc = $("#horSc"); if (sc) {
       var alvo = sc.querySelector("th.hj"); if (alvo && X.rolar) { sc.scrollLeft = Math.max(0, alvo.offsetLeft - 140); X.rolar = false; }
       if (X.ed) { sc.onclick = function (ev) { var t = ev.target.closest("td[data-c]"); if (t) escolher(t); }; sc.onkeydown = function (ev) { if (ev.key === "Enter" || ev.key === " ") { var t = ev.target.closest("td[data-c]"); if (t) { ev.preventDefault(); escolher(t); } } }; }
@@ -72,23 +72,71 @@
     var f = $("#horPop"); if (f) f.remove();
     var id = +td.dataset.c, d = +td.dataset.d, c = X.C[id] || {}, m = document.createElement("div"); m.id = "horPop";
     var cods = HOR.CODIGOS.filter(function (k) { return k !== "MT" || X.mt; });
-    m.innerHTML = "<b>" + esc(c.curto || "") + " · dia " + d + "</b><div>" + cods.map(function (k) { return "<button data-k='" + k + "'>" + k + "</button>"; }).join("") + "<button data-k=''>Limpar</button></div>";
+    var fx = (X.FX[id] || {})[d];
+    m.innerHTML = "<b>Fixar turno · " + esc(c.curto || "") + " · dia " + d + "</b><div>" + cods.map(function (k) { return "<button data-k='" + k + "'>" + k + "</button>"; }).join("") + "<button data-k=''>Limpar</button>" + (fx ? "<button data-s='1'>Soltar</button>" : "") + "</div>";
     m.onclick = function (e) {
-      var b = e.target.closest("button"); if (!b) return; m.remove(); definir(id, d, b.dataset.k);
+      var b = e.target.closest("button"); if (!b) return; m.remove();
+      if (b.dataset.s) definir(id, d, (X.G[id] || {})[d] || "", false); else definir(id, d, b.dataset.k, !!b.dataset.k);
     };
     $("#vApp").appendChild(m);
     var r = td.getBoundingClientRect(), w = m.offsetWidth, h = m.offsetHeight;
     m.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left - w / 2)) + "px"; m.style.top = (r.bottom + h + 8 < innerHeight ? r.bottom + 4 : Math.max(8, r.top - h - 4)) + "px";
     m.querySelector("button").focus();
   }
-  function definir(id, d, k) {
-    var um = function (i) {
-      var g = X.G[i] = X.G[i] || {}, ori = (X.ORI[i] || {})[d] || "", ch = i + "|" + d;
-      if (k) g[d] = k; else delete g[d];
-      if (k === ori) delete X.ALT[ch]; else X.ALT[ch] = k;
-    };
-    um(id); X.P.forEach(function (l) { if (l.espelho === id) um(l.colaborador_id); });
+  function pôr(i, d, k, fx) {
+    var g = X.G[i] = X.G[i] || {}, F = X.FX[i] = X.FX[i] || {}, ori = (X.ORI[i] || {})[d] || "", oriF = !!(X.FXO[i] || {})[d], ch = i + "|" + d;
+    if (k) g[d] = k; else delete g[d];
+    if (fx) F[d] = true; else delete F[d];
+    if (k === ori && !!fx === oriF) delete X.ALT[ch]; else X.ALT[ch] = k;
+  }
+  function definir(id, d, k, fx) {
+    pôr(id, d, k, fx); X.P.forEach(function (l) { if (l.espelho === id) pôr(l.colaborador_id, d, k, fx); });
     pintar();
+  }
+  /* Projetar o resto: fica o que está fixado, as férias e os dias que já passaram; o resto do mês sai das regras */
+  var HIGHS = "https://cdn.jsdelivr.net/npm/highs@1.8.0/build/";
+  function calcular(lp) {
+    var src = "importScripts('" + HIGHS + "highs.js');onmessage=async function(e){try{var h=await Module({locateFile:function(f){return '" + HIGHS + "'+f}});postMessage({ok:h.solve(e.data,{time_limit:75,mip_rel_gap:0.03})})}catch(x){postMessage({erro:String(x)})}}";
+    return new Promise(function (ok, ko) {
+      var w = new Worker(URL.createObjectURL(new Blob([src], {type: "text/javascript"}))), t = setTimeout(function () { w.terminate(); ko(new Error("O cálculo demorou demasiado.")); }, 120000);
+      w.onmessage = function (e) { clearTimeout(t); w.terminate(); if (e.data.erro) ko(new Error(e.data.erro)); else ok(e.data.ok); };
+      w.onerror = function (e) { clearTimeout(t); w.terminate(); ko(new Error(e.message || "Não consegui abrir o motor de cálculo.")); };
+      w.postMessage(lp);
+    });
+  }
+  async function dadosProjecao() {
+    var ano = +X.M.slice(0, 4), mes = +X.M.slice(5), hj = hoje(), base = HOR.meta(ano, mes, X.dias.length, X.fer);
+    var ES = X.P.filter(function (l) { return l.escala && !l.espelho; });
+    var h = await sb.from("msb_horario_dias").select("colaborador_id,codigo").eq("estacao", EST).gte("dia", addMes(X.M, -6) + "-01").lt("dia", X.M + "-01").in("codigo", ["M", "T", "MT"]).limit(3000);
+    if (h.error) throw h.error;
+    var AC = {}; h.data.forEach(function (x) { var a = AC[x.colaborador_id] = AC[x.colaborador_id] || {M: 0, T: 0}; if (x.codigo !== "T") a.M++; if (x.codigo !== "M") a.T++; });
+    var minM = Infinity, minT = Infinity; ES.forEach(function (l) { var a = AC[l.colaborador_id] || {M: 0, T: 0}; minM = Math.min(minM, a.M); minT = Math.min(minT, a.T); });
+    var P = ES.map(function (l) {
+      var g = X.G[l.colaborador_id] || {}, fx = X.FX[l.colaborador_id] || {}, fixos = {}, fu = 0, a = AC[l.colaborador_id] || {M: 0, T: 0};
+      X.dias.forEach(function (d) {
+        var c = g[d], iso = X.M + "-" + String(d).padStart(2, "0"); if (!c) return;
+        if (fx[d] || c === "F" || c === "FD" || iso < hj) fixos[d] = c;
+        var w = new Date(iso + "T12:00:00").getDay(); if (c === "F" && w > 0 && w < 6 && !X.fer[iso]) fu++;
+      });
+      return {id: l.colaborador_id, fixos: fixos, ant: (X.ANT[l.colaborador_id] || []).slice(-6).map(function (x) { return x[1]; }), fdsAnt: X.FDS[l.colaborador_id] || "", meta: base - fu, off: {M: a.M - minM, T: a.T - minT}, reforco: l.codigo === X.reforco};
+    });
+    var oM = {}, oT = {}, fora = 0;
+    X.P.forEach(function (l) { if (l.escala || l.espelho) return; X.dias.forEach(function (d) { var c = (X.G[l.colaborador_id] || {})[d]; if (c === "M" || c === "MT") { oM[d] = (oM[d] || 0) + 1; fora++; } if (c === "T" || c === "MT") { oT[d] = (oT[d] || 0) + 1; fora++; } }); });
+    var sem = X.mt && !X.semMT ? HOR.semanasMT(ano, mes, X.dias.length, X.fer) : [];
+    HORG.alvos(P, 2 * X.dias.length + sem.length - fora);
+    return {P: P, op: {y: ano, m: mes, fer: X.fer, mtSemanas: sem, outrosM: oM, outrosT: oT}};
+  }
+  async function projetar() {
+    var b = $("#horProj"), ES = X.P.filter(function (l) { return l.escala && !l.espelho; });
+    if (!ES.length) return msbAviso("Erro: não há pessoas na escala deste mês.");
+    b.disabled = true; b.textContent = "A projetar…";
+    try {
+      var D = await dadosProjecao(), r = await calcular(HORG.modelo(D.P, D.op));
+      if (!r || !r.Columns || /infeasible/i.test(r.Status || "")) throw new Error("Não há solução com estes turnos fixados. Solta algum turno e tenta outra vez.");
+      var S = HORG.ler(D.P, D.op, r.Columns);
+      D.P.forEach(function (p, i) { X.dias.forEach(function (d) { if (p.fixos[d]) return; var fx = false; pôr(p.id, d, S[i][d], fx); X.P.forEach(function (l) { if (l.espelho === p.id) pôr(l.colaborador_id, d, S[i][d], fx); }); }); });
+      pintar(); msbAviso("Proposta pronta. Ajusta o que quiseres e grava.");
+    } catch (e) { pintar(); msbAviso("Erro: " + falhou(e)); }
   }
   async function gravar() {
     var n = X.R.erros.length;
@@ -96,30 +144,30 @@
     var est = EST, P = [], D = [];
     Object.keys(X.ALT).forEach(function (k) {
       var a = k.split("|"), dia = X.M + "-" + String(a[1]).padStart(2, "0");
-      if (X.ALT[k]) P.push({estacao: est, dia: dia, colaborador_id: +a[0], codigo: X.ALT[k], atualizado_em: new Date().toISOString(), atualizado_por: EU && EU.id}); else D.push({dia: dia, c: +a[0]});
+      if (X.ALT[k]) P.push({estacao: est, dia: dia, colaborador_id: +a[0], codigo: X.ALT[k], fixo: !!(X.FX[a[0]] || {})[a[1]], atualizado_em: new Date().toISOString(), atualizado_por: EU && EU.id}); else D.push({dia: dia, c: +a[0]});
     });
     try {
       if (P.length) { var r = await sb.from("msb_horario_dias").upsert(P, {onConflict: "estacao,dia,colaborador_id"}); if (r.error) throw r.error; }
       for (var i = 0; i < D.length; i++) { var q = await sb.from("msb_horario_dias").delete().eq("estacao", est).eq("dia", D[i].dia).eq("colaborador_id", D[i].c); if (q.error) throw q.error; }
       await sb.from("msb_horario_meses").update({atualizado_em: new Date().toISOString(), origem: "Editado na app"}).eq("estacao", est).eq("mes", X.M);
-      status(true, "Horário gravado ✓"); X.ALT = {}; abrir(X.M);
-    } catch (e) { status(false, "⚠ " + falhou(e)); }
+      msbAviso("Horário gravado"); X.ALT = {}; abrir(X.M);
+    } catch (e) { msbAviso("Erro: " + falhou(e)); }
   }
   async function mudarEstado() {
     var novo = X.estado === "simulacao" ? "real" : "simulacao";
     if (!await msbConfirma(novo === "real" ? "Passar " + nomeMes(X.M) + " a horário real?" : "Passar " + nomeMes(X.M) + " a simulação?", "Confirmar")) return;
     var r = await sb.from("msb_horario_meses").update({estado: novo}).eq("estacao", EST).eq("mes", X.M);
-    if (r.error) return status(false, "⚠ " + falhou(r.error)); abrir(X.M);
+    if (r.error) return msbAviso("Erro: " + falhou(r.error)); abrir(X.M);
   }
   async function criar() {
     var r = await sb.from("msb_horario_meses").upsert({estacao: EST, mes: X.M, estado: "simulacao", origem: "Criado na app"}, {onConflict: "estacao,mes"});
-    if (r.error) return status(false, "⚠ " + falhou(r.error)); X.criado = true; abrir(X.M);
+    if (r.error) return msbAviso("Erro: " + falhou(r.error)); X.criado = true; abrir(X.M);
   }
   /* Excel com a estrutura do template do Picaponto: título em C1, dias da semana na linha 2, Código | Colaborador | dias na linha 3, legenda em AI:AJ */
   async function excel() {
     var inval = [], val = {}; X.leg.forEach(function (l) { val[l[0]] = 1; });
     X.P.forEach(function (l) { X.dias.forEach(function (d) { var v = (X.G[l.colaborador_id] || {})[d]; if (v && !val[v]) inval.push((X.C[l.colaborador_id] || {}).curto + " dia " + d + ": " + v); }); if (!l.nome_picaponto) inval.push((X.C[l.colaborador_id] || {}).curto + ": sem nome do Picaponto"); });
-    if (inval.length) return status(false, "⚠ O Picaponto não aceitaria: " + inval.slice(0, 4).join("; "));
+    if (inval.length) return msbAviso("Erro: o Picaponto não aceitaria " + inval.slice(0, 4).join("; "));
     var n = X.R.erros.length; if (n && !await msbConfirma("O horário tem " + n + " erro(s) nas regras. Exportar na mesma?", "Exportar na mesma")) return;
     await carregarXlsxMSB();
     var AI = 34, A = [], lin = function () { return new Array(AI + 2).fill(null); };
@@ -139,7 +187,7 @@
     XLSX.utils.book_append_sheet(wb, ws, nomeMes(X.M));
     var bin = XLSX.write(wb, {bookType: "xlsx", type: "array"});
     descarregar(new Blob([bin], {type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}), ficheiro("xlsx"));
-    status(true, "Excel pronto para importar no Picaponto ✓");
+    msbAviso("Excel pronto para importar no Picaponto");
   }
   /* A4 deitada, uma página, sem a coluna Código */
   async function pdf() {
@@ -171,7 +219,7 @@
     try {
       var ini = addDia(M + "-01", -14), fim = addMes(M, 1) + "-01";
       var R = await Promise.all([
-        sb.from("msb_horario_dias").select("dia,colaborador_id,codigo").eq("estacao", est).gte("dia", ini).lt("dia", fim).limit(2000),
+        sb.from("msb_horario_dias").select("dia,colaborador_id,codigo,fixo").eq("estacao", est).gte("dia", ini).lt("dia", fim).limit(2000),
         sb.from("msb_colab_lojas").select("colaborador_id,codigo,ordem,nome_picaponto,escala,espelho").eq("estacao", est).order("ordem"),
         sb.from("msb_colaboradores").select("id,curto,nome,ativo"),
         sb.from("msb_horario_meses").select("estado,sem_mt").eq("estacao", est).eq("mes", M).maybeSingle(),
@@ -182,16 +230,16 @@
       var ano = +M.slice(0, 4), n = new Date(ano, +M.slice(5), 0).getDate(), cfg = (R[4].data && R[4].data.horario) || {};
       var C = {}; R[2].data.forEach(function (c) { C[c.id] = c; });
       var dias = []; for (var d = 1; d <= n; d++) dias.push(d);
-      var G = {}, ORI = {}, ANT = {};
+      var G = {}, ORI = {}, ANT = {}, FX = {}, FXO = {};
       R[0].data.forEach(function (x) {
         var i = x.colaborador_id;
-        if (x.dia.slice(0, 7) === M) { (G[i] = G[i] || {})[+x.dia.slice(8)] = x.codigo; (ORI[i] = ORI[i] || {})[+x.dia.slice(8)] = x.codigo; }
+        if (x.dia.slice(0, 7) === M) { (G[i] = G[i] || {})[+x.dia.slice(8)] = x.codigo; (ORI[i] = ORI[i] || {})[+x.dia.slice(8)] = x.codigo; if (x.fixo) { (FX[i] = FX[i] || {})[+x.dia.slice(8)] = true; (FXO[i] = FXO[i] || {})[+x.dia.slice(8)] = true; } }
         else (ANT[i] = ANT[i] || []).push([x.dia, x.codigo]);
       });
       Object.keys(ANT).forEach(function (i) { ANT[i].sort(function (a, b) { return a[0] < b[0] ? -1 : 1; }); });
       var FDS = {}; Object.keys(ANT).forEach(function (i) { ANT[i].forEach(function (a) { var w = new Date(a[0] + "T12:00:00").getDay(); if (w === 6 || w === 0) FDS[i] = a[1]; }); });
       var existe = !!R[3].data, P = existe ? R[1].data.filter(function (l) { return G[l.colaborador_id] || (C[l.colaborador_id] || {}).ativo; }) : [];
-      X = {M: M, dias: dias, fer: feriados(ano), G: G, ORI: ORI, ANT: ANT, FDS: FDS, C: C, P: P, ALT: {}, ed: !!(X && X.criado), rolar: true, estado: existe ? R[3].data.estado : "simulacao", semMT: existe && R[3].data.sem_mt, mt: !!cfg.mt, leg: cfg.legenda || []};
+      X = {M: M, dias: dias, fer: feriados(ano), G: G, ORI: ORI, ANT: ANT, FX: FX, FXO: FXO, reforco: cfg.reforco, FDS: FDS, C: C, P: P, ALT: {}, ed: !!(X && X.criado), rolar: true, estado: existe ? R[3].data.estado : "simulacao", semMT: existe && R[3].data.sem_mt, mt: !!cfg.mt, leg: cfg.legenda || []};
       pintar();
     } catch (e) { box.innerHTML = "<div class='aviso'><p>" + esc(falhou(e)) + "</p></div>"; }
   }
