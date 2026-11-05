@@ -17,7 +17,7 @@ function aviParado(L) {
   return !!c && (Date.now() - new Date(c.criado).getTime()) / 36e5 > AVI_HORAS ? c : null;
 }
 /* ---- preços da ENSE, de todas as lojas: aprovar aqui e ver o histórico ---- */
-var AVI_PRECOS = [], AVI_ESPERA = null;
+var AVI_PRECOS = [], AVI_ESPERA = null, AVI_PD = [];
 async function aviTodosPrecos() {
   var r = await sb.from("msb_precos").select("estacao,dia,hora,produtos,estado,comunicado_em,comunicado_por,aprovado_em,aprovado_por,ense_tentado_em,ense_erro").order("dia", {ascending: false}).limit(60);
   if (r.error) throw r.error;
@@ -76,10 +76,29 @@ function aviPedidos(L) {
     var vi = p.visto_em ? "" : "<div style='margin-top:8px'><button class='btn' data-pv='" + p.id + "'>✔ Visto</button></div>";
     if (p.estado === "erro") return "<div class='card' style='padding:12px 14px'>❌ " + t + "<div class='bad'>" + esc(p.erro) + "</div>" + vi + "</div>";
     var L2 = p.linhas || [], q = L2.reduce(function (s, x) { return s + x[2]; }, 0), v = L2.reduce(function (s, x) { return s + x[3]; }, 0);
-    return "<details class='card' style='padding:12px 14px'><summary>✅ " + t + "<div class='mut'>" + L2.length + " artigos · " + fmt(q * 100).replace(",00", "") + " un. · " + fmt(v * 100) + " €</div></summary>" +
+    var usar = !p.artigo && (p.pasta === "TABACO" || p.pasta === "TODAS") && L2.length ? "<div class='bar' style='margin-top:8px'><button class='btn p' data-us='" + p.id + "|tabaco'>🛒 Encomenda Adelaide</button><button class='btn az' data-us='" + p.id + "|aquecido'>🛒 Encomenda Logista</button></div>" : "";
+    return "<details class='card' style='padding:12px 14px'><summary>✅ " + t + "<div class='mut'>" + L2.length + " artigos · " + fmt(q * 100).replace(",00", "") + " un. · " + fmt(v * 100) + " €</div>" + usar + vi + "</summary>" +
       "<div class='sc' style='margin-top:6px'><table><thead><tr><th class='l'>Artigo</th><th>Qtd</th><th>Montante €</th></tr></thead><tbody>" +
-      L2.map(function (x) { return "<tr><td class='l'>" + esc(x[1]) + "</td><td class='n'>" + fmt(x[2] * 100).replace(",00", "") + "</td><td class='n'>" + fmt(x[3] * 100) + "</td></tr>"; }).join("") + "</tbody></table></div>" + vi + "</details>";
+      L2.map(function (x) { return "<tr><td class='l'>" + esc(x[1]) + "</td><td class='n'>" + fmt(x[2] * 100).replace(",00", "") + "</td><td class='n'>" + fmt(x[3] * 100) + "</td></tr>"; }).join("") + "</tbody></table></div></details>";
   }).join("");
+}
+/* Usa as vendas lidas no CBOS na Nova encomenda, pelo mesmo caminho do relatório em Excel: mesmas regras, confirmação e aprovação. */
+async function aviUsar(id, sup) {
+  var p = AVI_PD.find(function (x) { return x.id === id; }), e = (ESTS || []).find(function (x) { return x.id === p.estacao; });
+  if (p.estacao !== EST) return status(false, "⚠ Este pedido é de " + aviLoja(p.estacao) + ". Mude de loja no cabeçalho e carregue de novo.");
+  if (!e || !e.posto_repsol) return status(false, "⚠ A loja não tem o posto Repsol configurado.");
+  var dias = [], d = new Date(p.de + "T12:00:00"), fim = new Date(p.ate + "T12:00:00");
+  for (; d <= fim; d.setDate(d.getDate() + 1)) dias.push(dmy(d.toISOString().slice(0, 10)) + " - Quantidade");
+  ir("nova");
+  try {
+    var w = await esperarNex(function (x) { return typeof x.salesChange === "function" && typeof x.carregarXlsx === "function"; });
+    await w.carregarXlsx();
+    var cab = ["Código", "Artigos"].concat(dias, ["Total quantidade", "Total Montante"]), L = [["Posto", e.posto_repsol + " - " + e.name], cab];
+    (p.linhas || []).forEach(function (l) { L.push([l[0], l[1]].concat(dias.map(function () { return 0; }), [l[2], l[3]])); });
+    var wb = w.XLSX.utils.book_new(); w.XLSX.utils.book_append_sheet(wb, w.XLSX.utils.aoa_to_sheet(L), "Vendas");
+    var f = new w.File([w.XLSX.write(wb, {type: "array", bookType: "xlsx"})], "vendas_pedido_" + id + ".xlsx");
+    return w.salesChange({target: {files: [f], value: "", dataset: {sup: sup}}});
+  } catch (x) { status(false, "⚠ " + (x.message || x)); }
 }
 async function aviPedir() {
   var de = $("#pvDe").value, ate = $("#pvAte").value;
@@ -128,7 +147,7 @@ async function carregarAvisos() {
         (novo ? "<div style='margin-top:8px'><button class='btn' data-avi='" + a.id + "'>✔ Visto</button></div>" : "") + "</div>";
     };
     var pd = await sb.from("msb_pedidos").select("*").order("criado", {ascending: false}).limit(30);
-    var PD = pd.data || [], feito = function (x) { return x.estado === "feito" || x.estado === "erro"; };
+    var PD = AVI_PD = pd.data || [], feito = function (x) { return x.estado === "feito" || x.estado === "erro"; };
     var pAbertos = PD.filter(function (x) { return !x.visto_em || !feito(x); }), pArq = PD.filter(function (x) { return x.visto_em && feito(x); });
     var arq = L.filter(function (a) { return a.lido_em || a.nivel === "info"; });
     h += porLer.map(cartaoAviso).join("");
@@ -142,6 +161,7 @@ async function carregarAvisos() {
     $("#pvPedir").onclick = aviPedir;
     $$("#aviCorpo [data-aprova]").forEach(function (b) { b.onclick = function () { var k = b.dataset.aprova.split("|"); aviAprovar(k[0], k[1]); }; });
     $$("#aviCorpo [data-avi]").forEach(function (b) { b.onclick = function () { aviVisto([Number(b.dataset.avi)]); }; });
+    $$("#aviCorpo [data-us]").forEach(function (b) { b.onclick = function (ev) { ev.preventDefault(); var k = b.dataset.us.split("|"); aviUsar(Number(k[0]), k[1]); }; });
     $$("#aviCorpo [data-pv]").forEach(function (b) { b.onclick = async function (ev) { ev.preventDefault(); var r = await sb.from("msb_pedidos").update({visto_em: new Date().toISOString()}).eq("id", Number(b.dataset.pv)); if (r.error) return status(false, "⚠ " + falhou(r.error)); carregarAvisos(); }; });
     var t = $("#aviTudo"); if (t) t.onclick = function () { aviVisto(porLer.map(function (a) { return a.id; })); };
   } catch (e) { box.innerHTML = "<div class='bad'>" + esc(falhou(e)) + "</div>"; }
