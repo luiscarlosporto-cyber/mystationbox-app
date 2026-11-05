@@ -16,7 +16,7 @@
   function descarregar(blob, nome) { var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = nome; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000); }
 
   function linhas() {   // para as regras: uma linha por pessoa, com o que está no ecrã
-    return X.P.map(function (l) {
+    return X.P.filter(function (l) { return !l.espelho; }).map(function (l) {   // quem segue outra pessoa não conta para a cobertura
       var g = X.G[l.colaborador_id] || {}, c = X.C[l.colaborador_id] || {}, ant = X.ANT[l.colaborador_id] || [];
       return {nome: c.curto || "", escala: l.escala, dias: X.dias.map(function (d) { return g[d] || ""; }), ant: ant.map(function (a) { return a[1]; }), fdsAnt: X.FDS[l.colaborador_id] || ""};
     });
