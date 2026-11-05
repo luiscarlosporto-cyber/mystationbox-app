@@ -182,18 +182,18 @@ async function carregarLucro() {
     h += "<div class='card' style='padding:14px;display:grid;gap:8px'><h2 style='margin:0'>🛍️ Loja</h2><div class='sc'><table><thead><tr><th class='l'>Categoria</th><th>Vendas sem IVA €</th><th>Margem</th><th>Margem €</th></tr></thead><tbody>" + lj +
       "</tbody><tfoot><tr><td class='l'>Total</td><td class='n'>" + fmt(Object.keys(fams).reduce(function (s, c) { return s + fams[c].base; }, 0)) + "</td><td></td><td class='n'><b>" + fmt(Math.round(mL)) + "</b></td></tr></tfoot></table></div></div>";
     /* resultado e projeção */
-    var custos = (C.reduce(function (s, c) { return s + c.valor_c; }, 0) + (TMR ? TMR.myrepsol_c : 0)) / 100;
+    var CM = await custosRealDoMes(C, m), custos = (CM.total_c + (TMR ? TMR.myrepsol_c : 0)) / 100;   // a despesa confirmada substitui o custo fixo da mesma categoria
     var diasMes = new Date(+m.slice(0, 4), +m.slice(5, 7), 0).getDate(), dias = V.de && V.ate ? diasEntre(V.de, V.ate) : diasMes, fator = dias < diasMes ? diasMes / dias : 1;
     var c2 = function (v) { return fmt(Math.round(v * 100)); };
     var res = totM - custos * Math.min(1, dias / diasMes), proj = totM * fator - custos;
     h = "<section class='totem'><div class='t'>Lucro estimado · " + esc(new Date(m + "-15").toLocaleDateString("pt-PT", {month: "long", year: "numeric"})) + " · " + dmy(V.de) + " a " + dmy(V.ate) + "</div>" +
       "<div><div class='k'>Margem combustível</div><div class='v'>" + c2(mC) + "<small>€</small></div></div>" +
       "<div><div class='k'>Margem loja</div><div class='v'>" + c2(mL / 100) + "<small>€</small></div></div>" +
-      "<div><div class='k'>Custos fixos" + (TMR ? " e My Repsol" : "") + "</div><div class='v'>" + c2(custos) + "<small>€/mês</small></div></div>" +
+      "<div><div class='k'>" + (CM.reais ? "Custos do mês" : "Custos fixos") + (TMR ? " e My Repsol" : "") + "</div><div class='v'>" + c2(custos) + "<small>€/mês</small></div></div>" +
       "<div><div class='k'>" + (fator > 1 ? "Resultado até " + dmy(V.ate).slice(0, 5) : "Resultado do mês") + "</div><div class='v' style='color:" + (res >= 0 ? "#7CE3A0" : "#FF9B85") + "'>" + c2(res) + "<small>€</small></div></div>" +
       (fator > 1 ? "<div><div class='k'>Projeção do mês (" + diasMes + " dias)</div><div class='v' style='color:" + (proj >= 0 ? "#7CE3A0" : "#FF9B85") + "'>" + c2(proj) + "<small>€</small></div></div>" : "") +
       "</section>" + (falta.length ? "<div class='aviso'><p>⚠ Margens por definir (não entram na conta): " + esc(falta.join(", ")) + ". <a href='#' data-ir='mrg'>Definir em Gestão → Margens e custos</a>.</p></div>" : "") +
-      (TMR ? "<p class='mut' style='margin:0;font-size:13px'>Taxa My Repsol: " + fmt(TMR.myrepsol_c) + " € da fatura" + (TMR.fatura ? " " + esc(TMR.fatura) : "") + (txEstimada ? ", em vez da estimativa em €/m³." : ".") + "</p>" : "") + (!C.length && !TMR ? "<div class='aviso'><p>ℹ️ Sem custos fixos: o valor acima é só a margem bruta. <a href='#' data-ir='mrg'>Acrescentar custos</a>.</p></div>" : "") + h +
+      (TMR ? "<p class='mut' style='margin:0;font-size:13px'>Taxa My Repsol: " + fmt(TMR.myrepsol_c) + " € da fatura" + (TMR.fatura ? " " + esc(TMR.fatura) : "") + (txEstimada ? ", em vez da estimativa em €/m³." : ".") + "</p>" : "") + (CM.reais ? "<p class='mut' style='font-size:12px;margin:0'>Custos sem IVA: " + CM.reais + " categorias com valor real (Despesas) e as restantes com o custo fixo.</p>" : "") + (!C.length && !TMR && !CM.reais ? "<div class='aviso'><p>ℹ️ Sem custos fixos: o valor acima é só a margem bruta. <a href='#' data-ir='mrg'>Acrescentar custos</a>.</p></div>" : "") + h +
       "<p class='mut' style='font-size:12px;margin:0'>Estimativa: margens por categoria definidas em Gestão; sem IVA. Fonte das vendas: " + esc(V.fonte || "relatório de vendas") + (fator > 1 ? ". Projeção = margem até agora × " + diasMes + "/" + dias + " dias − custos fixos do mês." : ".") + "</p>";
     box.innerHTML = h;
     $$("#lucCorpo [data-ir]").forEach(function (a) { a.onclick = function (ev) { ev.preventDefault(); ir(a.dataset.ir); }; });

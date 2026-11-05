@@ -235,6 +235,8 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
     <div class="bar"><button class="btn" id="kAnt">‹</button><input type="month" id="kMes"><button class="btn" id="kSeg">›</button></div>
     <div id="kmsCorpo" style="display:grid;gap:12px"></div>
   </div>
+  <!-- TESOURARIA: DESPESAS -->
+  <div id="v-dsp" class="v" hidden><div id="dspCorpo" style="display:grid;gap:12px"></div></div>
   <!-- RELATÓRIOS: ENSE MENSAL -->
   <div id="v-ense" class="v" hidden>
     <div class="bar"><button class="btn" id="eAnt">‹</button><input type="month" id="eMes"><button class="btn" id="eSeg">›</button><button class="btn p" id="bEnsePdf">📄 Gerar PDF para a ENSE</button></div>
@@ -495,6 +497,8 @@ entrar().catch(function(e){$("#vLogin").hidden=false;$("#lErro").textContent=fal
 <script src="avisos.js"></script>
 <script src="faturas_ler.js"></script>
 <script src="faturas.js"></script>
+<script src="despesas_regras.js"></script>
+<script src="despesas.js"></script>
 <script src="beta/beta.js?v=773696ca"></script>
 <script src="beta/painel.js?v=a414a064"></script>
 <script src="beta/paginas.js?v=cf170f45"></script>
