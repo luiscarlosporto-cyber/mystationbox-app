@@ -3,15 +3,13 @@
  * que continua a ser o mesmo código (stock-tabaco-central), embutido sem cabeçalho nem menu próprios: aqui
  * escolhe-se o separador e mostram-se só os cartões dessa página. Nada foi apagado: tudo mudou de sítio. */
 "use strict";
-var AREAS = [
-  {id: "ini", n: "🏠 Início", p: [["ini", "Resumo"]]},
-  {id: "cx", n: "📝 Caixa", p: [["reg", "Registo do dia"], ["sai", "Saídas de caixa"], ["his", "Histórico"]]},
-  {id: "ven", n: "📈 Vendas", adm: 1, p: [["ven", "Vendas e margens"], ["va", "Relatório de vendas (Excel)"], ["maq", "Máquina de tabaco"]]},
-  {id: "com", n: "🛒 Compras", adm: 1, p: [["enc", "Por aprovar"], ["nova", "Nova encomenda"], ["comh", "Encomendas feitas"], ["ent", "Entrada de mercadoria"], ["comb", "Entrada de combustível"]]},
-  {id: "stk", n: "📦 Stock", p: [["contar", "Contar"], ["ler", "Ler código"], ["stock", "Stock atual"], ["inv", "Inventário"], ["mov", "Movimentos"]]},
-  {id: "conf", n: "🏦 Conferências", adm: 1, p: [["rep", "Repsol e Multibanco"], ["tms", "Fecho mensal TMS"], ["pre", "Preços ENSE"]]},
-  {id: "rel", n: "📊 Relatórios", adm: 1, p: [["luc", "Lucro"], ["mes", "Mês"], ["fun", "Por funcionário"], ["ense", "ENSE mensal"]]},
-  {id: "ges", n: "⚙️ Gestão", adm: 1, p: [["avi", "OCTAN AI"], ["mrg", "Margens e custos"], ["kms", "Mapa de kms do gerente"], ["eq", "Equipa e acessos"], ["prod", "Produtos e códigos"], ["cfg", "Configuração do stock"]]}
+var AREAS = [   // ordem aprovada a 05/11/2026: decisão, operação e controlo, obrigações e regras. Terceiro campo: g = subgrupo, adm = só administrador.
+  {id: "ini", n: "🏠 Painel", p: [["ini", "Painel de Gestão"], ["avi", "OCTAN AI", {adm: 1}]]},
+  {id: "des", n: "📊 Desempenho", adm: 1, p: [["luc", "Lucro", {g: "Resultados"}], ["mes", "Resultado mensal", {g: "Resultados"}], ["ven", "Vendas e margens", {g: "Vendas"}], ["va", "Relatório de vendas", {g: "Vendas"}], ["maq", "Máquina de tabaco", {g: "Vendas"}], ["fun", "Por funcionário", {g: "Análise"}]]},
+  {id: "tes", n: "💶 Tesouraria", p: [["reg", "Registo diário", {g: "Caixa"}], ["sai", "Saídas de caixa", {g: "Caixa"}], ["his", "Histórico", {g: "Caixa"}], ["rep", "Repsol e Multibanco", {g: "Conferências", adm: 1}], ["tms", "Fecho mensal TMS", {g: "Conferências", adm: 1}]]},
+  {id: "cst", n: "🛒 Compras e Stocks", c: "Compras", p: [["enc", "Por aprovar", {g: "Compras", adm: 1}], ["nova", "Nova encomenda", {g: "Compras", adm: 1}], ["comh", "Encomendas feitas", {g: "Compras", adm: 1}], ["ent", "Entrada de mercadoria", {g: "Receções", adm: 1}], ["comb", "Entrada de combustível", {g: "Receções", adm: 1}], ["contar", "Contar", {g: "Stock"}], ["ler", "Ler código", {g: "Stock"}], ["stock", "Stock atual", {g: "Stock"}], ["inv", "Inventário", {g: "Stock"}], ["mov", "Movimentos", {g: "Stock"}]]},
+  {id: "con", n: "📋 Conformidade", adm: 1, p: [["pre", "Preços ENSE", {g: "ENSE"}], ["ense", "Reporte mensal", {g: "ENSE"}], ["kms", "Mapa de kms do gerente", {g: "Contabilidade"}]]},
+  {id: "adm", n: "⚙️ Administração", adm: 1, p: [["eq", "Equipa e acessos", {g: "Pessoas"}], ["mrg", "Margens e custos", {g: "Regras"}], ["prod", "Produtos e códigos", {g: "Regras"}], ["cfg", "Configuração do stock", {g: "Regras"}]]}
 ];
 /* páginas do módulo de stock: separador e cartões (pelo título, ou "#id" do cartão) a mostrar ou esconder.
    O cartão da encomenda muda de título ("Encomenda LOGISTA · Penafiel · por validar"), por isso vai pelo id. */
@@ -28,25 +26,27 @@ var NEXP = {
 var VISTA_DA = {avi: "avi", ini: "ini", reg: "reg", sai: "sai", his: "his", ven: "tab", comh: "tab", mov: "tab", rep: "rep", tms: "tms", mes: "mes", fun: "fun", eq: "ges", luc: "luc", mrg: "mrg", comb: "comb", ense: "ense", va: "va", kms: "kms", pre: "pre"};
 var PAGINA = "ini";
 function areasVisiveis() { return AREAS.filter(function (a) { return ADMIN || !a.adm; }); }
+function paginasDe(a) { return a.p.filter(function (x) { return ADMIN || !(x[2] && x[2].adm); }); }
 function areaDe(pg) { return AREAS.find(function (a) { return a.p.some(function (x) { return x[0] === pg; }); }); }
 
 function montarMenu() {
   if (!$("#equipa").parentElement.matches("#v-ges")) $("#v-ges").appendChild($("#equipa"));
   var vis = areasVisiveis(), mais = vis.some(function (a) { return AREAS_TEL.indexOf(a.id) < 0; });
-  $("#areas").innerHTML = vis.map(function (a) { var i = a.n.indexOf(" "); return "<button data-a='" + a.id + "'" + (AREAS_TEL.indexOf(a.id) < 0 ? " class='extra'" : "") + "><i>" + a.n.slice(0, i) + "</i><span>" + a.n.slice(i + 1) + "</span></button>"; }).join("") +
+  $("#areas").innerHTML = vis.map(function (a) { var i = a.n.indexOf(" "); return "<button data-a='" + a.id + "'" + (AREAS_TEL.indexOf(a.id) < 0 ? " class='extra'" : "") + "><i>" + a.n.slice(0, i) + "</i><span>" + (a.c ? "<em class='lg'>" + a.n.slice(i + 1) + "</em><em class='cu'>" + a.c + "</em>" : a.n.slice(i + 1)) + "</span></button>"; }).join("") +
     (mais ? "<button data-a='mais' class='so-tel'><i>☰</i><span>Mais</span></button>" : "");
-  $$("#areas button").forEach(function (b) { b.onclick = function () { if (b.dataset.a === "mais") return abrirMais(); $("#maisMenu").hidden = true; var a = AREAS.find(function (x) { return x.id === b.dataset.a; }); ir(a.p[0][0]); }; });
+  $$("#areas button").forEach(function (b) { b.onclick = function () { if (b.dataset.a === "mais") return abrirMais(); $("#maisMenu").hidden = true; var a = AREAS.find(function (x) { return x.id === b.dataset.a; }); ir(paginasDe(a)[0][0]); }; });
   ir("ini");
 }
 function marcar(pg) {
   PAGINA = pg; var a = areaDe(pg) || AREAS[0];
   $$("#areas button").forEach(function (b) { b.classList.toggle("on", b.dataset.a === a.id || (b.dataset.a === "mais" && AREAS_TEL.indexOf(a.id) < 0)); });
-  $("#subnav").innerHTML = a.p.length > 1 ? a.p.map(function (x) { return "<button data-p='" + x[0] + "'" + (x[0] === pg ? " class='on'" : "") + ">" + x[1] + "</button>"; }).join("") : "";
+  var ps = paginasDe(a), gr = "";
+  $("#subnav").innerHTML = ps.length > 1 ? ps.map(function (x) { var g = (x[2] && x[2].g) || "", t = g && g !== gr ? "<span class='subg'>" + g + "</span>" : ""; gr = g || gr; return t + "<button data-p='" + x[0] + "'" + (x[0] === pg ? " class='on'" : "") + ">" + x[1] + "</button>"; }).join("") : "";
   $$("#subnav button").forEach(function (b) { b.onclick = function () { ir(b.dataset.p); }; });
 }
 /* ir para uma página (também chamado pelo módulo de stock, ex.: depois de criar uma encomenda) */
 function ir(pg) {
-  var a = areaDe(pg); if (!a || (a.adm && !ADMIN)) pg = "ini";
+  var a = areaDe(pg), ent = a && a.p.find(function (x) { return x[0] === pg; }); if (!a || (a.adm && !ADMIN) || (ent[2] && ent[2].adm && !ADMIN)) pg = "ini";
   if (NEXP[pg]) { vistaBase("nex"); marcar(pg); nexMostrar(pg); }
   else {
     var v = VISTA_DA[pg] || pg;
@@ -246,7 +246,7 @@ $("#bCarregar").onclick = function () { $("#fCarregar").click(); };
 $("#fCarregar").onchange = function () { var fs = Array.from(this.files || []); this.value = ""; if (fs.length) carregarFicheiros(fs); };
 
 /* ---------------- telemóvel: barra de áreas em baixo, "Mais" para as restantes ---------------- */
-var AREAS_TEL = ["ini", "cx", "com", "stk"];
+var AREAS_TEL = ["ini", "des", "tes", "cst"];
 function abrirMais() {
   var el = $("#maisMenu"); el.hidden = !el.hidden; if (el.hidden) return;
   el.innerHTML = "<div class='mm'>" + areasVisiveis().filter(function (a) { return AREAS_TEL.indexOf(a.id) < 0; }).map(function (a) { return "<button data-a='" + a.id + "'>" + a.n + "</button>"; }).join("") + "</div>";
