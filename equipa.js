@@ -26,7 +26,7 @@ async function carregarEquipa() {
   catch (e) { $("#eqLista").innerHTML = "<tr><td colspan='6' class='bad'>" + esc(e.message) + "</td></tr>"; }
 }
 function nomeEst(id) { var e = EQ.estacoes.find(function (x) { return x.id === id; }); return e ? (e.short_name || e.name) : id; }
-function optsEst(sel) { return EQ.estacoes.map(function (e) { return "<option value='" + e.id + "'" + (e.id === sel ? " selected" : "") + ">" + esc(e.short_name || e.name) + "</option>"; }).join(""); }
+function optsEst(sel) { return (EQ.estacoes.length ? EQ.estacoes : ESTS).map(function (e) { return "<option value='" + e.id + "'" + (e.id === sel ? " selected" : "") + ">" + esc(e.short_name || e.name) + "</option>"; }).join(""); }
 function optsPapel(sel) { return "<option value='staff'" + (sel !== "admin" ? " selected" : "") + ">Funcionário</option><option value='admin'" + (sel === "admin" ? " selected" : "") + ">Administrador</option>"; }
 function desenharEquipa() {
   /* A edição abre num cartão por cima da tabela (e não dentro dela): no telemóvel a tabela desliza para o lado e
