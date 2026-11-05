@@ -912,8 +912,44 @@ function lerPrecosRepsol(linhas) {
   if (!erros.length) r.verificacoes.push({nivel: "ok", texto: r.produtos.length + " produtos; referência − reduzido = redução em todos"});
   return r;
 }
+/* Fatura mensal «Taxas Exploração» da Repsol: igual a caixa_app/taxas_repsol.py (mudar um obriga a mudar o outro) */
+function lerTaxasRepsol(linhas) {
+  var CH = {"Taxa My Repsol DI": "mr_di", "Taxa My Repsol CC": "mr_cc", "Taxas Lojas Fixas": "loja", "Taxas Lavagens Fixas": "lavagem", "Taxas Combustíveis": "combustiveis"};
+  var c = function (t) { return parseInt(t.replace(/\./g, "").replace(",", ""), 10); }, dt = function (t) { var d = t.split("."); return d[2] + "-" + d[1] + "-" + d[0]; };
+  var L = linhas.map(function (l) { return l.trim().replace(/\s+/g, " "); }), texto = L.filter(function (l) { return l; }).join(" ");
+  if (texto.indexOf("Taxas Exploração") < 0 || texto.indexOf("Repsol Portuguesa") < 0) throw tmsErro("Não é a fatura de taxas de exploração da Repsol (falta «Taxas Exploração»).");
+  var r = {numero: "", data: "", vencimento: "", posto: "", nome_posto: "", linhas: [], mr_di_c: 0, mr_cc_c: 0, myrepsol_c: 0, loja_c: 0, lavagem_c: 0, combustiveis_c: 0, total_c: 0, iva_c: 0, pagar_c: 0, verificacoes: []}, m;
+  m = /Documento nº (\S+ \S+\/\d+)/.exec(texto); if (m) r.numero = m[1];
+  m = /(?:^|[^\wÀ-ÿ])Data (\d{2}\.\d{2}\.\d{4})/.exec(texto); if (m) r.data = dt(m[1]);
+  m = /Data de Vencimento (\d{2}\.\d{2}\.\d{4})/.exec(texto); if (m) r.vencimento = dt(m[1]);
+  m = /Cliente \.+: (E\d{4}) (.+?) Referência/.exec(texto); if (m) { r.posto = m[1]; r.nome_posto = m[2].trim(); }
+  var erros = [], vistos = {}, RE = /(Taxa My Repsol DI|Taxa My Repsol CC|Taxas Lojas Fixas|Taxas Lavagens Fixas|Taxas Combustíveis) (L|UN) ([\d.]+,\d{2}) (\d+),(\d{6}) ([A-Z0-9]{2}) ([\d.]+,\d{2})/g;
+  while ((m = RE.exec(texto))) {
+    var k = CH[m[1]], l = {nome: m[1], un: m[2], qtd: c(m[3]), preco: parseInt(m[4], 10) * 1000000 + parseInt(m[5], 10), valor_c: c(m[7])};
+    r.linhas.push(l);
+    if (vistos[k]) erros.push("linha «" + l.nome + "» repetida");
+    vistos[k] = 1; r[k + "_c"] = l.valor_c;
+    if (Math.abs(l.qtd * l.preco - l.valor_c * 1000000) > 1000000) erros.push(l.nome + ": quantidade × preço não bate com o valor");
+  }
+  r.myrepsol_c = r.mr_di_c + r.mr_cc_c;
+  m = /VALOR TOTAL S\/IVA\.*: ([\d.]+,\d{2})/.exec(texto); if (m) r.total_c = c(m[1]);
+  m = /IVA à taxa de 23% ([\d.]+,\d{2}) ([\d.]+,\d{2})/.exec(texto);
+  if (m) { r.iva_c = c(m[2]); if (c(m[1]) !== r.total_c) erros.push("a base do IVA não é igual ao total sem IVA"); }
+  m = /VALOR A PAGAR \.*: ([\d.]+,\d{2})/.exec(texto); if (m) r.pagar_c = c(m[1]);
+  if (!r.numero) erros.push("não encontrei o número do documento");
+  if (!r.data) erros.push("não encontrei a data");
+  if (!r.posto) erros.push("o PDF não diz o posto (E….)");
+  if (!r.linhas.length) erros.push("não encontrei nenhuma taxa");
+  var soma = r.linhas.reduce(function (s, x) { return s + x.valor_c; }, 0);
+  if (!r.total_c || soma !== r.total_c) erros.push("a soma das linhas não bate com o total sem IVA: há uma linha que não conheço ou um valor errado");
+  if (Math.abs(r.total_c * 23 - r.iva_c * 100) > 100) erros.push("o IVA não é 23 % do total");
+  if (r.total_c + r.iva_c !== r.pagar_c) erros.push("total + IVA não bate com o valor a pagar");
+  erros.forEach(function (e) { r.verificacoes.push({nivel: "erro", texto: e}); });
+  if (!erros.length) r.verificacoes.push({nivel: "ok", texto: r.linhas.length + " linhas; contas certas"});
+  return r;
+}
 var MOTOR = {num: num, num1: num1, pt: pt, lerTurno: lerTurno, pdfPaginas: pdfPaginas, lerDocumento: lerDocumento, classificarDoc: classificarDoc, verificar: verificar,
   lerFecho: lerFecho, pontuarFecho: pontuarFecho, lerMB: lerMB, lerSolred: lerSolred, verificarMB: verificarMB, verificarSolred: verificarSolred, turnoSugerido: turnoSugerido, classificarFecho: classificarFecho, valores: valores, ratio: ratio,
-  lerTMS: lerTMS, lerTMSBytes: lerTMSBytes, inteiro100: inteiro100, turnoDoFecho: turnoDoFecho, turnoSeguinte: turnoSeguinte, lerVendasCBOS: lerVendasCBOS, lerFolhaFecho: lerFolhaFecho, lerPrecosRepsol: lerPrecosRepsol, PRECOS_ENSE: PRECOS_ENSE};
+  lerTMS: lerTMS, lerTMSBytes: lerTMSBytes, inteiro100: inteiro100, turnoDoFecho: turnoDoFecho, turnoSeguinte: turnoSeguinte, lerVendasCBOS: lerVendasCBOS, lerFolhaFecho: lerFolhaFecho, lerTaxasRepsol: lerTaxasRepsol, lerPrecosRepsol: lerPrecosRepsol, PRECOS_ENSE: PRECOS_ENSE};
 if (typeof module !== "undefined" && module.exports) module.exports = MOTOR; else raiz.MOTOR = MOTOR;
 })(typeof window !== "undefined" ? window : globalThis);
