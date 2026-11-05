@@ -31,6 +31,7 @@ function areaDe(pg) { return AREAS.find(function (a) { return a.p.some(function 
 
 function montarMenu() {
   if (!$("#equipa").parentElement.matches("#v-ges")) $("#v-ges").appendChild($("#equipa"));
+  if (window.MSB_NAV) { MSB_NAV.montar(); return ir("ini"); }   // navegação da beta
   var vis = areasVisiveis(), mais = vis.some(function (a) { return AREAS_TEL.indexOf(a.id) < 0; });
   $("#areas").innerHTML = vis.map(function (a) { var i = a.n.indexOf(" "); return "<button data-a='" + a.id + "'" + (AREAS_TEL.indexOf(a.id) < 0 ? " class='extra'" : "") + "><i>" + a.n.slice(0, i) + "</i><span>" + (a.c ? "<em class='lg'>" + a.n.slice(i + 1) + "</em><em class='cu'>" + a.c + "</em>" : a.n.slice(i + 1)) + "</span></button>"; }).join("") +
     (mais ? "<button data-a='mais' class='so-tel'><i>☰</i><span>Mais</span></button>" : "");
@@ -39,6 +40,7 @@ function montarMenu() {
 }
 function marcar(pg) {
   PAGINA = pg; var a = areaDe(pg) || AREAS[0];
+  if (window.MSB_NAV) return MSB_NAV.marcar(pg, a);
   $$("#areas button").forEach(function (b) { b.classList.toggle("on", b.dataset.a === a.id || (b.dataset.a === "mais" && AREAS_TEL.indexOf(a.id) < 0)); });
   var ps = paginasDe(a), gr = "";
   $("#subnav").innerHTML = ps.length > 1 ? ps.map(function (x) { var g = (x[2] && x[2].g) || "", t = g && g !== gr ? "<span class='subg'>" + g + "</span>" : ""; gr = g || gr; return t + "<button data-p='" + x[0] + "'" + (x[0] === pg ? " class='on'" : "") + ">" + x[1] + "</button>"; }).join("") : "";
@@ -96,7 +98,7 @@ function nexDoc() { try { var f = $("#nexFrame"); return f && f.contentDocument;
 function nexAjustar() {
   var d = nexDoc(); if (!d || !d.head || d.getElementById("msb-embed")) return;
   var st = d.createElement("style"); st.id = "msb-embed";
-  st.textContent = "header,nav,footer{display:none!important}main{padding-top:4px!important}body{background:transparent!important}";
+  st.textContent = "header,nav,footer{display:none!important}main{padding-top:4px!important}body{background:transparent!important}" + (window.MSB_NAV ? MSB_NAV.nexCss : "");
   d.head.appendChild(st);
 }
 function nexMostrar(pg) {
