@@ -264,3 +264,5 @@ function abrirMais() {
   el.innerHTML = "<div class='mm'>" + areasVisiveis().filter(function (a) { return AREAS_TEL.indexOf(a.id) < 0; }).map(function (a) { return "<button data-a='" + a.id + "'>" + a.n + "</button>"; }).join("") + "</div>";
   $$("#maisMenu [data-a]").forEach(function (b) { b.onclick = function () { el.hidden = true; var a = AREAS.find(function (x) { return x.id === b.dataset.a; }); ir(a.p[0][0]); }; });
 }
+/* Este ficheiro é o último a carregar. Se o arranque (assíncrono) acabou antes dele, foi aqui que ficou o menu por montar. */
+if (window.APP_ARRANCOU) montarMenu();

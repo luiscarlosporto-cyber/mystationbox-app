@@ -361,7 +361,7 @@ async function entrar(){
   var sel=$("#selEst");sel.innerHTML=ESTS.map(function(x){return "<option value='"+x.id+"'>"+esc(x.short_name||x.name)+"</option>"}).join("");sel.value=EST;sel.hidden=ESTS.length<2;
   var cf=await sb.from("msb_config").select("estacao,pos_mb");POSES={};(cf.data||[]).forEach(function(x){POSES[x.estacao]=x.pos_mb});
   $$(".adm").forEach(function(b){b.hidden=!ADMIN});
-  mostrarEst();irDia(DIA);if(window.montarMenu)montarMenu();
+  mostrarEst();irDia(DIA);window.APP_ARRANCOU=1;if(window.montarMenu)montarMenu();
 }
 function mostrarEst(){var e=ESTS.find(function(x){return x.id===EST});$("#hEst").textContent=e?(e.name||e.short_name):"—"}
 $("#selEst").onchange=function(){EST=this.value;if(window.NEX_EST!==undefined)NEX_EST=null;try{localStorage.setItem("msb_est",EST)}catch(e){}mostrarEst();LINHAS={};irDia(DIA);if(window.msbIr)msbIr(PAGINA);else if(VISTA!=="reg")vista(VISTA)};
