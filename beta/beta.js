@@ -32,6 +32,7 @@
 
   function montar() {
     if ($("#bLat")) return;
+    MSB_NAV.paginas();
     var app = $("#vApp"), lat = document.createElement("aside"), topo = document.createElement("div");
     lat.id = "bLat"; lat.setAttribute("aria-label", "Menu");
     lat.innerHTML = "<div class='marca'><img src='logo.svg' alt=''><img class='wm' src='marca_clara.png' alt='mystationbox'><em>beta</em></div><div id='bAreas'></div>" +
@@ -72,7 +73,9 @@
     document.addEventListener("click", function (e) { var m = $("#bNovoM"); if (m && !m.contains(e.target)) m.remove(); });
   }
 
+  var ABERTA = "";
   function marcar(pg, a) {
+    if (pg !== ABERTA) { ABERTA = pg; setTimeout(function () { if (PAGINA === pg) MSB_NAV.abrirPagina(pg); }); }
     var ps = paginasDe(a), gr = "", atual = a.p.find(function (x) { return x[0] === pg; }), grp = grupoDe(pg);
     var vistos = {}, itens = ps.filter(function (p) { var g = grupoDe(p[0]); if (!g) return true; if (vistos[g.n]) return false; return vistos[g.n] = 1; });
     function emFoco(p) { var g = grupoDe(p[0]); return p[0] === pg || (g && g === grp); }
@@ -103,6 +106,7 @@
   /* ---- sem emoji no conteúdo: tira-os do texto que as páginas escrevem. Fica ✔ e ⚠, que dizem o estado;
      um botão que só tem o emoji fica como está, para não ficar vazio. ---- */
   var EMO = /(?:\p{Emoji_Presentation}|[\u2600\u2601\u270F\u2709\u2699\u2328\u23F1\u231A\u2702\u{1F5A8}\u{1F5D1}\u{1F5C4}\u{1F5BC}\u{1F3F7}\u{1F58A}\u{1F4FD}\u{1F6E2}\u{1F321}])\uFE0F?\s*/gu;
+  var ROTULO = {"\u270F": "Editar", "\u{1F5D1}": "Apagar", "\u{1F4C4}": "PDF", "\u{1F4CB}": "Copiar", "\u{1F4AC}": "WhatsApp", "\u{1F3B2}": "Gerar", "\u{1F4CE}": "Original", "\u{1F441}": "Ver", "\u{1F4E4}": "Enviar"};
   function trocarTexto(t) { return t.replace(/\u2705\s*/g, "\u2714 ").replace(/\u274C\s*/g, "\u2716 ").replace(EMO, ""); }
   function limpar(n) {
     if (!n || n.nodeType === 8) return;
@@ -111,7 +115,7 @@
     T.forEach(function (t) {
       var p = t.parentNode; if (!p || /^(SCRIPT|STYLE|TEXTAREA)$/.test(p.nodeName)) return;
       var v = t.nodeValue, r = trocarTexto(v); if (r === v) return;
-      if (!r.trim() && !p.textContent.replace(v, "").trim() && !p.querySelector("img,svg")) return;
+      if (!r.trim() && !p.textContent.replace(v, "").trim() && !p.querySelector("img,svg")) { var nome = ROTULO[v.trim().replace(/\uFE0F/g, "")]; if (nome) t.nodeValue = nome; return; }
       t.nodeValue = r;
     });
     if (n.nodeType === 3) return;

@@ -75,7 +75,7 @@ async function carregarMargens() {
         C.filter(function (c) { return !CUSTOS_BASE.some(function (n) { return n.toLowerCase() === c.nome.toLowerCase(); }); }).map(function (c) { return linhaCusto(c.nome, c.valor_c / 100); }).join("") + "</div>" +
       "<div class='bar'><button class='btn' id='custoMais'>+ Acrescentar custo</button></div></div>";
     h += "<div class='bar'><button class='btn p' id='mrgGravar'>Gravar margens e custos</button><span class='st' id='mrgSt'></span></div>";
-    box.innerHTML = h;
+    box.innerHTML = h; if (window.MSB_NAV) MSB_NAV.seccoes(box);
     $("#custoMais").onclick = function () { $("#custosLista").insertAdjacentHTML("beforeend", linhaCusto("", null)); var u = $$("#custosLista .cn"); u[u.length - 1].focus(); };
     $("#mrgGravar").onclick = gravarMargens;
   } catch (e) { box.innerHTML = "<div class='bad'>" + esc(falhouLucro(e)) + "</div>"; }

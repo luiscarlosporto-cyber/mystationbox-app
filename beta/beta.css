@@ -171,6 +171,15 @@ body.b-rec #nexFrame{height:calc(100dvh - 146px)!important}
 #bConf div{display:flex;gap:8px;justify-content:flex-end}
 details.card summary{cursor:pointer}
 
+/* ---- restantes páginas (Etapa 5) ---- */
+.secs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.secs button{flex:none;border:1px solid var(--bd);background:var(--card);color:var(--fg);border-radius:999px;padding:6px 12px;font:500 13px var(--f-body);cursor:pointer}
+.secs button.on{background:var(--azul);border-color:var(--azul);color:var(--sobre-azul)}
+.tbTopo{display:flex;align-items:center;gap:10px}.tbTopo input{flex:1;max-width:360px}.tbTopo span{font-size:13px}
+.tbFim{display:flex;justify-content:center}
+#v-cmp .sc,#v-doc .sc{max-width:860px}
+#v-cmp td:not(:first-child),#v-cmp th:not(:first-child){text-align:right}
+
 /* ---- telemóvel ---- */
 @media (max-width:700px){
   :root,body.b-rec{--lat:0px}
