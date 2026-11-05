@@ -73,11 +73,12 @@ function aviPedidos(L) {
   return L.map(function (p) {
     var t = "<b>" + esc(aviLoja(p.estacao)) + " · " + esc((AVI_PASTAS.find(function (x) { return x[0] === p.pasta; }) || [0, p.pasta])[1]) + (p.artigo ? " · " + esc(p.artigo) : "") + "</b><div class='mut'>" + dmy(p.de) + " a " + dmy(p.ate) + "</div>";
     if (p.estado === "pendente" || p.estado === "a_ler") return "<div class='aviso'>⏳ " + t + "O OCTAN AI responde nos próximos 15 minutos.</div>";
-    if (p.estado === "erro") return "<div class='card' style='padding:12px 14px'>❌ " + t + "<div class='bad'>" + esc(p.erro) + "</div></div>";
+    var vi = p.visto_em ? "" : "<div style='margin-top:8px'><button class='btn' data-pv='" + p.id + "'>✔ Visto</button></div>";
+    if (p.estado === "erro") return "<div class='card' style='padding:12px 14px'>❌ " + t + "<div class='bad'>" + esc(p.erro) + "</div>" + vi + "</div>";
     var L2 = p.linhas || [], q = L2.reduce(function (s, x) { return s + x[2]; }, 0), v = L2.reduce(function (s, x) { return s + x[3]; }, 0);
     return "<details class='card' style='padding:12px 14px'><summary>✅ " + t + "<div class='mut'>" + L2.length + " artigos · " + fmt(q * 100).replace(",00", "") + " un. · " + fmt(v * 100) + " €</div></summary>" +
       "<div class='sc' style='margin-top:6px'><table><thead><tr><th class='l'>Artigo</th><th>Qtd</th><th>Montante €</th></tr></thead><tbody>" +
-      L2.map(function (x) { return "<tr><td class='l'>" + esc(x[1]) + "</td><td class='n'>" + fmt(x[2] * 100).replace(",00", "") + "</td><td class='n'>" + fmt(x[3] * 100) + "</td></tr>"; }).join("") + "</tbody></table></div></details>";
+      L2.map(function (x) { return "<tr><td class='l'>" + esc(x[1]) + "</td><td class='n'>" + fmt(x[2] * 100).replace(",00", "") + "</td><td class='n'>" + fmt(x[3] * 100) + "</td></tr>"; }).join("") + "</tbody></table></div>" + vi + "</details>";
   }).join("");
 }
 async function aviPedir() {
@@ -119,18 +120,26 @@ async function carregarAvisos() {
     var porLer = L.filter(function (a) { return !a.lido_em && a.nivel !== "info"; });
     if (porLer.length) h += "<div class='bar'><button class='btn' id='aviTudo'>✔ Marcar tudo como visto (" + porLer.length + ")</button></div>";
     if (!L.length) h += "<div class='mut'>Ainda não há avisos.</div>";
-    h += L.map(function (a) {
+    var cartaoAviso = function (a) {
       var n = AVI_NIVEL[a.nivel] || ["", a.nivel], novo = !a.lido_em && a.nivel !== "info";
       return "<div class='card' style='padding:12px 14px" + (novo ? "" : ";opacity:.72") + "'><b>" + n[0] + " " + esc(a.titulo) + "</b>" +
         "<div class='mut'>" + esc(aviLoja(a.estacao)) + " · " + n[1] + " · " + aviDataHora(a.criado) + (a.lido_em ? " · visto por " + esc(a.lido_por || "") : "") + "</div>" +
         (a.detalhe ? "<div style='white-space:pre-wrap;margin-top:6px'>" + esc(a.detalhe) + "</div>" : "") +
         (novo ? "<div style='margin-top:8px'><button class='btn' data-avi='" + a.id + "'>✔ Visto</button></div>" : "") + "</div>";
-    }).join("");
-    var pd = await sb.from("msb_pedidos").select("*").order("criado", {ascending: false}).limit(8);
-    box.innerHTML = aviForm() + aviPedidos(pd.data || []) + h + aviHistorico();
+    };
+    var pd = await sb.from("msb_pedidos").select("*").order("criado", {ascending: false}).limit(30);
+    var PD = pd.data || [], feito = function (x) { return x.estado === "feito" || x.estado === "erro"; };
+    var pAbertos = PD.filter(function (x) { return !x.visto_em || !feito(x); }), pArq = PD.filter(function (x) { return x.visto_em && feito(x); });
+    var arq = L.filter(function (a) { return a.lido_em || a.nivel === "info"; });
+    h += porLer.map(cartaoAviso).join("");
+    if (L.length && !porLer.length) h += "<div class='mut'>Nada por ver. Os avisos já vistos estão no arquivo.</div>";
+    var nArq = arq.length + pArq.length;
+    var arquivo = nArq ? "<details class='card' style='padding:12px 14px'><summary><b>🗄️ Arquivo (" + nArq + ")</b></summary><div style='display:grid;gap:10px;margin-top:10px'>" + aviPedidos(pArq) + arq.map(cartaoAviso).join("") + "</div></details>" : "";
+    box.innerHTML = aviForm() + aviPedidos(pAbertos) + h + aviHistorico() + arquivo;
     $("#pvPedir").onclick = aviPedir;
     $$("#aviCorpo [data-aprova]").forEach(function (b) { b.onclick = function () { var k = b.dataset.aprova.split("|"); aviAprovar(k[0], k[1]); }; });
     $$("#aviCorpo [data-avi]").forEach(function (b) { b.onclick = function () { aviVisto([Number(b.dataset.avi)]); }; });
+    $$("#aviCorpo [data-pv]").forEach(function (b) { b.onclick = async function (ev) { ev.preventDefault(); var r = await sb.from("msb_pedidos").update({visto_em: new Date().toISOString()}).eq("id", Number(b.dataset.pv)); if (r.error) return status(false, "⚠ " + falhou(r.error)); carregarAvisos(); }; });
     var t = $("#aviTudo"); if (t) t.onclick = function () { aviVisto(porLer.map(function (a) { return a.id; })); };
   } catch (e) { box.innerHTML = "<div class='bad'>" + esc(falhou(e)) + "</div>"; }
 }
