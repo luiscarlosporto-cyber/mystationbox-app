@@ -53,7 +53,7 @@ async function importarPrecos(f) {
 async function carregarPrecos() {
   var corpo = $("#preCorpo"); corpo.innerHTML = "<div class='mut'>A carregar…</div>";
   try {
-    var q = await sb.from("msb_precos").select("dia,hora,produtos,estado,ense,comunicado_em,comunicado_por,original,fonte").eq("estacao", EST).order("dia", {ascending: false}).limit(26);
+    var q = await sb.from("msb_precos").select("dia,hora,produtos,estado,ense,comunicado_em,comunicado_por,original,fonte,aprovado_em,aprovado_por,ense_tentado_em,ense_erro").eq("estacao", EST).order("dia", {ascending: false}).limit(26);
     if (q.error) throw q.error;
     var L = q.data || [];
     if (!L.length) { corpo.innerHTML = "<div class='card' style='padding:14px'><b>Ainda não há preços guardados.</b><p class='mut'>Carregue o PDF «Alterações Preços» que a Repsol envia ao sábado (📄 aqui em cima ou 📥 Carregar no cabeçalho).</p></div>"; return; }
@@ -70,6 +70,7 @@ async function carregarPrecos() {
       "<p class='mut' style='margin:6px 0 0;font-size:13px'>" + (L.some(function (x) { return (x.produtos || []).some(function (p) { return p.fora; }); }) ? "O AdBlue a granel vem no PDF mas não se comunica à ENSE. " : "") + "▲ subiu · ▼ desceu face à semana anterior. As garrafas de gás não vêm no PDF da Repsol: na ENSE ficam com o último valor registado.</p></div>";
     corpo.innerHTML = h;
     $$("#preCorpo [data-orig]").forEach(function (b) { b.onclick = function () { abrirOriginal(b.dataset.orig); }; });
+    $$("#preCorpo [data-apr]").forEach(function (b) { b.onclick = function () { aprovarOctan(b.dataset.apr); }; });
     $$("#preCorpo [data-com]").forEach(function (b) { b.onclick = function () { marcarComunicado(b.dataset.com, L.find(function (x) { return x.dia === b.dataset.com; })); }; });
   } catch (e) { corpo.innerHTML = "<div class='bad'>" + esc(falhou(e)) + "</div>"; }
 }
@@ -86,7 +87,25 @@ function quadroENSE(x, L) {
     PRE_CAMPOS.map(function (c) { var pr = (x.produtos || []).find(function (y) { return y.ense === c; }) || {}, d = p[c] != null && a[c] != null ? p[c] - a[c] : null;
       return "<tr><td class='l'>" + esc(c) + "</td><td class='n'><b>" + m4(p[c]) + "</b></td><td class='n'>" + m3(a[c]) + "</td><td class='n'>" + (d == null ? "—" : (d > 0 ? "+" : "") + m3(d)) + "</td><td class='l'>" + esc(pr.pdf || "—") + " <small class='mut'>ref. " + m3(pr.ref) + "</small></td></tr>"; }).join("") +
     "</tbody></table></div>" + (avisos.length ? avisos.map(function (t) { return "<div class='aviso' style='margin-top:6px'>⚠ " + esc(t) + "</div>"; }).join("") : "<div class='msgOk' style='margin-top:6px'>✔ Todos os campos com preço; variações normais face à semana anterior.</div>") +
-    (ADMIN ? "<div class='bar' style='margin-top:8px'><button class='btn p' data-com='" + x.dia + "'>✔ Já gravei na ENSE</button></div>" : "") + "</div>";
+    (ADMIN ? octanEstado(x) + "<div class='bar' style='margin-top:8px'>" + octanBotao(x) + "<button class='btn' data-com='" + x.dia + "'>✔ Já gravei na ENSE</button></div>" : "") + "</div>";
+}
+
+/* OCTAN AI: a aprovação aqui autoriza UMA gravação na ENSE; o PC verifica de 15 em 15 minutos. */
+function octanEstado(x) {
+  if (x.ense_erro) return "<div class='bad' style='margin-top:6px'>❌ O OCTAN AI não confirmou a gravação: " + esc(x.ense_erro) + "<br>Vê na ENSE se ficou gravado antes de tentar outra vez.</div>";
+  if (x.ense_tentado_em) return "<div class='aviso' style='margin-top:6px'>⏳ O OCTAN AI está a gravar na ENSE.</div>";
+  if (x.aprovado_em) return "<div class='aviso' style='margin-top:6px'>⏳ Aprovado por " + esc(x.aprovado_por || "") + ". O OCTAN AI grava nos próximos 15 minutos.</div>";
+  return "";
+}
+function octanBotao(x) {
+  if (x.ense_erro) return "<button class='btn p' data-apr='" + x.dia + "'>↻ Verifiquei: tentar outra vez</button>";
+  return x.aprovado_em ? "" : "<button class='btn p' data-apr='" + x.dia + "'>🤖 Aprovar: OCTAN AI grava na ENSE</button>";
+}
+async function aprovarOctan(dia) {
+  if (!confirm("Aprovas estes preços? O OCTAN AI vai gravá-los na ENSE com a data em vigor de " + dmy(dia) + ".")) return;
+  var r = await sb.from("msb_precos").update({aprovado_em: new Date().toISOString(), aprovado_por: (PERFIL && PERFIL.display_name) || "", ense_tentado_em: null, ense_erro: null}).eq("estacao", EST).eq("dia", dia).eq("estado", "lido");
+  if (r.error) { status(false, falhou(r.error)); return; }
+  status(true, "Aprovado ✓"); carregarPrecos();
 }
 
 async function marcarComunicado(dia, x) {
