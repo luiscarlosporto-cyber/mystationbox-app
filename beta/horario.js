@@ -48,9 +48,9 @@
     var box = $("#v-hor"), n = Object.keys(X.ALT).length, b = "<div class='bar'><button class='btn' id='horAnt' aria-label='Mês anterior'>‹</button><input type='month' id='horMes' value='" + X.M + "'><button class='btn' id='horSeg' aria-label='Mês seguinte'>›</button>" +
       "<span class='tag " + (X.estado === "simulacao" ? "t-at'>Simulação" : "t-ok'>Horário real") + "</span>";
     if (ADMIN && X.P.length) b += X.ed
-      ? "<button class='btn az' id='horProj'" + (X.calc ? " disabled" : "") + ">" + (X.calc ? "A ajustar…" : "Projetar o resto") + "</button><button class='btn p' id='horGrava'" + (n && !X.calc ? "" : " disabled") + ">Gravar" + (n ? " " + n : "") + "</button><button class='btn' id='horFim'>Sair da edição</button>"
-      : "<button class='btn' id='horEd'>Editar</button><button class='btn' id='horEst'>" + (X.estado === "simulacao" ? "Passar a real" : "Passar a simulação") + "</button><button class='btn' id='horXls'>Excel Picaponto</button><button class='btn' id='horPdf'>PDF</button>";
-    box.innerHTML = b + "</div>" + (X.P.length ? celulas() + "<p class='rod'>M manhã · T tarde · MT turno M/T · FG folga · F férias · FD feriado. Fundo azul: fim de semana; creme: feriado." + (X.ed ? " Toca numa célula e escolhe o turno: fica fixado (sublinhado) e a app ajusta o resto do mês às regras. Projetar o resto refaz tudo o que não está fixado." : "") + "</p>" + regras()
+      ? "<button class='btn az' id='horProj'" + (X.calc ? " disabled" : "") + ">" + (X.calc ? "A ajustar…" : "Projetar o resto") + "</button><button class='btn' id='horIni'" + (X.INI ? "" : " disabled") + ">Horário inicial</button><button class='btn p' id='horGrava'" + (n && !X.calc ? "" : " disabled") + ">Gravar" + (n ? " " + n : "") + "</button><button class='btn' id='horFim'>Sair da edição</button>"
+      : "<button class='btn' id='horEd'>Editar</button><button class='btn' id='horDefIni'>Guardar como inicial</button><button class='btn' id='horEst'>" + (X.estado === "simulacao" ? "Passar a real" : "Passar a simulação") + "</button><button class='btn' id='horXls'>Excel Picaponto</button><button class='btn' id='horPdf'>PDF</button>";
+    box.innerHTML = b + "</div>" + (X.P.length ? celulas() + "<p class='rod'>M manhã · T tarde · MT turno M/T · FG folga · F férias · FD feriado. Fundo azul: fim de semana; creme: feriado." + (X.ed ? " Toca numa célula e escolhe o turno: fica fixado (sublinhado) e a app ajusta o resto do mês às regras. Projetar o resto refaz tudo o que não está fixado. Horário inicial volta à versão de partida do mês." : "") + "</p>" + regras()
       : "<div class='vazio'>Ainda não há horário de " + nomeMes(X.M) + " nesta loja." + (ADMIN ? "<p><button class='btn p' id='horNovo'>Criar horário do mês</button></p>" : "") + "</div>");
     $("#horAnt").onclick = function () { sair(function () { abrir(addMes(X.M, -1)); }); };
     $("#horSeg").onclick = function () { sair(function () { abrir(addMes(X.M, 1)); }); };
@@ -58,7 +58,7 @@
     var e = function (id, f) { var x = $(id); if (x) x.onclick = f; };
     e("#horEd", function () { X.ed = true; pintar(); });
     e("#horFim", function () { sair(function () { abrir(X.M); }); });
-    e("#horProj", projetar); e("#horGrava", gravar); e("#horEst", mudarEstado); e("#horXls", excel); e("#horPdf", pdf); e("#horNovo", criar);
+    e("#horProj", projetar); e("#horIni", voltarInicial); e("#horDefIni", definirInicial); e("#horGrava", gravar); e("#horEst", mudarEstado); e("#horXls", excel); e("#horPdf", pdf); e("#horNovo", criar);
     var sc = $("#horSc"); if (sc) {
       var alvo = sc.querySelector("th.hj"); if (alvo && X.rolar) { sc.scrollLeft = Math.max(0, alvo.offsetLeft - 140); X.rolar = false; }
       if (X.ed) { sc.onclick = function (ev) { var t = ev.target.closest("td[data-c]"); if (t) escolher(t); }; sc.onkeydown = function (ev) { if (ev.key === "Enter" || ev.key === " ") { var t = ev.target.closest("td[data-c]"); if (t) { ev.preventDefault(); escolher(t); } } }; }
@@ -153,17 +153,40 @@
   async function gravar() {
     var n = X.R.erros.length;
     if (n && !await msbConfirma("O horário tem " + n + " erro(s) nas regras. Gravar na mesma?", "Gravar na mesma")) return;
-    var est = EST, P = [], D = [];
+    var est = EST, P = [], D = [], jaHa = Object.keys(X.ORI).length;
     Object.keys(X.ALT).forEach(function (k) {
       var a = k.split("|"), dia = X.M + "-" + String(a[1]).padStart(2, "0");
       if (X.ALT[k]) P.push({estacao: est, dia: dia, colaborador_id: +a[0], codigo: X.ALT[k], fixo: !!(X.FX[a[0]] || {})[a[1]], atualizado_em: new Date().toISOString(), atualizado_por: EU && EU.id}); else D.push({dia: dia, c: +a[0]});
     });
     try {
+      if (!X.INI) {   // primeira gravação de um mês sem inicial: o que lá estava, ou esta versão se estava vazio
+        var ini = await sb.from("msb_horario_inicial").insert({estacao: est, mes: X.M, dias: jaHa ? fotografia(X.ORI, X.FXO) : fotografia(X.G, X.FX), criado_por: EU && EU.id});
+        if (ini.error) throw ini.error;
+      }
       if (P.length) { var r = await sb.from("msb_horario_dias").upsert(P, {onConflict: "estacao,dia,colaborador_id"}); if (r.error) throw r.error; }
       for (var i = 0; i < D.length; i++) { var q = await sb.from("msb_horario_dias").delete().eq("estacao", est).eq("dia", D[i].dia).eq("colaborador_id", D[i].c); if (q.error) throw q.error; }
       await sb.from("msb_horario_meses").update({atualizado_em: new Date().toISOString(), origem: "Editado na app"}).eq("estacao", est).eq("mes", X.M);
       msbAviso("Horário gravado"); X.ALT = {}; abrir(X.M);
     } catch (e) { msbAviso("Erro: " + falhou(e)); }
+  }
+  function fotografia(G, F) {
+    var L = []; Object.keys(G).forEach(function (i) { Object.keys(G[i]).forEach(function (d) { L.push([+d, +i, G[i][d], !!(F[i] || {})[d]]); }); });
+    return L;
+  }
+  async function voltarInicial() {
+    if (!X.INI) return;
+    if (!await msbConfirma("Voltar ao horário inicial de " + nomeMes(X.M) + "? Só fica guardado quando carregares em Gravar.", "Voltar ao inicial")) return;
+    clearTimeout(X.tm); X.nr = (X.nr || 0) + 1; X.calc = false;
+    var S = {}; X.INI.dias.forEach(function (x) { (S[x[1]] = S[x[1]] || {})[x[0]] = [x[2], x[3]]; });
+    Object.keys(S).forEach(function (i) { if (!X.P.some(function (l) { return l.colaborador_id === +i; })) { var l = X.LJ.find(function (q) { return q.colaborador_id === +i; }); if (l) X.P.push(l); } });
+    X.P.forEach(function (l) { X.dias.forEach(function (d) { var v = (S[l.colaborador_id] || {})[d] || ["", false]; pôr(l.colaborador_id, d, v[0], v[1]); }); });
+    pintar(); msbAviso("Voltei ao horário inicial. Confere e grava.");
+  }
+  async function definirInicial() {
+    if (!await msbConfirma("Guardar o horário de " + nomeMes(X.M) + " como está agora como horário inicial? O inicial anterior é substituído.", "Guardar como inicial")) return;
+    var dias = fotografia(X.ORI, X.FXO), r = await sb.from("msb_horario_inicial").upsert({estacao: EST, mes: X.M, dias: dias, criado_em: new Date().toISOString(), criado_por: EU && EU.id}, {onConflict: "estacao,mes"});
+    if (r.error) return msbAviso("Erro: " + falhou(r.error));
+    X.INI = {dias: dias}; msbAviso("Horário inicial guardado");
   }
   async function mudarEstado() {
     var novo = X.estado === "simulacao" ? "real" : "simulacao";
@@ -235,7 +258,8 @@
         sb.from("msb_colab_lojas").select("colaborador_id,codigo,ordem,nome_picaponto,escala,espelho").eq("estacao", est).order("ordem"),
         sb.from("msb_colaboradores").select("id,curto,nome,ativo"),
         sb.from("msb_horario_meses").select("estado,sem_mt").eq("estacao", est).eq("mes", M).maybeSingle(),
-        sb.from("msb_config").select("horario").eq("estacao", est).maybeSingle()
+        sb.from("msb_config").select("horario").eq("estacao", est).maybeSingle(),
+        sb.from("msb_horario_inicial").select("dias").eq("estacao", est).eq("mes", M).maybeSingle()
       ]);
       R.forEach(function (r) { if (r.error) throw r.error; });
       if (est !== EST || M !== MES) return;
@@ -251,7 +275,7 @@
       Object.keys(ANT).forEach(function (i) { ANT[i].sort(function (a, b) { return a[0] < b[0] ? -1 : 1; }); });
       var FDS = {}; Object.keys(ANT).forEach(function (i) { ANT[i].forEach(function (a) { var w = new Date(a[0] + "T12:00:00").getDay(); if (w === 6 || w === 0) FDS[i] = a[1]; }); });
       var existe = !!R[3].data, P = existe ? R[1].data.filter(function (l) { return G[l.colaborador_id] || (C[l.colaborador_id] || {}).ativo; }) : [];
-      X = {M: M, dias: dias, fer: feriados(ano), G: G, ORI: ORI, ANT: ANT, FX: FX, FXO: FXO, reforco: cfg.reforco, FDS: FDS, C: C, P: P, ALT: {}, ed: !!(X && X.criado), rolar: true, estado: existe ? R[3].data.estado : "simulacao", semMT: existe && R[3].data.sem_mt, mt: !!cfg.mt, leg: cfg.legenda || []};
+      X = {M: M, dias: dias, fer: feriados(ano), G: G, ORI: ORI, ANT: ANT, FX: FX, FXO: FXO, reforco: cfg.reforco, INI: R[5].data, LJ: R[1].data, FDS: FDS, C: C, P: P, ALT: {}, ed: !!(X && X.criado), rolar: true, estado: existe ? R[3].data.estado : "simulacao", semMT: existe && R[3].data.sem_mt, mt: !!cfg.mt, leg: cfg.legenda || []};
       pintar();
     } catch (e) { box.innerHTML = "<div class='aviso'><p>" + esc(falhou(e)) + "</p></div>"; }
   }
