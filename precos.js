@@ -90,11 +90,11 @@ function quadroENSE(x, L) {
     (ADMIN ? octanEstado(x) + "<div class='bar' style='margin-top:8px'>" + octanBotao(x) + "<button class='btn' data-com='" + x.dia + "'>✔ Já gravei na ENSE</button></div>" : "") + "</div>";
 }
 
-/* OCTAN AI: a aprovação aqui autoriza UMA gravação na ENSE; o PC verifica de 2 em 2 minutos, só das 00:00 às 06:00. */
+/* OCTAN AI: a aprovação aqui autoriza UMA gravação na ENSE; o PC grava às 00:30. */
 function octanEstado(x) {
   if (x.ense_erro) return "<div class='bad' style='margin-top:6px'>❌ O OCTAN AI não confirmou a gravação: " + esc(x.ense_erro) + "<br>Vê na ENSE se ficou gravado antes de tentar outra vez.</div>";
   if (x.ense_tentado_em) return "<div class='aviso' style='margin-top:6px'>⏳ O OCTAN AI está a gravar na ENSE.</div>";
-  if (x.aprovado_em) return "<div class='aviso' style='margin-top:6px'>⏳ Aprovado por " + esc(x.aprovado_por || "") + ". O OCTAN AI grava de noite, entre as 00:00 e as 06:00.</div>";
+  if (x.aprovado_em) return "<div class='aviso' style='margin-top:6px'>⏳ Aprovado por " + esc(x.aprovado_por || "") + ". O OCTAN AI grava na ENSE às 00:30.</div>";
   return "";
 }
 function octanBotao(x) {

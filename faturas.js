@@ -122,7 +122,7 @@ async function enviarFatura() {
       linhas: d.linhas.map(function (l) { return {codigo: l.codigo, descricao: l.descricao, qtd: l.qtd, valor_c: l.valor_c, iva: l.iva}; })};
     var r = await sb.from("msb_faturas_dig").insert({estacao: EST, fornecedor: d.fornecedor, numero: d.numero, dia: d.data, total_c: d.total_c, dados: dados, original: caminho, hash: h, visto_por: (PERFIL && PERFIL.display_name) || "administrador"});
     if (r.error) { if (r.error.code === "23505") throw new Error("Esta fatura já foi enviada."); throw r.error; }
-    FD = null; await carregarFaturasDig("✔ Fatura enviada. O PC recebe-a de noite e o rascunho é criado na corrida da 01:00, ou em compras CORRER.");
+    FD = null; await carregarFaturasDig("✔ Fatura enviada. O PC recebe-a em 2 minutos, com o PC ligado, e o rascunho é criado na corrida da 01:00 ou em compras CORRER.");
   } catch (e) { m.innerHTML = "<div class='bad'>✖ " + esc(falhou(e)) + "</div>"; b.disabled = false; }
 }
 async function carregarFaturasDig(msg) {
