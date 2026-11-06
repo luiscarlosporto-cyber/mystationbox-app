@@ -102,11 +102,13 @@ async function maqAuto() {
     var v = (r.data || [])[0], chave = v ? est + v.de + v.ate : est;
     if (!v || MAQ_AUTO === chave || PAGINA !== "maq" || est !== EST) return;
     await carregarXlsxMSB();
-    var w = await esperarNex(function (w) { return w.document.getElementById("maqFile") && w.document.getElementById("maqFile").onchange; });
+    var pronto = function (w) { try { return w.document.getElementById("maqFile") && w.document.getElementById("maqFile").onchange && w.eval("typeof multi === 'function' && multi() && typeof company !== 'undefined' && !!company && products.length > 0"); } catch (e) { return false; } };
+    var w = await esperarNex(pronto, 45000);   // o módulo tem de ter a loja e os artigos carregados, senão não sabe o que é da máquina
     if (PAGINA !== "maq" || est !== EST) return;
     MAQ_AUTO = chave; maqVigiar(w);
     await w.document.getElementById("maqFile").onchange({target: {files: [await ficheiroNoQuadro(excelDeVendas(v, ESTS.find(function (x) { return x.id === est; }) || {}), w)], value: ""}});
-    var st = w.document.getElementById("maqStatus"); if (st && !/^Erro/.test(st.textContent)) st.textContent += " Do relatório guardado na app (Vendas → Relatório de vendas).";
+    var st = w.document.getElementById("maqStatus"); if (st && /^Erro/.test(st.textContent)) MAQ_AUTO = "";   // volta a tentar na próxima vez
+    if (st && !/^Erro/.test(st.textContent)) st.textContent += " Do relatório guardado na app (Vendas → Relatório de vendas).";
   } catch (e) { status(false, "⚠ Máquina de tabaco: " + falhou(e)); }
 }
 

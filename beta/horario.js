@@ -319,11 +319,11 @@
     var ids = linhasEnvio().map(function (l) { return l.colaborador_id; }), c = await sb.from("msb_colab_contactos").select("colaborador_id,email").in("colaborador_id", ids), u = await sb.from("msb_horario_envios").select("estado,para,erro,criado").eq("estacao", EST).eq("mes", X.M).order("id", {ascending: false}).limit(1);
     if (c.error || u.error) return msbAviso("Erro: " + falhou(c.error || u.error));
     X.MAIL = {}; (c.data || []).forEach(function (x) { X.MAIL[x.colaborador_id] = x.email; });
-    try {   // sem email guardado, usa o da conta da app (o email escrito à mão manda sempre)
+    try {   // o email da conta da app (Equipa) manda; o guardado só serve a quem não tem conta
       var q = await sb.functions.invoke("msb-equipa", {body: {acao: "listar"}});
       if (!q.error && q.data && q.data.equipa) {
         var A = HOR.emailsContas(ids.map(function (i) { return {id: i, nome: (X.C[i] || {}).nome}; }), q.data.equipa.map(function (p) { return {nome: p.display_name, email: p.email, banido: p.banido}; }));
-        X.CONTA = {}; Object.keys(A).forEach(function (i) { if (!X.MAIL[i]) { X.MAIL[i] = A[i]; X.CONTA[i] = 1; } });
+        X.CONTA = {}; Object.keys(A).forEach(function (i) { if (X.MAIL[i] !== A[i]) { X.MAIL[i] = A[i]; X.CONTA[i] = 1; } });   // regra do dono: manda o email da equipa
       }
     } catch (e) { /* sem contas: escreve-se à mão */ }
     X.ultEnv = (u.data || [])[0] || null; X.envio = true; pintar();
