@@ -948,8 +948,44 @@ function lerTaxasRepsol(linhas) {
   if (!erros.length) r.verificacoes.push({nivel: "ok", texto: r.linhas.length + " linhas; contas certas"});
   return r;
 }
+/* Faturas e notas de crédito de serviços da Repsol (água, bónus, compensação): igual a caixa_app/servico_repsol.py (mudar um obriga a mudar o outro) */
+function lerServicoRepsol(linhas) {
+  var c = function (t) { return parseInt(t.replace(/\./g, "").replace(",", ""), 10); }, dt = function (t) { var d = t.split("."); return d[2] + "-" + d[1] + "-" + d[0]; };
+  var L = linhas.map(function (l) { return l.trim().replace(/\s+/g, " "); }), texto = L.filter(function (l) { return l; }).join(" "), m;
+  if (texto.indexOf("Repsol Portuguesa") < 0 || texto.indexOf("Taxas Exploração") >= 0 || texto.indexOf("Documento nº") < 0 || !/\bRef Descrição\b/.test(texto)) throw tmsErro("Não é uma fatura ou nota de crédito de serviços da Repsol.");
+  var r = {tipo: texto.indexOf("NOTA DE CRÉDITO") >= 0 ? "NC" : "FT", numero: "", data: "", posto: "", linhas: [], ivas: [], total_c: 0, iva_c: 0, pagar_c: 0, mes: "", categoria: null, verificacoes: []}, erros = [];
+  m = /Documento nº (\S+ \S+\/\d+)/.exec(texto); if (m) r.numero = m[1];
+  m = /(?:^|[^\wÀ-ÿ])Data (\d{2}\.\d{2}\.\d{4})/.exec(texto); if (m) r.data = dt(m[1]);
+  m = /Cliente \.+: (E\d{4}) /.exec(texto); if (m) r.posto = m[1];
+  var RE = /\b(\d{5}) ([^\d.:].{0,60}?) UN ([\d.]+,\d{2}) (\d+),(\d{6}) ([A-Z0-9]{2}) ([\d.]+,\d{2})/g;
+  while ((m = RE.exec(texto))) {
+    var l = {ref: m[1], nome: m[2], qtd: c(m[3]), preco: parseInt(m[4], 10) * 1000000 + parseInt(m[5], 10), iva: m[6], valor_c: c(m[7])};
+    r.linhas.push(l);
+    if (Math.abs(l.qtd * l.preco - l.valor_c * 1000000) > 1000000) erros.push(l.nome + ": quantidade × preço não bate com o valor");
+  }
+  m = /VALOR TOTAL S\/IVA\.*: ([\d.]+,\d{2})/.exec(texto); if (m) r.total_c = c(m[1]);
+  m = /VALOR A PAGAR \.*: ([\d.]+,\d{2})/.exec(texto); if (m) r.pagar_c = c(m[1]);
+  var RI = /([A-Z0-9]{2}) IVA (?:à taxa de (\d+)%|não tributável.*?) ([\d.]+,\d{2}) ([\d.]+,\d{2})/g;
+  while ((m = RI.exec(texto))) {
+    var i = {cod: m[1], taxa: parseInt(m[2] || "0", 10), base_c: c(m[3]), iva_c: c(m[4])};
+    r.ivas.push(i); r.iva_c += i.iva_c;
+    if (Math.abs(i.base_c * i.taxa - i.iva_c * 100) > 100) erros.push("o IVA de " + i.taxa + " % não bate com a base");
+  }
+  if (!r.numero) erros.push("não encontrei o número do documento");
+  if (!r.data) erros.push("não encontrei a data");
+  if (!r.posto) erros.push("o PDF não diz o posto (E….)");
+  if (!r.linhas.length) erros.push("não encontrei nenhuma linha");
+  if (!r.total_c || r.linhas.reduce(function (s, x) { return s + x.valor_c; }, 0) !== r.total_c) erros.push("a soma das linhas não bate com o total sem IVA: há uma linha que não conheço ou um valor errado");
+  if (r.ivas.reduce(function (s, x) { return s + x.base_c; }, 0) !== r.total_c) erros.push("as bases do IVA não batem com o total sem IVA");
+  if (r.total_c + r.iva_c !== r.pagar_c) erros.push("total + IVA não bate com o valor a pagar");
+  var P = [], RP = /\b\d{2}\.\d{4}-(\d{2})\.(\d{4})\b/g; while ((m = RP.exec(texto))) P.push(m[2] + "-" + m[1]);
+  P.sort(); r.mes = P.length ? P[P.length - 1] : r.data.slice(0, 7);
+  if (r.linhas.length && r.linhas.every(function (x) { return x.ref === "10054" || x.ref === "10055"; })) r.categoria = "Água";
+  r.verificacoes = erros.length ? erros.map(function (e) { return {nivel: "erro", texto: e}; }) : [{nivel: "ok", texto: r.linhas.length + " linhas; contas certas"}];
+  return r;
+}
 var MOTOR = {num: num, num1: num1, pt: pt, lerTurno: lerTurno, pdfPaginas: pdfPaginas, lerDocumento: lerDocumento, classificarDoc: classificarDoc, verificar: verificar,
   lerFecho: lerFecho, pontuarFecho: pontuarFecho, lerMB: lerMB, lerSolred: lerSolred, verificarMB: verificarMB, verificarSolred: verificarSolred, turnoSugerido: turnoSugerido, classificarFecho: classificarFecho, valores: valores, ratio: ratio,
-  lerTMS: lerTMS, lerTMSBytes: lerTMSBytes, inteiro100: inteiro100, turnoDoFecho: turnoDoFecho, turnoSeguinte: turnoSeguinte, lerVendasCBOS: lerVendasCBOS, lerFolhaFecho: lerFolhaFecho, lerTaxasRepsol: lerTaxasRepsol, lerPrecosRepsol: lerPrecosRepsol, PRECOS_ENSE: PRECOS_ENSE};
+  lerServicoRepsol: lerServicoRepsol, lerTMS: lerTMS, lerTMSBytes: lerTMSBytes, inteiro100: inteiro100, turnoDoFecho: turnoDoFecho, turnoSeguinte: turnoSeguinte, lerVendasCBOS: lerVendasCBOS, lerFolhaFecho: lerFolhaFecho, lerTaxasRepsol: lerTaxasRepsol, lerPrecosRepsol: lerPrecosRepsol, PRECOS_ENSE: PRECOS_ENSE};
 if (typeof module !== "undefined" && module.exports) module.exports = MOTOR; else raiz.MOTOR = MOTOR;
 })(typeof window !== "undefined" ? window : globalThis);

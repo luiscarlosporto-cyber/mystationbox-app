@@ -48,6 +48,13 @@ var DESPESAS = (function () {
     return e;
   }
 
+  /* Despesa de água vinda de um documento da Saphety, já lido por lerServicoRepsol. Fica sempre por confirmar; nota de crédito entra a negativo. */
+  function deSaphety(t, est, doc, fonte, original) {
+    var s = t.tipo === "NC" ? -1 : 1;
+    return {estacao: est, mes: t.mes, dia: t.data, categoria: "Água", fornecedor: "Repsol água e esgoto", documento: t.numero, valor_c: s * t.pagar_c, iva_c: s * t.iva_c,
+      no_dl: true, estado: "por_confirmar", origem: "email", fonte: fonte, mensagem: "saphety:" + t.numero, hash: doc.hash, original: original, nota: t.tipo === "NC" ? "Nota de crédito" : null};
+  }
+
   /* Valor do mapa de kms gerado na app: a mesma conta do mapa em app/kms.js. */
   function valorMapaKms(m) { return Math.round(m.dias.length * m.km_dia * Number(m.euro_km) * 100); }
 
@@ -65,6 +72,6 @@ var DESPESAS = (function () {
       return d.estado === "por_confirmar" && d.origem === "email" && d.valor_c != null && !d.nota && (d.categoria === "Salários" || d.categoria === "Segurança Social");
     });
   }
-  return {CATEGORIAS: CATEGORIAS, valorC: valorC, custosDoMes: custosDoMes, resumo: resumo, erros: erros, valorMapaKms: valorMapaKms, compararKms: compararKms, recibosJuntos: recibosJuntos};
+  return {deSaphety: deSaphety, CATEGORIAS: CATEGORIAS, valorC: valorC, custosDoMes: custosDoMes, resumo: resumo, erros: erros, valorMapaKms: valorMapaKms, compararKms: compararKms, recibosJuntos: recibosJuntos};
 })();
 if (typeof module !== "undefined") module.exports = DESPESAS;
