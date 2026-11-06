@@ -1,13 +1,13 @@
 /* mystationbox beta · Etapa 3: Painel de Gestão do administrador. Três blocos sobre as duas lojas: Por decidir, Estado das lojas, Por fechar.
- * Só lê. Cada linha abre a página onde a coisa se resolve, já na loja certa. Vendas do mês fechado vêm da Folha de fecho do CBOS,
- * a única fonte igual nas duas lojas; Penafiel não regista turnos, por isso os turnos ficam só como indicador do mês em curso. */
+ * Cada linha abre a página onde a coisa se resolve, já na loja certa. Estado das lojas: mês em curso até ontem, lido no CBOS pelo OCTAN AI
+ * (pedido automático, pasta PAINEL, um por dia e por loja). Sem esse valor, mostra o mês fechado da Folha de fecho. */
 "use strict";
 (function () {
   var IND = [   // indicadores que se podem escolher e ordenar; valor por loja a partir de D (dados da loja)
-    ["vend", "Vendas do mês", 1, function (D) { return D.f ? eur(D.f.dados.totais.formas) : null; }],
-    ["lit", "Litros vendidos", 1, function (D) { return D.f && D.f.dados.totais.comb ? Math.round(D.f.dados.totais.comb[1] / 100).toLocaleString("pt-PT", {useGrouping: "always"}) + " L" : null; }],
-    ["comb", "Combustível", 1, function (D) { return D.f && D.f.dados.totais.comb ? eur(D.f.dados.totais.comb[5]) : null; }],
-    ["loja", "Loja", 1, function (D) { return D.f && D.f.dados.totais.loja ? eur(D.f.dados.totais.loja[5]) : null; }],
+    ["vend", "Vendas do mês", 1, function (D) { if (D.c) return eur(D.c.total); return D.f ? eur(D.f.dados.totais.formas) : null; }],
+    ["lit", "Litros vendidos", 1, function (D) { if (D.c) return Math.round(D.c.litros).toLocaleString("pt-PT", {useGrouping: "always"}) + " L"; return D.f && D.f.dados.totais.comb ? Math.round(D.f.dados.totais.comb[1] / 100).toLocaleString("pt-PT", {useGrouping: "always"}) + " L" : null; }],
+    ["comb", "Combustível", 1, function (D) { if (D.c) return eur(D.c.comb); return D.f && D.f.dados.totais.comb ? eur(D.f.dados.totais.comb[5]) : null; }],
+    ["loja", "Loja", 1, function (D) { if (D.c) return eur(D.c.total - D.c.comb); return D.f && D.f.dados.totais.loja ? eur(D.f.dados.totais.loja[5]) : null; }],
     ["mb", "Multibanco", 0, function (D) { return forma(D, ["CARTAO BANCARIO", "BANCARIO OFFLINE"]); }],
     ["sol", "Solred", 0, function (D) { return forma(D, ["SOLRED", "SOLRED OFFLINE"]); }],
     ["num", "Numerário", 0, function (D) { return forma(D, ["NUMERARIO"]); }],
@@ -39,13 +39,27 @@
       guarda("TMS", sb.from("msb_tms").select("estacao").eq("mes", ant)),
       guarda("relatórios", sb.from("msb_vendas_mes").select("estacao").eq("mes", ant)),
       guarda("vendas por artigo", sb.from("msb_vendas_artigos").select("estacao,de,ate").lte("de", ant + "-01").gte("ate", ant + "-28")),
-      guarda("pedidos", sb.from("msb_pedidos").select("id,estacao,estado,de,ate,visto_em,pasta").eq("estado", "feito").is("visto_em", null)),
+      guarda("pedidos", sb.from("msb_pedidos").select("id,estacao,estado,de,ate,visto_em,pasta").eq("estado", "feito").is("visto_em", null).neq("pasta", "PAINEL")),
       guarda("documentos", sb.from("msb_docs").select("estacao,emissao").order("emissao", {ascending: false}).limit(40)),
-      guarda("avisos", avisosRecentes(60).then(function (x) { return {data: x}; }))
+      guarda("avisos", avisosRecentes(60).then(function (x) { return {data: x}; })),
+      guarda("mês em curso", sb.from("msb_pedidos").select("estacao,estado,de,ate,linhas").eq("pasta", "PAINEL").gte("de", mes + "-01").order("id", {ascending: false}).limit(20))
     ]);
-    return {hoje: hoje, mes: mes, ant: ant, tur: R[0], fol: R[1], sai: R[2], enc: R[3], pre: R[4], tms: R[5], vm: R[6], va: R[7], ped: R[8], doc: R[9], avi: R[10], falhas: f};
+    pedirMes(mes, R[11]);
+    return {cur: R[11], hoje: hoje, mes: mes, ant: ant, tur: R[0], fol: R[1], sai: R[2], enc: R[3], pre: R[4], tms: R[5], vm: R[6], va: R[7], ped: R[8], doc: R[9], avi: R[10], falhas: f};
   }
 
+  /* Uma leitura por dia e por loja, até ontem. No dia 1 ainda não há nada do mês */
+  async function pedirMes(mes, P) {
+    var ontem = hojeISO(-1); if (!ADMIN || !P || ontem.slice(0, 7) !== mes) return;
+    var falta = ESTS.filter(function (e) { return !P.some(function (p) { return p.estacao === e.id && p.ate === ontem && p.estado !== "erro"; }); });
+    if (falta.length) await sb.from("msb_pedidos").insert(falta.map(function (e) { return {estacao: e.id, de: mes + "-01", ate: ontem, pasta: "PAINEL", artigo: "", pedido_por: "Painel", visto_em: new Date().toISOString()}; }));
+  }
+  function mesCurso(X, id) {   // códigos de 1 ou 2 algarismos = combustíveis, como na família do CBOS
+    var p = (X.cur || []).find(function (q) { return q.estacao === id && q.estado === "feito" && q.linhas; }); if (!p) return null;
+    var c = {ate: p.ate, total: 0, comb: 0, litros: 0};
+    p.linhas.forEach(function (l) { var v = Math.round(l[3] * 100); c.total += v; if (/^\d{1,2}$/.test(l[0])) { c.comb += v; c.litros += l[2]; } });
+    return c;
+  }
   function porDecidir(X) {
     var L = [], loja = function (id) { var e = ESTS.find(function (x) { return x.id === id; }); return e ? nomeLoja(e) : id; };
     (X.avi || []).filter(function (a) { return !a.lido_em && (a.nivel === "erro" || a.nivel === "atencao"); }).forEach(function (a) {
@@ -67,19 +81,21 @@
 
   function dadosLoja(X, e) {
     var f = (X.fol || []).find(function (x) { return x.estacao === e.id; }) || null, T = (X.tur || []).filter(function (r) { return r.estacao === e.id; });
-    return {f: f, mes: T.filter(function (r) { return r.dia.slice(0, 7) === X.mes; }), ant: T.filter(function (r) { return r.dia.slice(0, 7) !== X.mes; }), T: T};
+    var c = mesCurso(X, e.id); if ((X.cur || []).some(function (q) { return q.estado === "feito" && q.linhas; })) f = null;   // o mês em curso substitui o mês fechado nas duas lojas
+    return {c: c, f: f, mes: T.filter(function (r) { return r.dia.slice(0, 7) === X.mes; }), ant: T.filter(function (r) { return r.dia.slice(0, 7) !== X.mes; }), T: T};
   }
   function estado(X) {
     var ativos = indAtivos(), meses = {};
     var DL = ESTS.map(function (e) { var D = dadosLoja(X, e); if (D.f) meses[D.f.mes] = 1; return D; });
-    var ms = Object.keys(meses).sort(), tit = ms.length === 1 ? "Mês de " + nomeMes(ms[0]) : "Último mês fechado";
+    var ms = Object.keys(meses).sort(), ates = DL.filter(function (D) { return D.c; }).map(function (D) { return D.c.ate; }).sort();
+    var tit = ates.length ? nomeMes(X.mes).replace(/^./, function (l) { return l.toUpperCase(); }) + " até " + dmy(ates[0]).slice(0, 5) : ms.length === 1 ? "Mês de " + nomeMes(ms[0]) : "Último mês fechado";
     var h = "<div class='bl'><h3>Estado das lojas<button class='mini' id='pnPers'>Personalizar</button></h3><div id='pnEdit' hidden></div>" +
       "<div class='pnT' style='--n:" + ESTS.length + "'><span class='cab'>" + tit + "</span>" + ESTS.map(function (e) { return "<button class='cab' data-loja='" + e.id + "'>" + esc(nomeLoja(e)) + "</button>"; }).join("");
     ativos.forEach(function (k) {
       var I = IND.find(function (x) { return x[0] === k; });
       h += "<span class='rot'>" + I[1] + "</span>" + DL.map(function (D) { var v = I[3](D); return "<b class='" + (v === "Sem turnos" || v == null ? "sem" : "") + "'>" + esc(v == null ? "—" : v) + "</b>"; }).join("");
     });
-    return h + "</div><p class='rod'>Vendas com IVA, da Folha de fecho do CBOS. O mês em curso vem dos turnos registados.</p></div>";
+    return h + "</div><p class='rod'>" + (ates.length ? "Vendas com IVA, lidas no CBOS pelo OCTAN AI, até ontem." : "Vendas com IVA, da Folha de fecho do CBOS. O mês em curso aparece depois de o OCTAN AI o ler no CBOS.") + "</p></div>";
   }
   function porFechar(X) {
     var ontem = new Date().getDate() - 1;

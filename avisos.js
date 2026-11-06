@@ -148,7 +148,7 @@ async function carregarAvisos() {
         (a.detalhe ? "<div style='white-space:pre-wrap;margin-top:6px'>" + esc(a.detalhe) + "</div>" : "") +
         (novo ? "<div style='margin-top:8px'><button class='btn' data-avi='" + a.id + "'>✔ Visto</button></div>" : "") + "</div>";
     };
-    var pd = await sb.from("msb_pedidos").select("*").order("criado", {ascending: false}).limit(30);
+    var pd = await sb.from("msb_pedidos").select("*").neq("pasta", "PAINEL").order("criado", {ascending: false}).limit(30);
     var PD = AVI_PD = pd.data || [], feito = function (x) { return x.estado === "feito" || x.estado === "erro"; };
     var pAbertos = PD.filter(function (x) { return !x.visto_em || !feito(x); }), pArq = PD.filter(function (x) { return x.visto_em && feito(x); });
     var arq = L.filter(function (a) { return a.lido_em || a.nivel === "info"; });
