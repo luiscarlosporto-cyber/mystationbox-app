@@ -24,7 +24,7 @@
   function pedir(P, id, m, ate) { return !(P || []).some(function (q) { return q.estacao === id && q.de.slice(0, 7) === m && q.ate === ate && q.estado !== "erro" && (q.estado !== "feito" || q.dias != null); }); }
   /* Topo redondo do eixo, dividido em 3 */
   function escala(max) {
-    var b = Math.pow(10, Math.floor(Math.log10(Math.max(max, 3) / 3))), p = [1, 2, 3, 4, 5, 6, 8, 10].find(function (x) { return x * b * 3 >= max; });
+    var b = Math.pow(10, Math.floor(Math.log10(Math.max(max, 3) / 3))), p = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find(function (x) { return x * b * 3 >= max; });
     return p * b * 3;
   }
   /* Variação do valor por dia, em %. null se não há com que comparar */
