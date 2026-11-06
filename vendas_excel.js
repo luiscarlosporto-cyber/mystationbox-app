@@ -91,6 +91,8 @@ function excelDeVendas(v, est) {
   var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(L), "Vendas");
   return new File([XLSX.write(wb, {type: "array", bookType: "xlsx"})], "vendas_" + v.de + "_" + v.ate + ".xlsx", {type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
 }
+/* O módulo de stock está noutro quadro: um ficheiro criado aqui chega-lhe como «de outro sítio» e o leitor de Excel não o lê. Copia-se para lá. */
+async function ficheiroNoQuadro(f, w) { return new w.File([new w.Uint8Array(await f.arrayBuffer())], f.name, {type: f.type}); }
 var MAQ_AUTO = "";
 async function maqAuto() {
   var est = EST;
@@ -103,7 +105,7 @@ async function maqAuto() {
     var w = await esperarNex(function (w) { return w.document.getElementById("maqFile") && w.document.getElementById("maqFile").onchange; });
     if (PAGINA !== "maq" || est !== EST) return;
     MAQ_AUTO = chave;
-    await w.document.getElementById("maqFile").onchange({target: {files: [excelDeVendas(v, ESTS.find(function (x) { return x.id === est; }) || {})], value: ""}});
+    await w.document.getElementById("maqFile").onchange({target: {files: [await ficheiroNoQuadro(excelDeVendas(v, ESTS.find(function (x) { return x.id === est; }) || {}), w)], value: ""}});
     var st = w.document.getElementById("maqStatus"); if (st && !/^Erro/.test(st.textContent)) st.textContent += " Do relatório guardado na app (Vendas → Relatório de vendas).";
   } catch (e) { status(false, "⚠ Máquina de tabaco: " + falhou(e)); }
 }

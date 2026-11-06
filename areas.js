@@ -229,7 +229,7 @@ function escolherVendas(f) {
     ir(o === "maq" ? "maq" : "nova");
     try {
       var w = await esperarNex(function (w) { return o === "maq" ? w.document.getElementById("maqFile") && w.document.getElementById("maqFile").onchange : typeof w.salesChange === "function"; });
-      var ev = {target: {files: [f], value: "", dataset: {sup: o}}};
+      var ev = {target: {files: [await ficheiroNoQuadro(f, w)], value: "", dataset: {sup: o}}};
       if (o === "maq") w.document.getElementById("maqFile").onchange(ev); else w.salesChange(ev);
     } catch (e) { status(false, "⚠ " + e.message); }
   }; });
