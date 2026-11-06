@@ -2,7 +2,7 @@
  * O OCTAN AI traz as despesas do email: com valor ficam por confirmar, sem valor ficam por preencher, com o documento ao lado.
  * Só as confirmadas contam no Lucro. Uma despesa nunca se apaga: fica ignorada. O histórico fica em msb_despesas_hist. */
 "use strict";
-var DSP = {mes: null, lista: [], fontes: [], taxaMes: true, editar: null, aberto: false};
+var DSP = {mes: null, lista: [], fontes: [], taxaMes: true, editar: null, aberto: false, kms: {}};
 function falhouDesp(e) { var m = falhou(e); return /msb_despesas|does not exist|schema cache|42P01|PGRST205/i.test(m + " " + (e && e.code || "")) ? "As despesas ainda não estão ativas na base de dados." : m; }
 function quemSou() { return (PERFIL && PERFIL.display_name) || (EU && EU.email) || "administrador"; }
 async function verDocumentoDespesa(caminho) {
@@ -23,6 +23,8 @@ async function carregarDespesas() {
     var f = await sb.from("msb_despesas_fontes").select("*").eq("estacao", EST).order("categoria"); if (f.error) throw f.error;
     var t = await sb.from("msb_taxas_mes").select("mes").eq("estacao", EST).eq("mes", DSP.mes).maybeSingle();
     DSP.lista = r.data || []; DSP.fontes = f.data || []; DSP.taxaMes = !!t.data || !!t.error;   // a leitura falhar não pode inventar um aviso
+    var mK = DSP.lista.filter(function (d) { return d.categoria === "Kms do gerente"; }).map(function (d) { return d.mes; }); DSP.kms = {};
+    if (mK.length) { var k = await sb.from("msb_kms").select("mes,dias,km_dia,euro_km").in("mes", mK); if (k.error) throw k.error; (k.data || []).forEach(function (m) { DSP.kms[m.mes] = m; }); }
     desenharDespesas();
   } catch (e) { box.innerHTML = "<div class='bad'>" + esc(falhouDesp(e)) + "</div>"; }
 }
@@ -33,7 +35,7 @@ function desenharDespesas() {
   h += "<div id='dspForm'></div>";
   h += "<section class='totem'><div class='t'>Despesas · " + esc(dspMesPt(DSP.mes)) + "</div><div><div class='k'>Confirmadas</div><div class='v'>" + fmt(R.confirmadas_c) + "<small>€</small></div></div><div><div class='k'>Por tratar</div><div class='v'>" + tratar.length + "</div></div></section>";
   if (!DSP.taxaMes) h += "<div class='aviso'><p>⚠ A aguardar a fatura das taxas de exploração de " + esc(dspMesPt(DSP.mes)) + ". <a href='#' id='dspTaxas'>Escrever em Margens e custos</a>.</p></div>";
-  h += "<div class='card' style='padding:14px;display:grid;gap:10px'><h2 style='margin:0'>Por tratar</h2>" + (tratar.length ? tratar.map(dspCartao).join("") : "<div class='mut'>Nada por tratar.</div>") + "</div>";
+  h += "<div class='card' style='padding:14px;display:grid;gap:10px'><h2 style='margin:0'>Por tratar</h2>" + dspBotaoRecibos(tratar) + (tratar.length ? tratar.map(dspCartao).join("") : "<div class='mut'>Nada por tratar.</div>") + "</div>";
   h += "<div class='card' style='padding:14px;display:grid;gap:10px'><h2 style='margin:0'>Confirmadas no mês</h2>" + (conf.length ? "<div class='sc'><table><thead><tr><th class='l'>Categoria</th><th class='l'>Fornecedor</th><th class='l'>Documento</th><th>Valor</th><th class='l'></th></tr></thead><tbody>" + conf.map(dspLinha).join("") + "</tbody><tfoot><tr><td class='l' colspan='3'>Total</td><td class='n'><b>" + fmt(R.confirmadas_c) + "</b></td><td></td></tr></tfoot></table></div>" : "<div class='mut'>Ainda sem despesas confirmadas neste mês. No Lucro contam os custos fixos.</div>") + "</div>";
   h += "<details class='card' style='padding:14px'" + (DSP.aberto ? " open" : "") + " id='dspFontesBox'><summary><b>Fontes do email</b> <span class='mut'>(" + DSP.fontes.filter(function (f) { return f.ativo; }).length + " ativas)</span></summary><div id='dspFontes' style='display:grid;gap:10px;margin-top:10px'>" + dspFontes() + "</div></details>";
   $("#dspCorpo").innerHTML = h;
@@ -41,14 +43,33 @@ function desenharDespesas() {
   $("#dspSeg").onclick = function () { DSP.mes = addMes(DSP.mes, 1); carregarDespesas(); };
   $("#dspMes").onchange = function () { if (this.value) { DSP.mes = this.value; carregarDespesas(); } };
   $("#dspNova").onclick = function () { dspAbrir(null); };
+  if ($("#dspRecibos")) $("#dspRecibos").onclick = function () { dspConfirmarRecibos(this); };
   if ($("#dspTaxas")) $("#dspTaxas").onclick = function (ev) { ev.preventDefault(); ir("mrg"); };
   $("#dspFontesBox").ontoggle = function () { DSP.aberto = this.open; };
   $$("#dspCorpo [data-acao]").forEach(function (b) { b.onclick = function () { dspAcao(b.dataset.acao, Number(b.dataset.id), b); }; });
 }
+function dspBotaoRecibos(tratar) {
+  var L = DESPESAS.recibosJuntos(tratar);
+  return L.length > 1 ? "<div class='bar'><button class='btn p' id='dspRecibos'>Confirmar os " + L.length + " valores dos recibos</button></div>" : "";
+}
+async function dspConfirmarRecibos(b) {
+  var L = DESPESAS.recibosJuntos(DSP.lista), total = L.reduce(function (s, d) { return s + d.valor_c; }, 0);
+  if (!(await msbConfirma("Confirmar " + L.length + " valores dos recibos, no total de " + fmt(total) + " €? Ficam a contar no Lucro.", "Confirmar"))) return;
+  b.disabled = true;
+  var r = await sb.from("msb_despesas").update({estado: "confirmada", confirmado_em: new Date().toISOString(), confirmado_por: quemSou()}).in("id", L.map(function (d) { return d.id; })).eq("estacao", EST).eq("estado", "por_confirmar");
+  if (r.error) { b.disabled = false; return dspAviso(falhouDesp(r.error)); }
+  await carregarDespesas(); dspAviso("Confirmados " + L.length + " valores.", true);
+}
+function dspKms(d) {
+  var c = DESPESAS.compararKms(d, DSP.kms[d.mes]); if (!c) return "";
+  if (c.estado === "igual") return "<div class='ok' style='font-size:13px'>✔ Igual ao mapa de kms da app</div>";
+  return "<div class='bad' style='font-size:13px'>⚠ " + (c.estado === "sem_mapa" ? "Não há mapa de kms gravado neste mês" : "Diferente do mapa de kms da app: " + fmt(c.mapa_c) + " €") + "</div>";
+}
 function dspCartao(d) {
   var sem = d.valor_c == null;
-  return "<div style='display:grid;gap:8px;border:1px solid var(--line,#d9dee3);border-radius:10px;padding:10px'><div><b>" + esc(d.fornecedor) + "</b> <span class='mut'>· " + esc(d.categoria) + " · " + esc(dspMesPt(d.mes)) + "</span>" +
+  return "<div style='display:grid;gap:8px;border:1px solid var(--line,#d9dee3);border-radius:10px;padding:10px'><div><b>" + esc(d.colaborador || d.fornecedor) + "</b> <span class='mut'>· " + esc(d.categoria) + " · " + esc(dspMesPt(d.mes)) + "</span>" +
     "<div class='mut' style='font-size:13px'>" + dspData(d.dia) + (d.documento ? " · " + esc(d.documento) : "") + (d.debito ? " · débito a " + dspData(d.debito) : "") + (d.no_dl ? " · incluído na liquidação" : "") + (d.valor_c < 0 ? " · nota de crédito ou anulação" : "") + "</div></div>" +
+    dspKms(d) + (d.nota ? "<div class='mut' style='font-size:13px'>" + esc(d.nota) + "</div>" : "") +
     "<div class='bar'><label style='display:grid;gap:2px;font-size:13px'>Valor (€)<input class='dspVal' data-id='" + d.id + "' inputmode='decimal' value='" + (sem ? "" : fmt(d.valor_c)) + "' placeholder='Por preencher' style='width:130px'></label><label style='display:grid;gap:2px;font-size:13px'>IVA incluído (€)<input class='dspIva' data-id='" + d.id + "' inputmode='decimal' value='" + (d.iva_c == null ? "" : fmt(d.iva_c)) + "' style='width:110px'></label>" +
     "<button class='btn p' data-acao='confirmar' data-id='" + d.id + "'>Confirmar</button>" + (d.original ? "<button class='btn' data-acao='ver' data-id='" + d.id + "'>Ver documento</button>" : "") +
     "<button class='btn' data-acao='editar' data-id='" + d.id + "'>Editar</button><button class='btn' data-acao='ignorar' data-id='" + d.id + "'>Ignorar</button></div></div>";

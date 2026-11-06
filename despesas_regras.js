@@ -47,6 +47,24 @@ var DESPESAS = (function () {
     if (typeof d.iva_c === "number" && isNaN(d.iva_c)) e.push("IVA inválido");
     return e;
   }
-  return {CATEGORIAS: CATEGORIAS, valorC: valorC, custosDoMes: custosDoMes, resumo: resumo, erros: erros};
+
+  /* Valor do mapa de kms gerado na app: a mesma conta do mapa em app/kms.js. */
+  function valorMapaKms(m) { return Math.round(m.dias.length * m.km_dia * Number(m.euro_km) * 100); }
+
+  /* O recibo de kms tem de dar o valor do mapa. A diferença mostra-se; não se corrige sozinha. */
+  function compararKms(d, mapa) {
+    if (d.categoria !== "Kms do gerente") return null;
+    if (!mapa) return {estado: "sem_mapa", mapa_c: null};
+    var m = valorMapaKms(mapa);
+    return {estado: m === d.valor_c ? "igual" : "diferente", mapa_c: m};
+  }
+
+  /* O que se pode confirmar de uma vez: salários e Segurança Social dos recibos. Recibo refeito e tudo o resto vê-se um a um. */
+  function recibosJuntos(lista) {
+    return (lista || []).filter(function (d) {
+      return d.estado === "por_confirmar" && d.origem === "email" && d.valor_c != null && !d.nota && (d.categoria === "Salários" || d.categoria === "Segurança Social");
+    });
+  }
+  return {CATEGORIAS: CATEGORIAS, valorC: valorC, custosDoMes: custosDoMes, resumo: resumo, erros: erros, valorMapaKms: valorMapaKms, compararKms: compararKms, recibosJuntos: recibosJuntos};
 })();
 if (typeof module !== "undefined") module.exports = DESPESAS;
