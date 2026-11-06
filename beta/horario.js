@@ -30,7 +30,7 @@
       h += "<tr" + (c.curto === eu ? " class='eu'" : "") + "><td class='l' title='" + esc(c.nome || "") + "'>" + esc(c.curto || "") + (fixo && X.ed ? "<small>segue " + esc((X.C[l.espelho] || {}).curto || "") + "</small>" : "") + "</td>" + X.dias.map(function (d) {
         var v = g[d] || ""; if (v === "M" || v === "T" || v === "MT") tur++;
         var mudou = X.ALT[l.colaborador_id + "|" + d] != null, fx = (X.FX[l.colaborador_id] || {})[d], es = (X.EM[l.colaborador_id] || {})[d];
-        return "<td class='" + t(d).cl + (mudou ? " alt" : "") + (fx ? " fx" : "") + ((EX[l.colaborador_id] || []).indexOf(d) >= 0 ? " ex" : "") + "'" + (es ? " title='" + esc(TIPOS[es.tipo][0] + (es.nota ? ": " + es.nota : "")) + "'" : fx ? " title='Escolhido por ti'" : "") + (X.ed && (!fixo || es) ? " data-c='" + l.colaborador_id + "' data-d='" + d + "' tabindex='0' role='button' aria-label='" + esc(c.curto || "") + " dia " + d + "'" : "") + ">" + v + (es && TIPOS[es.tipo][2] ? "<small>" + TIPOS[es.tipo][2] + "</small>" : "") + "</td>";
+        return "<td class='" + t(d).cl + (mudou ? " alt" : "") + (fx ? " fx" : "") + ((EX[l.colaborador_id] || []).indexOf(d) >= 0 ? " ex" : "") + "'" + (es ? " title='" + esc(TIPOS[es.tipo][0] + (es.nota ? ": " + es.nota : "")) + "'" : fx ? " title='Escolhido por ti'" : "") + (X.ed ? " data-c='" + l.colaborador_id + "' data-d='" + d + "' tabindex='0' role='button' aria-label='" + esc(c.curto || "") + " dia " + d + "'" : "") + ">" + v + (es && TIPOS[es.tipo][2] ? "<small>" + TIPOS[es.tipo][2] + "</small>" : "") + "</td>";
       }).join("") + "<td class='n'>" + tur + "</td></tr>";
     });
     return h + "</tbody></table></div>";
@@ -40,7 +40,7 @@
     var M = {}; if (!ADMIN) return M;
     var E = HOR.extras(linhas(), opRegras());
     X.P.forEach(function (l) { var d = E[(X.C[l.colaborador_id] || {}).curto || ""]; if (d && d.length) M[l.colaborador_id] = d; });
-    X.P.forEach(function (l) { if (l.espelho && M[l.espelho]) M[l.colaborador_id] = M[l.espelho]; });
+    X.P.forEach(function (l) { if (l.espelho && M[l.espelho]) M[l.colaborador_id] = M[l.espelho].filter(function (d) { return (X.G[l.colaborador_id] || {})[d] === (X.G[l.espelho] || {})[d]; }); });
     return M;
   }
   function verif() { return HOR.verificar(linhas(), opRegras()); }
@@ -107,7 +107,7 @@
     if (k === ori && !!fx === oriF) delete X.ALT[ch]; else X.ALT[ch] = k;
   }
   function definir(id, d, k, fx) {
-    pôr(id, d, k, fx); X.P.forEach(function (l) { if (l.espelho === id && !(X.EM[l.colaborador_id] || {})[d]) pôr(l.colaborador_id, d, k, fx); });
+    pôr(id, d, k, fx); X.P.forEach(function (l) { if (l.espelho === id && !(X.FX[l.colaborador_id] || {})[d]) pôr(l.colaborador_id, d, k, false); });   // o que se mudou na própria pessoa mantém-se
     ajustar();
   }
   function ajustar() {
@@ -253,7 +253,7 @@
       D.P.forEach(function (p, i) { X.dias.forEach(function (d) {
         if (p.fixos[d]) return;
         if ((X.G[p.id] || {})[d] !== S[i][d]) mudou++;
-        pôr(p.id, d, S[i][d], false); X.P.forEach(function (l) { if (l.espelho === p.id && !(X.EM[l.colaborador_id] || {})[d]) pôr(l.colaborador_id, d, S[i][d], false); });
+        pôr(p.id, d, S[i][d], false); X.P.forEach(function (l) { if (l.espelho === p.id && !(X.FX[l.colaborador_id] || {})[d]) pôr(l.colaborador_id, d, S[i][d], false); });
       }); });
       X.calc = false; pintar();
       msbAviso($(".hinv") ? "Erro: horário inviável. Vê a razão em cima." : auto === true ? (mudou ? "Ajustei " + mudou + " turno(s). Confere e grava." : "Não foi preciso mudar mais nada.") : "Proposta pronta. Ajusta o que quiseres e grava.");
