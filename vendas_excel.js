@@ -79,3 +79,31 @@ async function importarVendasExcel(f) {
 }
 $("#bVa").onclick = function () { $("#fVa").click(); };
 $("#fVa").onchange = function () { var f = this.files[0]; this.value = ""; if (f) importarVendasExcel(f); };
+
+/* Máquina de tabaco (06/11/2026, pedido do utilizador): usa sozinha o último relatório guardado nesta loja, sem escolher ficheiro.
+   O módulo de stock lê Excel: refaz-se um Excel com o mesmo formato (Posto, Data, Código, colunas por dia, totais, família). */
+function excelDeVendas(v, est) {
+  var dmy2 = function (iso) { var p = iso.split("-"); return +p[2] + "/" + +p[1] + "/" + p[0]; }, dias = [];
+  for (var d = v.de; d <= v.ate; d = addDia(d, 1)) dias.push(dmy2(d));
+  var cab = ["Código", "Artigo"].concat(dias.map(function (x) { return x + " - Quantidade"; }), ["Total quantidade", "Total Montante", "Família"]);
+  var L = [["Posto", (est.posto_repsol || "") + " - " + (est.name || est.short_name || "")], ["Data", "Desde: " + dmy2(v.de) + " Até: " + dmy2(v.ate)], [], cab];
+  v.linhas.forEach(function (l) { L.push([l[0], l[1]].concat(dias.map(function () { return null; }), [l[2], l[3], l[4] || ""])); });
+  var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(L), "Vendas");
+  return new File([XLSX.write(wb, {type: "array", bookType: "xlsx"})], "vendas_" + v.de + "_" + v.ate + ".xlsx", {type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+}
+var MAQ_AUTO = "";
+async function maqAuto() {
+  var est = EST;
+  try {
+    var r = await sb.from("msb_vendas_artigos").select("de,ate,dias,linhas").eq("estacao", est).order("ate", {ascending: false}).order("dias", {ascending: false}).limit(1);
+    if (r.error) throw r.error;
+    var v = (r.data || [])[0], chave = v ? est + v.de + v.ate : est;
+    if (!v || MAQ_AUTO === chave || PAGINA !== "maq" || est !== EST) return;
+    await carregarXlsxMSB();
+    var w = await esperarNex(function (w) { return w.document.getElementById("maqFile") && w.document.getElementById("maqFile").onchange; });
+    if (PAGINA !== "maq" || est !== EST) return;
+    MAQ_AUTO = chave;
+    await w.document.getElementById("maqFile").onchange({target: {files: [excelDeVendas(v, ESTS.find(function (x) { return x.id === est; }) || {})], value: ""}});
+    var st = w.document.getElementById("maqStatus"); if (st && !/^Erro/.test(st.textContent)) st.textContent += " Do relatório guardado na app (Vendas → Relatório de vendas).";
+  } catch (e) { status(false, "⚠ Máquina de tabaco: " + falhou(e)); }
+}

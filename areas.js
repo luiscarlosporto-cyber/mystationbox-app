@@ -108,7 +108,7 @@ function nexAjustar() {
 function nexMostrar(pg) {
   var box = $("#nexBox");
   if (NEX_EST !== EST || !$("#nexFrame")) {
-    prepararNexStock(); NEX_EST = EST; NEX_PRONTO = false;
+    prepararNexStock(); NEX_EST = EST; NEX_PRONTO = false; if (typeof MAQ_AUTO !== "undefined") MAQ_AUTO = "";
     box.innerHTML = "<iframe id='nexFrame' title='Stock e encomendas' src='" + NEX_URL + "?msb=" + Date.now() + "' allow='camera; clipboard-write' style='width:100%;height:calc(100dvh - 170px);min-height:520px;border:0;border-radius:12px;background:transparent'></iframe><div id='nexVazio' class='vazio' hidden></div>";
     $("#nexFrame").addEventListener("load", function () { NEX_PRONTO = true; nexAjustar(); if (NEX_PEND) nexAplicar(NEX_PEND); });
   }
@@ -133,6 +133,7 @@ function nexAplicar(pg) {
   try { NEX_OBS = new d.defaultView.MutationObserver(function () { if (NEXP[PAGINA]) nexVis(PAGINA); }); NEX_OBS.observe(d.body, {subtree: true, attributes: true, attributeFilter: ["class"], childList: true}); } catch (e) { NEX_OBS = null; }
   nexVis(pg);
   try { d.defaultView.scrollTo(0, 0); } catch (e) { /* nada */ }
+  if (pg === "maq" && typeof maqAuto === "function") maqAuto();
 }
 function nexVis(pg) {
   var cfg = NEXP[pg], d = nexDoc(); if (!cfg || !d) return;
