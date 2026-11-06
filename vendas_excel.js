@@ -104,8 +104,60 @@ async function maqAuto() {
     await carregarXlsxMSB();
     var w = await esperarNex(function (w) { return w.document.getElementById("maqFile") && w.document.getElementById("maqFile").onchange; });
     if (PAGINA !== "maq" || est !== EST) return;
-    MAQ_AUTO = chave;
+    MAQ_AUTO = chave; maqVigiar(w);
     await w.document.getElementById("maqFile").onchange({target: {files: [await ficheiroNoQuadro(excelDeVendas(v, ESTS.find(function (x) { return x.id === est; }) || {}), w)], value: ""}});
     var st = w.document.getElementById("maqStatus"); if (st && !/^Erro/.test(st.textContent)) st.textContent += " Do relatório guardado na app (Vendas → Relatório de vendas).";
   } catch (e) { status(false, "⚠ Máquina de tabaco: " + falhou(e)); }
+}
+
+/* Relatório só da máquina (06/11/2026, pedido do utilizador): o módulo de stock faz as contas; aqui mostra-se só a máquina,
+   numa tabela compacta, e o PDF cabe numa folha A4. Vale também para um ficheiro escolhido à mão. */
+function maqNum(v, c) { return (Math.round(v * 100) / 100).toLocaleString("pt-PT", {minimumFractionDigits: c, maximumFractionDigits: c, useGrouping: "always"}); }
+function maqDados(w) {
+  var R = null; try { R = w.eval("typeof maqRep !== 'undefined' ? maqRep : null"); } catch (e) { /* ainda não leu */ }
+  if (!R) return null;
+  var linhas = R.rows.filter(function (r) { return r.qty > 0; }).sort(function (a, b) { return b.qty - a.qty || a.name.localeCompare(b.name, "pt"); });
+  var est = ESTS.find(function (x) { return x.id === EST; }) || {};
+  return {loja: est.short_name || est.name || "", per: R.per, qty: R.tot.qty, valor: R.tot.valor, margem: R.mM, pct: R.pctM, linhas: linhas};
+}
+function maqVigiar(w) {
+  var L = w.document.getElementById("maqList"); if (!L || w.__msbMaq) return;
+  w.__msbMaq = new w.MutationObserver(function () { if (!L.querySelector("[data-msb-maq]") && L.textContent.trim()) maqMostrar(w); });
+  w.__msbMaq.observe(L, {childList: true});
+  if (L.textContent.trim()) maqMostrar(w);
+}
+function maqMostrar(w) {
+  var D = maqDados(w), L = w.document.getElementById("maqList"); if (!D || !L) return;
+  L.innerHTML = "<div data-msb-maq='1'><div class='notice' style='font-size:15px;line-height:1.6;margin-top:8px'><b>Máquina de tabaco · " + esc(D.per) + "</b><br>" + maqNum(D.qty, 0) + " maços · <b>" + maqNum(D.valor, 2) + " €</b>" +
+    (D.margem != null ? " · margem " + maqNum(D.pct, 2) + " % = " + maqNum(D.margem, 2) + " €" : "") + "</div>" +
+    "<div style='overflow-x:auto'><table style='width:100%;border-collapse:collapse;font-size:14px;margin-top:8px'><thead><tr><th style='text-align:left;padding:6px 4px'>Artigo</th><th style='text-align:right;padding:6px 4px'>Maços</th><th style='text-align:right;padding:6px 4px'>€</th></tr></thead><tbody>" +
+    D.linhas.map(function (r) { return "<tr style='border-top:1px solid #e3e8ec'><td style='padding:5px 4px'>" + esc(r.name) + "</td><td style='text-align:right;padding:5px 4px;font-weight:600'>" + maqNum(r.qty, 0) + "</td><td style='text-align:right;padding:5px 4px;white-space:nowrap'>" + maqNum(r.valor, 2) + "</td></tr>"; }).join("") +
+    "</tbody></table></div><div class='actions'><button class='btn' id='msbMaqPdf' style='flex:1'>📄 Descarregar PDF (uma folha)</button></div></div>";
+  w.document.getElementById("msbMaqPdf").onclick = function () { maqPdfFolha(D).catch(function (e) { status(false, "⚠ PDF: " + falhou(e)); }); };
+}
+async function maqPdfFolha(D) {
+  await carregarPdfLib();
+  var P = window.PDFLib, doc = await P.PDFDocument.create(), F = await doc.embedFont(P.StandardFonts.Helvetica), B = await doc.embedFont(P.StandardFonts.HelveticaBold), pg = doc.addPage([595.28, 841.89]);
+  var W = 595.28, M = 28, az = P.rgb(0, 0.231, 0.361), tx = P.rgb(0.09, 0.14, 0.19), lin = P.rgb(0.85, 0.88, 0.91), n = D.linhas.length, topo = 841.89 - 40;
+  pg.drawText("Vendas da máquina de tabaco · " + D.loja, {x: M, y: topo, size: 14, font: B, color: az});
+  pg.drawText(D.per + " · " + maqNum(D.qty, 0) + " maços · " + maqNum(D.valor, 2) + " €" + (D.margem != null ? " · margem " + maqNum(D.pct, 2) + " % = " + maqNum(D.margem, 2) + " €" : ""), {x: M, y: topo - 18, size: 9.5, font: F, color: tx});
+  var y0 = topo - 44, alt = y0 - 40, fs = 8, cols = 1, por = 1;   // cabe numa folha: até 3 colunas e letra entre 8 e 5
+  for (fs = 8; fs >= 5; fs -= 0.5) { por = Math.floor(alt / (fs * 1.45)) - 1; cols = Math.ceil(n / por); if (cols <= 3) break; }
+  cols = Math.max(1, Math.min(3, cols)); por = Math.ceil(n / cols);
+  var gap = 14, cw = (W - 2 * M - (cols - 1) * gap) / cols, lh = fs * 1.45, nQ = B.widthOfTextAtSize("0000", fs), nV = F.widthOfTextAtSize("0 000,00", fs);
+  var corta = function (t, wmax) { if (F.widthOfTextAtSize(t, fs) <= wmax) return t; while (t.length > 1 && F.widthOfTextAtSize(t + "…", fs) > wmax) t = t.slice(0, -1); return t + "…"; };
+  var dir = function (t, x, y, f) { pg.drawText(t, {x: x - f.widthOfTextAtSize(t, fs), y: y, size: fs, font: f, color: tx}); };
+  for (var c = 0; c < cols; c++) {
+    var x = M + c * (cw + gap), y = y0;
+    pg.drawText("Artigo", {x: x, y: y, size: fs, font: B, color: az}); dir("Maços", x + cw - nV - 6, y, B); dir("€", x + cw, y, B);
+    y -= 3; pg.drawLine({start: {x: x, y: y}, end: {x: x + cw, y: y}, thickness: 0.7, color: az});
+    D.linhas.slice(c * por, (c + 1) * por).forEach(function (r) {
+      y -= lh; pg.drawText(corta(r.name, cw - nQ - nV - 14), {x: x, y: y, size: fs, font: F, color: tx});
+      dir(maqNum(r.qty, 0), x + cw - nV - 6, y, B); dir(maqNum(r.valor, 2), x + cw, y, F);
+      pg.drawLine({start: {x: x, y: y - fs * 0.35}, end: {x: x + cw, y: y - fs * 0.35}, thickness: 0.3, color: lin});
+    });
+  }
+  await marcaPdf(doc, pg, F, B, M, 18);
+  var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([await doc.save()], {type: "application/pdf"}));
+  a.download = "maquina-tabaco-" + (D.loja || "").toLowerCase().replace(/\s+/g, "-") + "-" + D.per.replace(/[^0-9]+/g, "-").replace(/^-|-$/g, "") + ".pdf"; document.body.appendChild(a); a.click(); a.remove();
 }

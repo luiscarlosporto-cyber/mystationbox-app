@@ -133,7 +133,7 @@ function nexAplicar(pg) {
   try { NEX_OBS = new d.defaultView.MutationObserver(function () { if (NEXP[PAGINA]) nexVis(PAGINA); }); NEX_OBS.observe(d.body, {subtree: true, attributes: true, attributeFilter: ["class"], childList: true}); } catch (e) { NEX_OBS = null; }
   nexVis(pg);
   try { d.defaultView.scrollTo(0, 0); } catch (e) { /* nada */ }
-  if (pg === "maq" && typeof maqAuto === "function") maqAuto();
+  if (pg === "maq" && typeof maqAuto === "function") { try { maqVigiar(d.defaultView); } catch (e) { /* nada */ } maqAuto(); }
 }
 function nexVis(pg) {
   var cfg = NEXP[pg], d = nexDoc(); if (!cfg || !d) return;
@@ -230,7 +230,7 @@ function escolherVendas(f) {
     try {
       var w = await esperarNex(function (w) { return o === "maq" ? w.document.getElementById("maqFile") && w.document.getElementById("maqFile").onchange : typeof w.salesChange === "function"; });
       var ev = {target: {files: [await ficheiroNoQuadro(f, w)], value: "", dataset: {sup: o}}};
-      if (o === "maq") w.document.getElementById("maqFile").onchange(ev); else w.salesChange(ev);
+      if (o === "maq") { maqVigiar(w); w.document.getElementById("maqFile").onchange(ev); } else w.salesChange(ev);
     } catch (e) { status(false, "⚠ " + e.message); }
   }; });
 }
