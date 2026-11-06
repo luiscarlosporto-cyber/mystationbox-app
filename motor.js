@@ -981,6 +981,7 @@ function lerServicoRepsol(linhas) {
   var P = [], RP = /\b\d{2}\.\d{4}-(\d{2})\.(\d{4})\b/g; while ((m = RP.exec(texto))) P.push(m[2] + "-" + m[1]);
   P.sort(); r.mes = P.length ? P[P.length - 1] : r.data.slice(0, 7);
   if (r.linhas.length && r.linhas.every(function (x) { return x.ref === "10054" || x.ref === "10055"; })) r.categoria = "Água";
+  else if (r.linhas.length && r.linhas.every(function (x) { return x.ref === "10082" || x.ref === "10516"; })) r.categoria = "Outros bónus";   // bónus trimestral My Repsol e compensação de rede
   r.verificacoes = erros.length ? erros.map(function (e) { return {nivel: "erro", texto: e}; }) : [{nivel: "ok", texto: r.linhas.length + " linhas; contas certas"}];
   return r;
 }

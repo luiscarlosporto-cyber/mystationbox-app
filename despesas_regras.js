@@ -1,7 +1,7 @@
 /* mystationbox · regras das despesas, sem ecrã, para se poderem testar: node app/testes/despesas.js */
 "use strict";
 var DESPESAS = (function () {
-  var CATEGORIAS = ["Salários", "Segurança Social", "Renda", "Luz", "Água", "Comunicações", "Seguros", "Contabilidade", "Limpeza", "Alarmes", "Kms do gerente", "Outros"];
+  var CATEGORIAS = ["Salários", "Segurança Social", "Renda", "Luz", "Água", "Comunicações", "Seguros", "Contabilidade", "Limpeza", "Alarmes", "Kms do gerente", "Outros bónus", "Outros"];
 
   /* "1.234,56", "1 234,56", "-336,93" ou "28.04" → cêntimos, sem passar por float. Devolve null se estiver vazio e NaN se for inválido. */
   function valorC(t) {
@@ -48,10 +48,10 @@ var DESPESAS = (function () {
     return e;
   }
 
-  /* Despesa de água vinda de um documento da Saphety, já lido por lerServicoRepsol. Fica sempre por confirmar; nota de crédito entra a negativo. */
+  /* Água ou outros bónus vindos de um documento da Saphety, já lido por lerServicoRepsol. Fica sempre por confirmar; nota de crédito entra a negativo e abate nos custos do Lucro. */
   function deSaphety(t, est, doc, fonte, original) {
     var s = t.tipo === "NC" ? -1 : 1;
-    return {estacao: est, mes: t.mes, dia: t.data, categoria: "Água", fornecedor: "Repsol água e esgoto", documento: t.numero, valor_c: s * t.pagar_c, iva_c: s * t.iva_c,
+    return {estacao: est, mes: t.mes, dia: t.data, categoria: t.categoria, fornecedor: t.categoria === "Água" ? "Repsol água e esgoto" : "Repsol bónus e compensações", documento: t.numero, valor_c: s * t.pagar_c, iva_c: s * t.iva_c,
       no_dl: true, estado: "por_confirmar", origem: "email", fonte: fonte, mensagem: "saphety:" + t.numero, hash: doc.hash, original: original, nota: t.tipo === "NC" ? "Nota de crédito" : null};
   }
 

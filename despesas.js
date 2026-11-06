@@ -15,9 +15,9 @@ function dspOpcoes(sel) { return DESPESAS.CATEGORIAS.map(function (c) { return "
 function dspMesPt(m) { return new Date(m + "-15").toLocaleDateString("pt-PT", {month: "long", year: "numeric"}); }
 function dspData(d) { return d ? d.split("-").reverse().join("/") : ""; }
 
-/* Água recolhida da Saphety pelo OCTAN AI: entra por confirmar. As taxas ficam em Margens e custos; outros serviços (bónus, compensação) ficam por classificar. */
+/* Água e outros bónus recolhidos da Saphety pelo OCTAN AI: entram por confirmar. As taxas ficam em Margens e custos; referência desconhecida fica por classificar. */
 async function dspImportarSaphety() {
-  var est = EST, r = await sb.from("msb_saphety_docs").select("numero,original,hash,estado").eq("estacao", est).in("estado", ["recolhido", "outro"]).or("numero.like.Z3FS*,numero.like.Z3G3*,numero.like.Z720*"); if (r.error) throw r.error;
+  var est = EST, r = await sb.from("msb_saphety_docs").select("numero,original,hash,estado").eq("estacao", est).in("estado", ["recolhido", "outro", "por_classificar"]).or("numero.like.Z3FS*,numero.like.Z3G3*,numero.like.Z720*"); if (r.error) throw r.error;
   if (!(r.data || []).length) return;
   var fx = await sb.from("msb_despesas_fontes").select("id").eq("estacao", est).eq("categoria", "Água").limit(1); if (fx.error) throw fx.error;
   var fonte = fx.data && fx.data[0] ? fx.data[0].id : null, posto = (ESTS.find(function (x) { return x.id === est; }) || {}).posto_repsol;
@@ -25,12 +25,12 @@ async function dspImportarSaphety() {
   for (var i = 0; i < r.data.length; i++) {
     var d = r.data[i], f = await sb.storage.from("msb-originais").download(d.original); if (f.error) throw f.error;
     var t, L = await linhasPdf(new Uint8Array(await f.data.arrayBuffer()));
-    try { t = MOTOR.lerServicoRepsol(L); } catch (e) { if (d.estado === "outro") await marca(d.numero, "nao_lido"); continue; }   // recolhido e não lido: pode ser fatura de taxas
+    try { t = MOTOR.lerServicoRepsol(L); } catch (e) { if (d.estado !== "recolhido") await marca(d.numero, "nao_lido"); continue; }   // recolhido e não lido: pode ser fatura de taxas
     if (t.verificacoes.some(function (v) { return v.nivel === "erro"; }) || (posto && t.posto !== posto)) { await marca(d.numero, "nao_lido"); continue; }
-    if (t.categoria !== "Água") { await marca(d.numero, "por_classificar"); continue; }
+    if (!t.categoria) { if (d.estado !== "por_classificar") await marca(d.numero, "por_classificar"); continue; }
     var caminho = est + "/" + t.mes + "/" + d.hash + ".pdf", up = await sb.storage.from("msb-despesas").upload(caminho, f.data, {contentType: "application/pdf", upsert: false});
     if (up.error && !/exist|duplicate|409/i.test(up.error.message + " " + (up.error.statusCode || ""))) throw up.error;
-    var ins = await sb.from("msb_despesas").insert(DESPESAS.deSaphety(t, est, d, fonte, caminho)); if (ins.error && ins.error.code !== "23505") throw ins.error;
+    var ins = await sb.from("msb_despesas").insert(DESPESAS.deSaphety(t, est, d, t.categoria === "Água" ? fonte : null, caminho)); if (ins.error && ins.error.code !== "23505") throw ins.error;
     await marca(d.numero, "despesa");
   }
 }
