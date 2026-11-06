@@ -72,7 +72,7 @@ async function carregarMargens() {
     h += "<div class='card' style='padding:14px;display:grid;gap:10px'><h2 style='margin:0'>🧾 Taxas de exploração · fatura mensal da Repsol</h2>" +
       "<p class='mut' style='margin:0;font-size:13px'>Valores sem IVA. Loja e Lavagem são fixas e contam todos os meses. A My Repsol varia: escreva o valor de cada fatura. Nesse mês, o Lucro usa este valor em vez da estimativa em €/m³ do quadro de bónus.</p>" +
       "<b>Fixas (€ por mês)</b><div id='taxasLista' style='display:grid;gap:6px'>" + TAXAS_FIXAS.map(function (n) { var c = C.find(function (x) { return x.nome === n; }); return linhaCusto(n, c ? c.valor_c / 100 : null, true); }).join("") + "</div>" +
-      "<b>My Repsol (variável)</b><div class='ff'><label>Mês<input type='month' id='txMes' value='" + addMes(MES, -1) + "'></label><label>Valor € sem IVA<input id='txMr' inputmode='decimal' autocomplete='off'></label><label>Nº da fatura<input id='txFt' autocomplete='off'></label></div></div>";
+      "<b>My Repsol (variável)</b><div class='ff'><label>Mês<input type='month' id='txMes' value='" + addMes(MES, -1) + "'></label><label>Valor € sem IVA<input id='txMr' inputmode='decimal' autocomplete='off'></label><label>Nº da fatura<input id='txFt' autocomplete='off'></label></div><div id='txSaphety' style='display:grid;gap:8px'></div></div>";
     h += "<div class='card' style='padding:14px;display:grid;gap:10px'><h2 style='margin:0'>🧾 Custos fixos por mês</h2>" +
       "<p class='mut' style='margin:0;font-size:13px'>Valor por mês; valores aproximados chegam. Os que deixar em branco não contam. Para outros (manutenção, combustível próprio, limpeza…), use «+ Acrescentar custo».</p>" +
       "<div id='custosLista' style='display:grid;gap:6px'>" + CUSTOS_BASE.map(function (n) { var c = C.find(function (x) { return x.nome.toLowerCase() === n.toLowerCase(); }); return linhaCusto(n, c ? c.valor_c / 100 : null, true); }).join("") +
@@ -80,7 +80,7 @@ async function carregarMargens() {
       "<div class='bar'><button class='btn' id='custoMais'>+ Acrescentar custo</button></div></div>";
     h += "<div class='bar'><button class='btn p' id='mrgGravar'>Gravar margens e custos</button><span class='st' id='mrgSt'></span></div>";
     box.innerHTML = h; if (window.MSB_NAV) MSB_NAV.seccoes(box);
-    $("#txMes").onchange = function () { lerTaxaMes().catch(function (e) { $("#mrgSt").textContent = "⚠ " + falhou(e); }); }; await lerTaxaMes();
+    $("#txMes").onchange = function () { lerTaxaMes().catch(function (e) { $("#mrgSt").textContent = "⚠ " + falhou(e); }); }; await lerTaxaMes(); pintarTaxasSaphety(C);
     $("#custoMais").onclick = function () { $("#custosLista").insertAdjacentHTML("beforeend", linhaCusto("", null)); var u = $$("#custosLista .cn"); u[u.length - 1].focus(); };
     $("#mrgGravar").onclick = gravarMargens;
   } catch (e) { box.innerHTML = "<div class='bad'>" + esc(falhouLucro(e)) + "</div>"; }
@@ -92,6 +92,41 @@ async function lerTaxaMes() {   // preenche o valor My Repsol do mês escolhido
   var r = await sb.from("msb_taxas_mes").select("myrepsol_c,fatura").eq("estacao", EST).eq("mes", m).maybeSingle();
   if (r.error) throw r.error;
   if (r.data && $("#txMes").value === m) { $("#txMr").value = String(r.data.myrepsol_c / 100).replace(".", ","); $("#txFt").value = r.data.fatura || ""; }
+}
+/* Faturas de taxas recolhidas da Saphety pelo OCTAN AI: leem-se aqui e só contam depois de confirmadas. A série Z3FS também traz água: fica marcada como «outro». */
+async function pintarTaxasSaphety(C) {
+  var box = $("#txSaphety"), est = EST; if (!box || !ADMIN) return;
+  try {
+    var r = await sb.from("msb_saphety_docs").select("numero,data,original").eq("estacao", est).eq("estado", "recolhido").like("numero", "Z3FS%").order("data"); if (r.error) throw r.error;
+    var e = ESTS.find(function (x) { return x.id === est; }), L = [];
+    for (var i = 0; i < (r.data || []).length; i++) {
+      var d = r.data[i], f = await sb.storage.from("msb-originais").download(d.original); if (f.error) throw f.error;
+      var bytes = new Uint8Array(await f.data.arrayBuffer()), t;
+      try { t = MOTOR.lerTaxasRepsol(await linhasPdf(bytes)); }
+      catch (x) { var u = await sb.from("msb_saphety_docs").update({estado: "outro"}).eq("estacao", est).eq("numero", d.numero); if (u.error) throw u.error; continue; }
+      L.push({d: d, t: t, erros: t.verificacoes.filter(function (v) { return v.nivel === "erro"; }).map(function (v) { return v.texto; }).concat(e && e.posto_repsol && t.posto !== e.posto_repsol ? ["o posto da fatura (" + t.posto + ") não é o desta loja"] : [])});
+    }
+    if (est !== EST || !$("#txSaphety")) return;
+    var fixo = function (n) { var c = C.find(function (x) { return x.nome === n; }); return c ? c.valor_c : 0; };
+    var dif = function (v, n) { return v !== fixo(n) ? " <span class='bad'>⚠ o quadro tem " + fmt(fixo(n)) + " €</span>" : ""; };
+    box.innerHTML = L.length ? "<b>Faturas recolhidas, por confirmar</b>" + L.map(function (x, i) {
+      var t = x.t;
+      return "<div class='aviso' style='display:grid;gap:6px'><b>" + esc(t.numero) + " · " + dmy(t.data) + "</b>" +
+        "<div style='font-size:14px'>My Repsol " + fmt(t.myrepsol_c) + " € · Combustíveis " + fmt(t.combustiveis_c) + " €<br>Loja " + fmt(t.loja_c) + " €" + dif(t.loja_c, TAXAS_FIXAS[0]) + " · Lavagem " + fmt(t.lavagem_c) + " €" + dif(t.lavagem_c, TAXAS_FIXAS[1]) + "<br>Total sem IVA " + fmt(t.total_c) + " € · IVA " + fmt(t.iva_c) + " € · A pagar com IVA " + fmt(t.pagar_c) + " €</div>" +
+        (x.erros.length ? "<div class='bad'>❌ Não pode ser confirmada: " + esc(x.erros.join("; ")) + "</div>" : "") +
+        "<div class='bar'><label style='margin:0'>Mês<input type='month' class='txCm' data-i='" + i + "' value='" + addMes(t.data.slice(0, 7), -1) + "'></label><button class='btn' data-ver='" + i + "'>Ver PDF</button>" + (x.erros.length ? "" : "<button class='btn p' data-cf='" + i + "'>Confirmar</button>") + "</div></div>";
+    }).join("") : "";
+    box.querySelectorAll("[data-ver]").forEach(function (b) { b.onclick = function () { abrirOriginal(L[+b.dataset.ver].d.original); }; });
+    box.querySelectorAll("[data-cf]").forEach(function (b) { b.onclick = async function () {
+      var x = L[+b.dataset.cf], m = box.querySelector(".txCm[data-i='" + b.dataset.cf + "']").value, st = $("#mrgSt"); if (!m) { st.textContent = "⚠ Escolha o mês."; return; }
+      b.disabled = true;
+      try {
+        var a = await sb.from("msb_taxas_mes").upsert({estacao: est, mes: m, myrepsol_c: x.t.myrepsol_c, combustiveis_c: x.t.combustiveis_c, fatura: x.t.numero, dados: x.t, original: x.d.original, atualizado_em: new Date().toISOString(), atualizado_por: EU && EU.id}, {onConflict: "estacao,mes"}); if (a.error) throw a.error;
+        var u2 = await sb.from("msb_saphety_docs").update({estado: "confirmado"}).eq("estacao", est).eq("numero", x.d.numero); if (u2.error) throw u2.error;
+        st.className = "st ok"; st.textContent = "✔ Fatura confirmada para " + m + "."; if ($("#txMes").value === m) await lerTaxaMes(); pintarTaxasSaphety(C);
+      } catch (e2) { b.disabled = false; st.className = "st bad"; st.textContent = "⚠ " + falhou(e2); }
+    }; });
+  } catch (e3) { if ($("#txSaphety")) box.innerHTML = "<div class='bad'>⚠ Faturas recolhidas: " + esc(falhou(e3)) + "</div>"; }
 }
 var CUSTOS_BASE = ["Salários", "Renda", "Luz", "Água", "Comunicações", "Seguros", "Contabilidade"];
 function linhaCusto(nome, v, base) { return "<div class='bar custo" + (base ? " base" : "") + "'><input class='cn' placeholder='Nome do custo' value='" + esc(nome || "") + "'" + (base ? " readonly tabindex='-1' style='flex:1;min-width:0;border-color:transparent;background:transparent;font-weight:600'" : " style='flex:1;min-width:0'") + "><input class='cv' inputmode='decimal' placeholder='0,00' value='" + (v == null ? "" : num4(v.toFixed(2))) + "' style='width:110px;text-align:right'> €" + (base ? "<span style='width:34px'></span>" : "<button class='mini' onclick='this.parentElement.remove()'>✕</button>") + "</div>"; }
@@ -149,7 +184,7 @@ async function carregarLucro() {
     var h = "", totM = 0, falta = [];
     /* combustível */
     var BL = bonusLitro(M), tBon = 0;
-    var rx = await sb.from("msb_taxas_mes").select("myrepsol_c,fatura").eq("estacao", EST).eq("mes", m).maybeSingle(); if (rx.error) throw rx.error;
+    var rx = await sb.from("msb_taxas_mes").select("myrepsol_c,combustiveis_c,fatura").eq("estacao", EST).eq("mes", m).maybeSingle(); if (rx.error) throw rx.error;
     var TMR = rx.data, txEstimada = BL.tx;
     if (TMR) { BL.cons += BL.tx; BL.desc += BL.tx; BL.tx = 0; }   // há valor real da fatura: sai a estimativa em €/m³
     var prods = Object.keys(Object.assign({}, D.comb.consigna || {}, D.comb.solred || {})).sort(), linhas = "", tl = {cons: 0, desc: 0, sol: 0}, mC = 0;
@@ -182,7 +217,7 @@ async function carregarLucro() {
     h += "<div class='card' style='padding:14px;display:grid;gap:8px'><h2 style='margin:0'>🛍️ Loja</h2><div class='sc'><table><thead><tr><th class='l'>Categoria</th><th>Vendas sem IVA €</th><th>Margem</th><th>Margem €</th></tr></thead><tbody>" + lj +
       "</tbody><tfoot><tr><td class='l'>Total</td><td class='n'>" + fmt(Object.keys(fams).reduce(function (s, c) { return s + fams[c].base; }, 0)) + "</td><td></td><td class='n'><b>" + fmt(Math.round(mL)) + "</b></td></tr></tfoot></table></div></div>";
     /* resultado e projeção */
-    var CM = await custosRealDoMes(C, m), custos = (CM.total_c + (TMR ? TMR.myrepsol_c : 0)) / 100;   // a despesa confirmada substitui o custo fixo da mesma categoria
+    var CM = await custosRealDoMes(C, m), custos = (CM.total_c + (TMR ? TMR.myrepsol_c + (TMR.combustiveis_c || 0) : 0)) / 100;   // a despesa confirmada substitui o custo fixo da mesma categoria
     var diasMes = new Date(+m.slice(0, 4), +m.slice(5, 7), 0).getDate(), dias = V.de && V.ate ? diasEntre(V.de, V.ate) : diasMes, fator = dias < diasMes ? diasMes / dias : 1;
     var c2 = function (v) { return fmt(Math.round(v * 100)); };
     var res = totM - custos * Math.min(1, dias / diasMes), proj = totM * fator - custos;
@@ -193,7 +228,7 @@ async function carregarLucro() {
       "<div><div class='k'>" + (fator > 1 ? "Resultado até " + dmy(V.ate).slice(0, 5) : "Resultado do mês") + "</div><div class='v' style='color:" + (res >= 0 ? "#7CE3A0" : "#FF9B85") + "'>" + c2(res) + "<small>€</small></div></div>" +
       (fator > 1 ? "<div><div class='k'>Projeção do mês (" + diasMes + " dias)</div><div class='v' style='color:" + (proj >= 0 ? "#7CE3A0" : "#FF9B85") + "'>" + c2(proj) + "<small>€</small></div></div>" : "") +
       "</section>" + (falta.length ? "<div class='aviso'><p>⚠ Margens por definir (não entram na conta): " + esc(falta.join(", ")) + ". <a href='#' data-ir='mrg'>Definir em Gestão → Margens e custos</a>.</p></div>" : "") +
-      (TMR ? "<p class='mut' style='margin:0;font-size:13px'>Taxa My Repsol: " + fmt(TMR.myrepsol_c) + " € da fatura" + (TMR.fatura ? " " + esc(TMR.fatura) : "") + (txEstimada ? ", em vez da estimativa em €/m³." : ".") + "</p>" : "") + (CM.reais ? "<p class='mut' style='font-size:12px;margin:0'>Custos sem IVA: " + CM.reais + " categorias com valor real (Despesas) e as restantes com o custo fixo.</p>" : "") + (!C.length && !TMR && !CM.reais ? "<div class='aviso'><p>ℹ️ Sem custos fixos: o valor acima é só a margem bruta. <a href='#' data-ir='mrg'>Acrescentar custos</a>.</p></div>" : "") + h +
+      (TMR ? "<p class='mut' style='margin:0;font-size:13px'>Taxa My Repsol: " + fmt(TMR.myrepsol_c) + " €" + (TMR.combustiveis_c ? " e taxa de combustíveis: " + fmt(TMR.combustiveis_c) + " €" : "") + " da fatura" + (TMR.fatura ? " " + esc(TMR.fatura) : "") + (txEstimada ? ", em vez da estimativa em €/m³." : ".") + "</p>" : "") + (CM.reais ? "<p class='mut' style='font-size:12px;margin:0'>Custos sem IVA: " + CM.reais + " categorias com valor real (Despesas) e as restantes com o custo fixo.</p>" : "") + (!C.length && !TMR && !CM.reais ? "<div class='aviso'><p>ℹ️ Sem custos fixos: o valor acima é só a margem bruta. <a href='#' data-ir='mrg'>Acrescentar custos</a>.</p></div>" : "") + h +
       "<p class='mut' style='font-size:12px;margin:0'>Estimativa: margens por categoria definidas em Gestão; sem IVA. Fonte das vendas: " + esc(V.fonte || "relatório de vendas") + (fator > 1 ? ". Projeção = margem até agora × " + diasMes + "/" + dias + " dias − custos fixos do mês." : ".") + "</p>";
     box.innerHTML = h;
     $$("#lucCorpo [data-ir]").forEach(function (a) { a.onclick = function (ev) { ev.preventDefault(); ir(a.dataset.ir); }; });
