@@ -62,19 +62,19 @@
   }
   function pintar() {
     var box = $("#v-hor"), n = Object.keys(X.ALT).length, b = "<div class='bar'><button class='btn' id='horAnt' aria-label='Mês anterior'>‹</button><input type='month' id='horMes' value='" + X.M + "'><button class='btn' id='horSeg' aria-label='Mês seguinte'>›</button>" +
-      "<span class='tag " + (X.estado === "simulacao" ? "t-at'>Simulação" : "t-ok'>Horário real") + "</span>";
+      "<span class='tag " + (X.apr ? "t-ok'>Selado · edição manual" : X.estado === "simulacao" ? "t-at'>Em preparação" : "t-ok'>Horário real") + "</span>";
     if (ADMIN && X.P.length) b += X.ed
-      ? "<button class='btn az' id='horProj'" + (X.calc ? " disabled" : "") + ">" + (X.calc ? "A ajustar…" : "Projetar o resto") + "</button><button class='btn' id='horIni'" + (X.INI ? "" : " disabled") + ">Horário inicial</button><button class='btn' id='horEsp'>Especiais</button><button class='btn p' id='horGrava'" + (n && !X.calc ? "" : " disabled") + ">Gravar" + (n ? " " + n : "") + "</button><button class='btn' id='horFim'>Sair da edição</button>"
-      : "<button class='btn' id='horEd'>Editar</button><button class='btn' id='horEsp'>Especiais</button><button class='btn' id='horDefIni'>Guardar como inicial</button><button class='btn' id='horEst'>" + (X.estado === "simulacao" ? "Passar a real" : "Passar a simulação") + "</button><button class='btn' id='horXls'>Excel Picaponto</button><button class='btn' id='horPdf'>PDF</button>";
-    box.innerHTML = b + "</div>" + (X.esp ? cartaoEsp() : "") + inviavel() + (X.P.length ? celulas() + "<p class='rod'>M manhã · T tarde · MT turno M/T · FG folga · F férias · FD feriado. Fundo azul: fim de semana; creme: feriado." + (ADMIN ? " Verde e negrito: turno extra." : "") + (X.ESP.length ? " Especiais: B baixa · Fr formação · A aniversário · O outros."  : "") + (X.ed ? " Toca numa célula e escolhe o turno: fica fixado (sublinhado) e a app ajusta o resto do mês às regras, sem mexer no que está fixado. Para segurar um turno sem o mudar, toca nele e carrega em Fixar turno. Se não der, avisa e diz porquê. Projetar o resto refaz tudo menos o fixado. Horário inicial volta à versão de partida do mês." : "") + "</p>" + regras()
-      : "<div class='vazio'>Ainda não há horário de " + nomeMes(X.M) + " nesta loja." + (ADMIN ? "<p><button class='btn p' id='horNovo'>Criar horário do mês</button></p>" : "") + "</div>");
+      ? (X.apr ? "" : "<button class='btn az' id='horProj'" + (X.calc ? " disabled" : "") + ">" + (X.calc ? "A ajustar…" : "Projetar o resto") + "</button><button class='btn' id='horIni'" + (X.INI ? "" : " disabled") + ">Horário inicial</button>") + "<button class='btn' id='horEsp'>Especiais</button><button class='btn p' id='horGrava'" + (n && !X.calc ? "" : " disabled") + ">Gravar" + (n ? " " + n : "") + "</button><button class='btn' id='horFim'>Sair da edição</button>"
+      : (X.apr ? "<button class='btn p' id='horEnv'>" + (X.env ? "Reenviar aos funcionários" : "Enviar aos funcionários") + "</button>" : "<button class='btn p' id='horSelo'>Selar horário</button>") + "<button class='btn' id='horEd'>Editar</button><button class='btn' id='horEsp'>Especiais</button>" + (X.apr ? "<button class='btn' id='horTira'>Tirar o selo</button>" : "<button class='btn' id='horDefIni'>Guardar como inicial</button>") + "<button class='btn' id='horXls'>Excel Picaponto</button><button class='btn' id='horPdf'>PDF</button>";
+    box.innerHTML = b + "</div>" + (ADMIN && X.apr && X.env && X.atu > X.env ? "<div class='aviso'><p>⚠ Alterado depois de enviado. Os funcionários ainda têm a versão anterior: carrega em Reenviar.</p></div>" : "") + (ADMIN && X.apr && !X.env ? "<div class='aviso'><p>Horário selado. Falta enviar aos funcionários.</p></div>" : "") + (X.envio ? cartaoEnvio() : "") + (X.esp ? cartaoEsp() : "") + inviavel() + (X.P.length ? celulas() + "<p class='rod'>M manhã · T tarde · MT turno M/T · FG folga · F férias · FD feriado. Fundo azul: fim de semana; creme: feriado." + (ADMIN ? " Verde e negrito: turno extra." : "") + (X.ESP.length ? " Especiais: B baixa · Fr formação · A aniversário · O outros."  : "") + (X.ed && X.apr ? " Horário selado: cada mudança é manual, nada se ajusta sozinho." : "") + (X.ed && !X.apr ? " Toca numa célula e escolhe o turno: fica fixado (sublinhado) e a app ajusta o resto do mês às regras, sem mexer no que está fixado. Para segurar um turno sem o mudar, toca nele e carrega em Fixar turno. Se não der, avisa e diz porquê. Projetar o resto refaz tudo menos o fixado. Horário inicial volta à versão de partida do mês." : "") + "</p>" + regras()
+      : "<div class='vazio'>" + (ADMIN ? "Ainda não há horário de " + nomeMes(X.M) + " nesta loja." : "O horário de " + nomeMes(X.M) + " ainda não está disponível.") + (ADMIN ? "<p><button class='btn p' id='horNovo'>Criar horário do mês</button></p>" : "") + "</div>");
     $("#horAnt").onclick = function () { sair(function () { abrir(addMes(X.M, -1)); }); };
     $("#horSeg").onclick = function () { sair(function () { abrir(addMes(X.M, 1)); }); };
     $("#horMes").onchange = function () { var v = this.value; if (v) sair(function () { abrir(v); }); };
     var e = function (id, f) { var x = $(id); if (x) x.onclick = f; };
     e("#horEd", function () { X.ed = true; pintar(); });
     e("#horFim", function () { sair(function () { abrir(X.M); }); });
-    e("#horEsp", function () { X.esp = !X.esp; pintar(); }); if (X.esp) ligarEsp(); e("#horProj", projetar); e("#horIni", voltarInicial); e("#horDefIni", definirInicial); e("#horGrava", gravar); e("#horEst", mudarEstado); e("#horXls", excel); e("#horPdf", pdf); e("#horNovo", criar);
+    e("#horEsp", function () { X.esp = !X.esp; pintar(); }); if (X.esp) ligarEsp(); e("#horProj", projetar); e("#horIni", voltarInicial); e("#horDefIni", definirInicial); e("#horGrava", gravar); e("#horSelo", selar); e("#horTira", tirarSelo); e("#horEnv", abrirEnvio); if (X.envio) ligarEnvio(); e("#horXls", excel); e("#horPdf", pdf); e("#horNovo", criar);
     var sc = $("#horSc"); if (sc) {
       var alvo = sc.querySelector("th.hj"); if (alvo && X.rolar) { sc.scrollLeft = Math.max(0, alvo.offsetLeft - 140); X.rolar = false; }
       if (X.ed) { sc.onclick = function (ev) { var t = ev.target.closest("td[data-c]"); if (t) escolher(t); }; sc.onkeydown = function (ev) { if (ev.key === "Enter" || ev.key === " ") { var t = ev.target.closest("td[data-c]"); if (t) { ev.preventDefault(); escolher(t); } } }; }
@@ -90,7 +90,7 @@
     var es = (X.EM[id] || {})[d]; if (es) return editarEsp(es);
     var cods = HOR.CODIGOS.filter(function (k) { return k !== "MT" || X.mt; });
     var fx = (X.FX[id] || {})[d], atual = (X.G[id] || {})[d] || "";
-    m.innerHTML = "<b>Turno · " + esc(c.curto || "") + " · dia " + d + "</b><div>" + cods.map(function (k) { return "<button data-k='" + k + "'>" + k + "</button>"; }).join("") + (/^(F|FD)$/.test(atual) ? "<button data-k=''>Limpar</button>" : fx ? "<button data-s='1'>Soltar turno</button>" : atual ? "<button data-f='1'>Fixar turno</button>" : "") + "</div>";
+    m.innerHTML = "<b>Turno · " + esc(c.curto || "") + " · dia " + d + "</b><div>" + cods.map(function (k) { return "<button data-k='" + k + "'>" + k + "</button>"; }).join("") + (/^(F|FD)$/.test(atual) ? "<button data-k=''>Limpar</button>" : X.apr ? "" : fx ? "<button data-s='1'>Soltar turno</button>" : atual ? "<button data-f='1'>Fixar turno</button>" : "") + "</div>";
     m.onclick = function (e) {
       var b = e.target.closest("button"); if (!b) return; m.remove();
       if (b.dataset.f) { pôr(id, d, atual, true); pintar(); }   // fica como está: não é preciso ajustar nada
@@ -112,6 +112,7 @@
     ajustar();
   }
   function ajustar() {
+    if (X.apr) { X.calc = false; return pintar(); }   // selado: só mudam as células que o gerente mudar
     X.nr = (X.nr || 0) + 1;   // um cálculo ainda a correr já não vale: não sabe desta mudança
     X.calc = true; pintar();
     clearTimeout(X.tm); X.tm = setTimeout(function () { projetar(true); }, 500);   // vários toques seguidos dão um só ajuste
@@ -244,6 +245,7 @@
     return {P: P, op: {y: ano, m: mes, fer: X.fer, mtSemanas: sem, outrosM: oM, outrosT: oT}};
   }
   async function projetar(auto) {   // auto = ajuste depois de uma edição: mexe só no necessário
+    if (X.apr) return;
     var ES = X.P.filter(function (l) { return l.escala && !l.espelho; }), ctx = X, nr = X.nr = (X.nr || 0) + 1;
     if (!ES.length) { X.calc = false; pintar(); return msbAviso("Erro: não há pessoas na escala deste mês."); }
     clearTimeout(X.tm); X.calc = true; X.inv = ""; pintar();
@@ -299,11 +301,63 @@
     if (r.error) return msbAviso("Erro: " + falhou(r.error));
     X.INI = {dias: dias}; msbAviso("Horário inicial guardado");
   }
-  async function mudarEstado() {
-    var novo = X.estado === "simulacao" ? "real" : "simulacao";
-    if (!await msbConfirma(novo === "real" ? "Passar " + nomeMes(X.M) + " a horário real?" : "Passar " + nomeMes(X.M) + " a simulação?", "Confirmar")) return;
-    var r = await sb.from("msb_horario_meses").update({estado: novo}).eq("estacao", EST).eq("mes", X.M);
+  async function selar() {
+    var n = verif().erros.length;
+    if (!await msbConfirma("Selar o horário de " + nomeMes(X.M) + "? Depois disso o sistema deixa de compensar sozinho e cada mudança é manual." + (n ? " Atenção: o horário tem " + n + " erro(s) nas regras." : ""), "Selar horário")) return;
+    var r = await sb.from("msb_horario_meses").update({estado: "real", aprovado_em: new Date().toISOString(), aprovado_por: quemSou()}).eq("estacao", EST).eq("mes", X.M);
     if (r.error) return msbAviso("Erro: " + falhou(r.error)); abrir(X.M);
+  }
+  async function tirarSelo() {
+    if (!await msbConfirma("Tirar o selo de " + nomeMes(X.M) + "? O sistema volta a compensar e os funcionários deixam de ver este horário até o selares outra vez.", "Tirar o selo")) return;
+    var r = await sb.from("msb_horario_meses").update({estado: "simulacao", aprovado_em: null, aprovado_por: null}).eq("estacao", EST).eq("mes", X.M);
+    if (r.error) return msbAviso("Erro: " + falhou(r.error)); abrir(X.M);
+  }
+  /* Envio aos funcionários: fica na app (quem tem conta vê o que está selado) e segue o PDF, por email pelo OCTAN AI ou partilhado pelo telemóvel */
+  function linhasEnvio() { return X.P.filter(function (l) { return Object.keys(X.G[l.colaborador_id] || {}).length; }); }
+  async function abrirEnvio() {
+    if (Object.keys(X.ALT).length) return msbAviso("Erro: grava as alterações antes de enviar.");
+    var ids = linhasEnvio().map(function (l) { return l.colaborador_id; }), c = await sb.from("msb_colab_contactos").select("colaborador_id,email").in("colaborador_id", ids), u = await sb.from("msb_horario_envios").select("estado,para,erro,criado").eq("estacao", EST).eq("mes", X.M).order("id", {ascending: false}).limit(1);
+    if (c.error || u.error) return msbAviso("Erro: " + falhou(c.error || u.error));
+    X.MAIL = {}; (c.data || []).forEach(function (x) { X.MAIL[x.colaborador_id] = x.email; });
+    X.ultEnv = (u.data || [])[0] || null; X.envio = true; pintar();
+  }
+  function cartaoEnvio() {
+    var u = X.ultEnv, E = {pendente: "Na fila: sai dentro de minutos, com o PC ligado.", a_enviar: "A enviar.", enviado: "Enviado.", erro: "Falhou: "};
+    return "<div class='aviso' style='display:grid;gap:8px'><b>Enviar o horário de " + esc(nomeMes(X.M)) + "</b><div class='mut' style='font-size:13px'>O PDF vai sem a marcação dos turnos extra. Quem tem conta também o vê na app.</div>" +
+      linhasEnvio().map(function (l) { var c = X.C[l.colaborador_id] || {}, m = X.MAIL[l.colaborador_id] || ""; return "<label style='display:grid;grid-template-columns:24px minmax(90px,150px) minmax(0,1fr);gap:8px;align-items:center;margin:0'><input type='checkbox' class='envSim' data-c='" + l.colaborador_id + "'" + (m ? " checked" : "") + " aria-label='Enviar a " + esc(c.curto || "") + "'><span>" + esc(c.curto || "") + "</span><input type='email' class='envMail' data-c='" + l.colaborador_id + "' value='" + esc(m) + "' placeholder='email' autocomplete='off'></label>"; }).join("") +
+      "<div class='bar'><button class='btn p' id='envMail'>Enviar por email</button><button class='btn' id='envPdf'>Partilhar PDF</button><button class='btn' id='envFim'>Fechar</button></div>" +
+      (u ? "<div class='mut' style='font-size:13px'>Último envio: " + u.para.length + " pessoa(s) · " + esc(E[u.estado] || "") + (u.estado === "erro" ? esc(u.erro || "") : "") + "</div>" : "") + "</div>";
+  }
+  function ligarEnvio() {
+    $("#envFim").onclick = function () { X.envio = false; pintar(); };
+    $("#envMail").onclick = enviarEmail; $("#envPdf").onclick = partilhar;
+    [].forEach.call(document.querySelectorAll(".envMail"), function (i) { i.oninput = function () { var s = document.querySelector(".envSim[data-c='" + i.dataset.c + "']"); s.checked = !!i.value.trim(); }; });
+  }
+  async function marcarEnviado() {
+    var t = new Date().toISOString(), r = await sb.from("msb_horario_meses").update({enviado_em: t}).eq("estacao", EST).eq("mes", X.M); if (r.error) throw r.error;
+    X.env = t;
+  }
+  async function enviarEmail() {
+    var b = $("#envMail"), L = [].filter.call(document.querySelectorAll(".envSim"), function (s) { return s.checked; }).map(function (s) { return {c: +s.dataset.c, e: document.querySelector(".envMail[data-c='" + s.dataset.c + "']").value}; }), T = HOR.emails(L.map(function (x) { return x.e; }));
+    if (T.maus.length) return msbAviso("Erro: email inválido: " + T.maus.join(", "));
+    if (!T.ok.length) return msbAviso("Erro: escreve pelo menos um email.");
+    if (!await msbConfirma("Enviar o horário de " + nomeMes(X.M) + " a " + T.ok.length + " pessoa(s)?", "Enviar")) return;
+    b.disabled = true;
+    try {
+      var C = L.filter(function (x) { return x.e.trim().toLowerCase() !== X.MAIL[x.c]; }).map(function (x) { return {colaborador_id: x.c, email: x.e.trim().toLowerCase()}; });
+      if (C.length) { var r0 = await sb.from("msb_colab_contactos").upsert(C, {onConflict: "colaborador_id"}); if (r0.error) throw r0.error; }
+      var cam = EST + "/horarios/" + X.M + "_" + Date.now() + ".pdf", r1 = await sb.storage.from("msb-originais").upload(cam, await gerarPdf(true), {contentType: "application/pdf", upsert: false}); if (r1.error) throw r1.error;
+      var r2 = await sb.from("msb_horario_envios").insert({estacao: EST, mes: X.M, para: T.ok, assunto: "Horário de " + nomeMes(X.M) + " · " + nomeLoja(), original: cam, pedido_por: quemSou()}); if (r2.error) throw r2.error;
+      await marcarEnviado(); X.envio = false; pintar(); msbAviso("Na fila: o OCTAN AI envia dentro de minutos, com o PC ligado.");
+    } catch (e) { b.disabled = false; msbAviso("Erro: " + falhou(e)); }
+  }
+  async function partilhar() {
+    try {
+      var blob = await gerarPdf(true), f = new File([blob], ficheiro("pdf"), {type: "application/pdf"});
+      if (navigator.canShare && navigator.canShare({files: [f]})) { try { await navigator.share({files: [f], title: "Horário de " + nomeMes(X.M)}); } catch (e) { if (e.name === "AbortError") return; throw e; } }
+      else { descarregar(blob, ficheiro("pdf")); msbAviso("PDF descarregado: envia-o por WhatsApp ou email."); }
+      await marcarEnviado(); pintar();
+    } catch (e) { msbAviso("Erro: " + falhou(e)); }
   }
   async function criar() {
     var r = await sb.from("msb_horario_meses").upsert({estacao: EST, mes: X.M, estado: "simulacao", origem: "Criado na app"}, {onConflict: "estacao,mes"});
@@ -336,7 +390,8 @@
     msbAviso("Excel pronto para importar no Picaponto");
   }
   /* A4 deitada, uma página, sem a coluna Código */
-  async function pdf() {
+  async function pdf() { descarregar(await gerarPdf(false), ficheiro("pdf")); }
+  async function gerarPdf(funcionarios) {   // para os funcionários vai sem a marcação dos turnos extra, que na app só o administrador vê
     await carregarPdfLib();
     var P = window.PDFLib, doc = await P.PDFDocument.create(), F = await doc.embedFont(P.StandardFonts.Helvetica), B = await doc.embedFont(P.StandardFonts.HelveticaBold), pg = doc.addPage([841.89, 595.28]);
     var W = 841.89, M = 28, nome = 96, col = (W - 2 * M - nome) / X.dias.length, alt = 26, y = 595.28 - 44;
@@ -348,16 +403,16 @@
     X.dias.forEach(function (d) { fundo(d, y - 8, alt + 4); centro(String(d), M + nome + (d - 1) * col, y + 8, B, 9); centro(SEM[new Date(X.M + "-" + String(d).padStart(2, "0") + "T12:00:00").getDay()], M + nome + (d - 1) * col, y - 3, F, 6.5); });
     pg.drawText("Colaborador", {x: M + 3, y: y + 3, size: 9, font: B, color: tx}); y -= 8;
     pg.drawLine({start: {x: M, y: y}, end: {x: W - M, y: y}, thickness: 0.8, color: az});
-    var EX = mapaExtras(), ver = P.rgb(0.875, 0.949, 0.882), linhas = X.P.filter(function (l) { return Object.keys(X.G[l.colaborador_id] || {}).length; });
+    var EX = funcionarios ? {} : mapaExtras(), ver = P.rgb(0.875, 0.949, 0.882), linhas = X.P.filter(function (l) { return Object.keys(X.G[l.colaborador_id] || {}).length; });
     linhas.forEach(function (l) {
       var c = X.C[l.colaborador_id] || {}; y -= alt;
       X.dias.forEach(function (d) { fundo(d, y, alt); var v = (X.G[l.colaborador_id] || {})[d] || "", e = (EX[l.colaborador_id] || []).indexOf(d) >= 0; if (e) pg.drawRectangle({x: M + nome + (d - 1) * col, y: y, width: col, height: alt, color: ver}); if (v) centro(v, M + nome + (d - 1) * col, y + 9, e ? B : F, 9); });
       pg.drawText(c.nome || "", {x: M + 3, y: y + 9, size: 9, font: B, color: tx});
       pg.drawLine({start: {x: M, y: y}, end: {x: W - M, y: y}, thickness: 0.4, color: lin});
     });
-    pg.drawText("M manhã · T tarde" + (X.mt ? " · MT turno M/T" : "") + " · FG folga · F férias · FD feriado · verde e negrito: turno extra", {x: M, y: y - 16, size: 8, font: F, color: tx});
+    pg.drawText("M manhã · T tarde" + (X.mt ? " · MT turno M/T" : "") + " · FG folga · F férias · FD feriado" + (funcionarios ? "" : " · verde e negrito: turno extra"), {x: M, y: y - 16, size: 8, font: F, color: tx});
     await marcaPdf(doc, pg, F, B, M, 18);
-    descarregar(new Blob([await doc.save()], {type: "application/pdf"}), ficheiro("pdf"));
+    return new Blob([await doc.save()], {type: "application/pdf"});
   }
   async function abrir(M) {
     var box = $("#v-hor"); M = M || MES || hoje().slice(0, 7); MES = M; var est = EST; if (X) clearTimeout(X.tm);
@@ -368,7 +423,7 @@
         sb.from("msb_horario_dias").select("dia,colaborador_id,codigo,fixo").eq("estacao", est).gte("dia", ini).lt("dia", fim).limit(2000),
         sb.from("msb_colab_lojas").select("colaborador_id,codigo,ordem,nome_picaponto,escala,espelho").eq("estacao", est).order("ordem"),
         sb.from("msb_colaboradores").select("id,curto,nome,ativo"),
-        sb.from("msb_horario_meses").select("estado,sem_mt").eq("estacao", est).eq("mes", M).maybeSingle(),
+        sb.from("msb_horario_meses").select("estado,sem_mt,aprovado_em,enviado_em,atualizado_em").eq("estacao", est).eq("mes", M).maybeSingle(),
         sb.from("msb_config").select("horario").eq("estacao", est).maybeSingle(),
         sb.from("msb_horario_inicial").select("dias").eq("estacao", est).eq("mes", M).maybeSingle()
       ]);
@@ -385,10 +440,10 @@
       });
       Object.keys(ANT).forEach(function (i) { ANT[i].sort(function (a, b) { return a[0] < b[0] ? -1 : 1; }); });
       var FDS = {}; Object.keys(ANT).forEach(function (i) { ANT[i].forEach(function (a) { var w = new Date(a[0] + "T12:00:00").getDay(); if (w === 6 || w === 0) FDS[i] = a[1]; }); });
-      var existe = !!R[3].data, P = existe ? R[1].data.filter(function (l) { return G[l.colaborador_id] || (C[l.colaborador_id] || {}).ativo; }) : [];
-      X = {M: M, dias: dias, fer: feriados(ano), G: G, ORI: ORI, ANT: ANT, FX: FX, FXO: FXO, reforco: cfg.reforco, INI: R[5].data, LJ: R[1].data, ER0: [], inv: "", ESP: [], EM: {}, esp: !!(X && X.esp && X.M === M), espF: novoEspF(), FDS: FDS, C: C, P: P, ALT: {}, ed: !!(X && X.criado), rolar: true, estado: existe ? R[3].data.estado : "simulacao", semMT: existe && R[3].data.sem_mt, mt: !!cfg.mt, leg: cfg.legenda || []};
+      var existe = !!R[3].data && (ADMIN || R[3].data.estado === "real"), P = existe ? R[1].data.filter(function (l) { return G[l.colaborador_id] || (C[l.colaborador_id] || {}).ativo; }) : [];
+      X = {M: M, dias: dias, fer: feriados(ano), G: G, ORI: ORI, ANT: ANT, FX: FX, FXO: FXO, reforco: cfg.reforco, INI: R[5].data, LJ: R[1].data, ER0: [], inv: "", ESP: [], EM: {}, esp: !!(X && X.esp && X.M === M), espF: novoEspF(), FDS: FDS, C: C, P: P, ALT: {}, ed: !!(X && X.criado), rolar: true, apr: existe ? R[3].data.aprovado_em : null, env: existe ? R[3].data.enviado_em : null, atu: existe ? R[3].data.atualizado_em : null, envio: false, MAIL: {}, ultEnv: null, estado: existe ? R[3].data.estado : "simulacao", semMT: existe && R[3].data.sem_mt, mt: !!cfg.mt, leg: cfg.legenda || []};
       var nEsp = 0;
-      if (ADMIN) { await lerEsp(R[1].data.map(function (l) { return l.colaborador_id; })); if (est !== EST || M !== MES) return; X.ER0 = verif().erros.map(function (e) { return e.msg; }); if (!ADIAR[est + M]) nEsp = aplicarEsp(); }
+      if (ADMIN) { await lerEsp(R[1].data.map(function (l) { return l.colaborador_id; })); if (est !== EST || M !== MES) return; X.ER0 = verif().erros.map(function (e) { return e.msg; }); if (!ADIAR[est + M] && !X.apr) nEsp = aplicarEsp(); }
       if (nEsp) ajustar(); else pintar();
     } catch (e) { box.innerHTML = "<div class='aviso'><p>" + esc(falhou(e)) + "</p></div>"; }
   }

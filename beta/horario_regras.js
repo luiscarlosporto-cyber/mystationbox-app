@@ -13,6 +13,12 @@
   }
   function meta(y, m, n, fer) { var t = 0; for (var d = 1; d <= n; d++) { var w = dt(y, m, d).getUTCDay(); if (w > 0 && w < 6 && !fer[iso(dt(y, m, d))]) t++; } return t; }
   /* L = [{nome, dias: [códigos do mês], ant: [códigos dos dias anteriores], escala, fdsAnt}] · op = {y, m, fer, mt, semMT} */
+  /* Lista de emails para o envio: sem repetidos; os que não forem válidos ficam à parte. */
+  function emails(L) {
+    var ok = [], maus = [];
+    L.forEach(function (e) { var t = String(e || "").trim().toLowerCase(); if (!t) return; if (!/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(t)) maus.push(t); else if (ok.indexOf(t) < 0) ok.push(t); });
+    return {ok: ok, maus: maus};
+  }
   function verificar(L, op) {
     var y = op.y, m = op.m, n = new Date(y, m, 0).getDate(), fer = op.fer || {}, E = [], A = [];
     function erro(d, t) { E.push({dia: d, msg: t}); } function aviso(d, t) { A.push({dia: d, msg: t}); }
@@ -77,6 +83,6 @@
     });
     return res;
   }
-  var H = {verificar: verificar, extras: extras, meta: meta, semanasMT: semanasMT, CODIGOS: ["M", "T", "MT", "FG", "F", "FD"]};
+  var H = {emails: emails, verificar: verificar, extras: extras, meta: meta, semanasMT: semanasMT, CODIGOS: ["M", "T", "MT", "FG", "F", "FD"]};
   if (typeof module !== "undefined") module.exports = H; else raiz.HOR = H;
 })(typeof window !== "undefined" ? window : this);
