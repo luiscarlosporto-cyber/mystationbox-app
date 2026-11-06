@@ -158,7 +158,7 @@
       "<path class='l2' id='pnL2'></path><path class='ar' id='pnAr'></path><path class='l1' id='pnL1'></path></svg>" +
       [0, 1, 2, 3].map(function (i) { return "<span class='yl' style='top:" + (i * 100 / 3) + "%'>" + rot(top * (3 - i) / 3) + "</span>"; }).join("") +
       "<span class='gu' id='pnGu' hidden></span><span class='pt' id='pnPt' hidden></span><div class='di' id='pnDi' hidden></div></div>" +
-      "<div class='pnX'>" + xs.map(function (x) { return "<span>" + x + "</span>"; }).join("") + "</div></section>";
+      "<div class='pnX'>" + xs.map(function (x) { return "<span style='left:" + ((x - 1) / (N - 1) * 100) + "%'>" + x + "</span>"; }).join("") + "</div></section>";
   }
   function caminho(v) {
     var d = "", n = GR.n - 1;

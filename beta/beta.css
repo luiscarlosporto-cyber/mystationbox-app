@@ -197,7 +197,7 @@ main .wrap:has(#v-ini:not([hidden])){max-width:1700px}
 .pnGraf .gu{position:absolute;top:0;bottom:0;width:1px;background:var(--mut);opacity:.45;pointer-events:none}
 .pnGraf .di{position:absolute;top:0;background:var(--fg);color:var(--card);border-radius:8px;padding:6px 10px;font-size:12.5px;line-height:1.4;white-space:nowrap;pointer-events:none;transform:translateX(-50%);z-index:2}
 .pnGraf [hidden]{display:none}
-.pnX{display:flex;justify-content:space-between;margin:6px 0 0 54px;font-size:12px;color:var(--mut)}
+.pnX{position:relative;height:18px;margin:6px 0 0 54px;font-size:12px;color:var(--mut)}.pnX span{position:absolute;transform:translateX(-50%)}
 .pnVaz{height:262px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:var(--soft);border-radius:9px;padding:18px;color:var(--mut);font-size:14px}
 .pnVaz b{color:var(--fg);font-size:15px;margin-bottom:3px}
 .pnBar{margin-bottom:14px}.pnBar.fora{opacity:.5}
@@ -216,7 +216,7 @@ main .wrap:has(#v-ini:not([hidden])){max-width:1700px}
 .pnDon .dl{flex:1;min-width:150px;font-size:13.5px}
 .pnDon .dl div{display:flex;align-items:center;gap:7px;padding:4px 0}
 .pnDon .dl i{width:10px;height:10px;border-radius:3px;flex:none}.pnDon .dl span{flex:1;min-width:0}.pnDon .dl b{font-weight:600}
-@media (max-width:1180px){.pnKs{grid-template-columns:repeat(2,minmax(0,1fr))}.pnC8,.pnC4{grid-column:span 12}}
+@media (max-width:1180px){.pnKs{grid-template-columns:repeat(2,minmax(0,1fr))}.pnK:last-child:nth-child(even){grid-column:span 2}.pnC8,.pnC4{grid-column:span 12}}
 @media (max-width:680px){
   .pnSeg{width:100%;margin-right:0}.pnSeg button{flex:1;padding:7px 4px;min-height:44px}
   .pnMes{flex:1}.pnMes b{flex:1;min-width:0}
