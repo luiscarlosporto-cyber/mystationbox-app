@@ -19,6 +19,18 @@
     L.forEach(function (e) { var t = String(e || "").trim().toLowerCase(); if (!t) return; if (!/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(t)) maus.push(t); else if (ok.indexOf(t) < 0) ok.push(t); });
     return {ok: ok, maus: maus};
   }
+  /* Email da conta da app de cada colaborador. Nome e apelido iguais; senão, primeiro nome único dos dois lados. Na dúvida, nada. */
+  function emailsContas(colab, contas) {
+    var n = function (t) { return String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z ]/g, " ").trim().split(/\s+/).filter(Boolean); };
+    var C = (contas || []).filter(function (c) { return c.email && !c.banido; }).map(function (c) { return {p: n(c.nome), e: c.email.toLowerCase()}; }), r = {};
+    (colab || []).forEach(function (x) {
+      var p = n(x.nome); if (!p.length) return;
+      var a = C.filter(function (c) { return c.p[0] === p[0] && p.length > 1 && c.p[c.p.length - 1] === p[p.length - 1]; });
+      if (a.length !== 1) { var mesmo = (colab || []).filter(function (y) { return n(y.nome)[0] === p[0]; }).length; a = mesmo === 1 ? C.filter(function (c) { return c.p[0] === p[0]; }) : []; }
+      if (a.length === 1) r[x.id] = a[0].e;
+    });
+    return r;
+  }
   function verificar(L, op) {
     var y = op.y, m = op.m, n = new Date(y, m, 0).getDate(), fer = op.fer || {}, E = [], A = [];
     function erro(d, t) { E.push({dia: d, msg: t}); } function aviso(d, t) { A.push({dia: d, msg: t}); }
@@ -83,6 +95,6 @@
     });
     return res;
   }
-  var H = {emails: emails, verificar: verificar, extras: extras, meta: meta, semanasMT: semanasMT, CODIGOS: ["M", "T", "MT", "FG", "F", "FD"]};
+  var H = {emailsContas: emailsContas, emails: emails, verificar: verificar, extras: extras, meta: meta, semanasMT: semanasMT, CODIGOS: ["M", "T", "MT", "FG", "F", "FD"]};
   if (typeof module !== "undefined") module.exports = H; else raiz.HOR = H;
 })(typeof window !== "undefined" ? window : this);
