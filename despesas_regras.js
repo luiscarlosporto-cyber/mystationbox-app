@@ -48,9 +48,11 @@ var DESPESAS = (function () {
     return e;
   }
 
-  /* Regra do dono: um crédito vê-se sempre positivo. Por dentro fica negativo, para abater nos custos do Lucro. */
+  /* Regra do dono: respeitar o documento. Crédito impresso positivo (Saphety, ou assim marcado à mão) vê-se positivo; o que vem negativo no documento fica negativo.
+     Por dentro um crédito é sempre negativo, para abater nos custos do Lucro. */
+  function emPositivo(d) { return d.valor_c < 0 && /^(saphety:|doc_positivo)/.test(d.mensagem || ""); }
   function comSinal(c, credito) { return c == null || isNaN(c) ? c : credito ? -Math.abs(c) : c; }
-  function creditoVisto(c) { return c == null ? c : Math.abs(c); }
+  function visto(c, d) { return c == null ? c : emPositivo(d) ? Math.abs(c) : c; }
 
   /* Água ou outros bónus vindos de um documento da Saphety, já lido por lerServicoRepsol. Fica sempre por confirmar; nota de crédito entra a negativo e abate nos custos do Lucro. */
   function deSaphety(t, est, doc, fonte, original) {
@@ -76,6 +78,6 @@ var DESPESAS = (function () {
       return d.estado === "por_confirmar" && d.origem === "email" && d.valor_c != null && !d.nota && (d.categoria === "Salários" || d.categoria === "Segurança Social");
     });
   }
-  return {comSinal: comSinal, creditoVisto: creditoVisto, deSaphety: deSaphety, CATEGORIAS: CATEGORIAS, valorC: valorC, custosDoMes: custosDoMes, resumo: resumo, erros: erros, valorMapaKms: valorMapaKms, compararKms: compararKms, recibosJuntos: recibosJuntos};
+  return {emPositivo: emPositivo, comSinal: comSinal, visto: visto, deSaphety: deSaphety, CATEGORIAS: CATEGORIAS, valorC: valorC, custosDoMes: custosDoMes, resumo: resumo, erros: erros, valorMapaKms: valorMapaKms, compararKms: compararKms, recibosJuntos: recibosJuntos};
 })();
 if (typeof module !== "undefined") module.exports = DESPESAS;
