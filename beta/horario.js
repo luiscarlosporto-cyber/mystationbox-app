@@ -30,7 +30,7 @@
       h += "<tr" + (c.curto === eu ? " class='eu'" : "") + "><td class='l' title='" + esc(c.nome || "") + "'>" + esc(c.curto || "") + (fixo && X.ed ? "<small>segue " + esc((X.C[l.espelho] || {}).curto || "") + "</small>" : "") + "</td>" + X.dias.map(function (d) {
         var v = g[d] || ""; if (v === "M" || v === "T" || v === "MT") tur++;
         var mudou = X.ALT[l.colaborador_id + "|" + d] != null, fx = (X.FX[l.colaborador_id] || {})[d], es = (X.EM[l.colaborador_id] || {})[d];
-        return "<td class='" + t(d).cl + (mudou ? " alt" : "") + (fx ? " fx" : "") + ((EX[l.colaborador_id] || []).indexOf(d) >= 0 ? " ex" : "") + "'" + (es ? " title='" + esc(TIPOS[es.tipo][0] + (es.nota ? ": " + es.nota : "")) + "'" : fx ? " title='Escolhido por ti'" : "") + (X.ed ? " data-c='" + l.colaborador_id + "' data-d='" + d + "' tabindex='0' role='button' aria-label='" + esc(c.curto || "") + " dia " + d + "'" : "") + ">" + v + (es && TIPOS[es.tipo][2] ? "<small>" + TIPOS[es.tipo][2] + "</small>" : "") + "</td>";
+        return "<td class='" + t(d).cl + (mudou ? " alt" : "") + (fx ? " fx" : "") + ((EX[l.colaborador_id] || []).indexOf(d) >= 0 ? " ex" : "") + "'" + (es ? " title='" + esc(TIPOS[es.tipo][0] + (es.nota ? ": " + es.nota : "")) + "'" : fx ? " title='Turno fixado'" : "") + (X.ed ? " data-c='" + l.colaborador_id + "' data-d='" + d + "' tabindex='0' role='button' aria-label='" + esc(c.curto || "") + " dia " + d + "'" : "") + ">" + v + (es && TIPOS[es.tipo][2] ? "<small>" + TIPOS[es.tipo][2] + "</small>" : "") + "</td>";
       }).join("") + "<td class='n'>" + tur + "</td></tr>";
     });
     return h + "</tbody></table></div>";
@@ -66,7 +66,7 @@
     if (ADMIN && X.P.length) b += X.ed
       ? "<button class='btn az' id='horProj'" + (X.calc ? " disabled" : "") + ">" + (X.calc ? "A ajustar…" : "Projetar o resto") + "</button><button class='btn' id='horIni'" + (X.INI ? "" : " disabled") + ">Horário inicial</button><button class='btn' id='horEsp'>Especiais</button><button class='btn p' id='horGrava'" + (n && !X.calc ? "" : " disabled") + ">Gravar" + (n ? " " + n : "") + "</button><button class='btn' id='horFim'>Sair da edição</button>"
       : "<button class='btn' id='horEd'>Editar</button><button class='btn' id='horEsp'>Especiais</button><button class='btn' id='horDefIni'>Guardar como inicial</button><button class='btn' id='horEst'>" + (X.estado === "simulacao" ? "Passar a real" : "Passar a simulação") + "</button><button class='btn' id='horXls'>Excel Picaponto</button><button class='btn' id='horPdf'>PDF</button>";
-    box.innerHTML = b + "</div>" + (X.esp ? cartaoEsp() : "") + inviavel() + (X.P.length ? celulas() + "<p class='rod'>M manhã · T tarde · MT turno M/T · FG folga · F férias · FD feriado. Fundo azul: fim de semana; creme: feriado." + (ADMIN ? " Verde e negrito: turno extra." : "") + (X.ESP.length ? " Especiais: B baixa · Fr formação · A aniversário · O outros."  : "") + (X.ed ? " Toca numa célula e escolhe o turno: a app ajusta o resto do mês às regras e mantém o que escolheste (sublinhado). Se não der, avisa e diz porquê. Projetar o resto refaz tudo menos o que escolheste. Horário inicial volta à versão de partida do mês." : "") + "</p>" + regras()
+    box.innerHTML = b + "</div>" + (X.esp ? cartaoEsp() : "") + inviavel() + (X.P.length ? celulas() + "<p class='rod'>M manhã · T tarde · MT turno M/T · FG folga · F férias · FD feriado. Fundo azul: fim de semana; creme: feriado." + (ADMIN ? " Verde e negrito: turno extra." : "") + (X.ESP.length ? " Especiais: B baixa · Fr formação · A aniversário · O outros."  : "") + (X.ed ? " Toca numa célula e escolhe o turno: fica fixado (sublinhado) e a app ajusta o resto do mês às regras, sem mexer no que está fixado. Para segurar um turno sem o mudar, toca nele e carrega em Fixar turno. Se não der, avisa e diz porquê. Projetar o resto refaz tudo menos o fixado. Horário inicial volta à versão de partida do mês." : "") + "</p>" + regras()
       : "<div class='vazio'>Ainda não há horário de " + nomeMes(X.M) + " nesta loja." + (ADMIN ? "<p><button class='btn p' id='horNovo'>Criar horário do mês</button></p>" : "") + "</div>");
     $("#horAnt").onclick = function () { sair(function () { abrir(addMes(X.M, -1)); }); };
     $("#horSeg").onclick = function () { sair(function () { abrir(addMes(X.M, 1)); }); };
@@ -89,11 +89,12 @@
     var id = +td.dataset.c, d = +td.dataset.d, c = X.C[id] || {}, m = document.createElement("div"); m.id = "horPop";
     var es = (X.EM[id] || {})[d]; if (es) return editarEsp(es);
     var cods = HOR.CODIGOS.filter(function (k) { return k !== "MT" || X.mt; });
-    var fx = (X.FX[id] || {})[d];
-    m.innerHTML = "<b>Mudar turno · " + esc(c.curto || "") + " · dia " + d + "</b><div>" + cods.map(function (k) { return "<button data-k='" + k + "'>" + k + "</button>"; }).join("") + (/^(F|FD)$/.test((X.G[id] || {})[d] || "") ? "<button data-k=''>Limpar</button>" : fx ? "<button data-s='1'>App decide</button>" : "") + "</div>";
+    var fx = (X.FX[id] || {})[d], atual = (X.G[id] || {})[d] || "";
+    m.innerHTML = "<b>Turno · " + esc(c.curto || "") + " · dia " + d + "</b><div>" + cods.map(function (k) { return "<button data-k='" + k + "'>" + k + "</button>"; }).join("") + (/^(F|FD)$/.test(atual) ? "<button data-k=''>Limpar</button>" : fx ? "<button data-s='1'>Soltar turno</button>" : atual ? "<button data-f='1'>Fixar turno</button>" : "") + "</div>";
     m.onclick = function (e) {
       var b = e.target.closest("button"); if (!b) return; m.remove();
-      if (b.dataset.s) definir(id, d, (X.G[id] || {})[d] || "", false); else definir(id, d, b.dataset.k, !!b.dataset.k);
+      if (b.dataset.f) { pôr(id, d, atual, true); pintar(); }   // fica como está: não é preciso ajustar nada
+      else if (b.dataset.s) definir(id, d, atual, false); else definir(id, d, b.dataset.k, !!b.dataset.k);
     };
     $("#vApp").appendChild(m);
     var r = td.getBoundingClientRect(), w = m.offsetWidth, h = m.offsetHeight;
@@ -111,6 +112,7 @@
     ajustar();
   }
   function ajustar() {
+    X.nr = (X.nr || 0) + 1;   // um cálculo ainda a correr já não vale: não sabe desta mudança
     X.calc = true; pintar();
     clearTimeout(X.tm); X.tm = setTimeout(function () { projetar(true); }, 500);   // vários toques seguidos dão um só ajuste
   }
@@ -251,7 +253,7 @@
       if (!r || !r.Columns || /infeasible/i.test(r.Status || "")) { X.calc = false; X.inv = "As mudanças feitas não deixam cobrir todos os turnos do mês."; pintar(); return msbAviso("Erro: horário inviável. Vê a razão em cima."); }
       var S = HORG.ler(D.P, D.op, r.Columns), mudou = 0;
       D.P.forEach(function (p, i) { X.dias.forEach(function (d) {
-        if (p.fixos[d]) return;
+        if (p.fixos[d] || (X.FX[p.id] || {})[d]) return;
         if ((X.G[p.id] || {})[d] !== S[i][d]) mudou++;
         pôr(p.id, d, S[i][d], false); X.P.forEach(function (l) { if (l.espelho === p.id && !(X.FX[l.colaborador_id] || {})[d]) pôr(l.colaborador_id, d, S[i][d], false); });
       }); });
