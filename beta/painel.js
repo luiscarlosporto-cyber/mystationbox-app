@@ -1,22 +1,27 @@
-/* mystationbox beta · Etapa 3: Painel de Gestão do administrador. Três blocos sobre as duas lojas: Por decidir, Estado das lojas, Por fechar.
- * Cada linha abre a página onde a coisa se resolve, já na loja certa. Estado das lojas: abre no mês em curso até ontem, lido no CBOS pelo OCTAN AI
+/* mystationbox beta · Etapa 3: Painel de Gestão do administrador (desenho aprovado a 06/11/2026): loja e mês, cartões, vendas por dia, Por decidir, combustível e loja, como recebeste, Por fechar.
+ * Cada linha abre a página onde a coisa se resolve, já na loja certa. Abre no mês em curso até ontem, lido no CBOS pelo OCTAN AI
  * (pedido automático, pasta PAINEL, um por dia e por loja); ‹ › mudam para meses inteiros: Folha de fecho do CBOS ou, se não houver, leitura pedida ao OCTAN AI. */
 "use strict";
 (function () {
-  var IND = [   // indicadores que se podem escolher e ordenar; valor por loja a partir de D (dados da loja)
-    ["vend", "Vendas do mês", 1, function (D) { if (D.c) return eur(D.c.total); return D.f ? eur(D.f.dados.totais.formas) : null; }],
-    ["lit", "Litros vendidos", 1, function (D) { if (D.c) return Math.round(D.c.litros).toLocaleString("pt-PT", {useGrouping: "always"}) + " L"; return D.f && D.f.dados.totais.comb ? Math.round(D.f.dados.totais.comb[1] / 100).toLocaleString("pt-PT", {useGrouping: "always"}) + " L" : null; }],
-    ["comb", "Combustível", 1, function (D) { if (D.c) return eur(D.c.comb); return D.f && D.f.dados.totais.comb ? eur(D.f.dados.totais.comb[5]) : null; }],
-    ["loja", "Loja", 1, function (D) { if (D.c) return eur(D.c.total - D.c.comb); return D.f && D.f.dados.totais.loja ? eur(D.f.dados.totais.loja[5]) : null; }],
-    ["mb", "Multibanco", 0, function (D) { return forma(D, ["CARTAO BANCARIO", "BANCARIO OFFLINE"]); }],
-    ["sol", "Solred", 0, function (D) { return forma(D, ["SOLRED", "SOLRED OFFLINE"]); }],
-    ["num", "Numerário", 0, function (D) { return forma(D, ["NUMERARIO"]); }],
-    ["tur", "Mês em curso · vendas", 0, function (D) { return D.mes.length ? eur(D.mes.reduce(function (s, r) { return s + r.vendas_c; }, 0)) : "Sem turnos"; }],
-    ["dif", "Mês em curso · diferença", 0, function (D) { if (!D.mes.length) return "Sem turnos"; return sinal(D.mes.reduce(function (s, r) { return s + (dif(r) || 0); }, 0)) + " €"; }],
-    ["ont", "Ontem · vendas", 0, function (D) { var v = D.mes.concat(D.ant).filter(function (r) { return r.dia === hojeISO(-1); }); return v.length ? eur(v.reduce(function (s, r) { return s + r.vendas_c; }, 0)) : "Sem turnos"; }]
+  var IND = [   // indicadores que se podem escolher e ordenar: id, nome, de início?, valor por loja a partir de D (número ou null), formato
+    ["vend", "Vendas com IVA", 1, function (D) { return D.c ? D.c.total : D.f ? D.f.dados.totais.formas : null; }, "eur"],
+    ["lit", "Litros vendidos", 1, function (D) { return D.c ? D.c.litros : D.f && D.f.dados.totais.comb ? D.f.dados.totais.comb[1] / 100 : null; }, "lit"],
+    ["comb", "Combustível com IVA", 1, function (D) { return D.c ? D.c.comb : D.f && D.f.dados.totais.comb ? D.f.dados.totais.comb[5] : null; }, "eur"],
+    ["loja", "Loja com IVA", 1, function (D) { return D.c ? D.c.total - D.c.comb : D.f && D.f.dados.totais.loja ? D.f.dados.totais.loja[5] : null; }, "eur"],
+    ["mb", "Multibanco", 0, function (D) { return forma(D, ["CARTAO BANCARIO", "BANCARIO OFFLINE"]); }, "eur"],
+    ["sol", "Solred", 0, function (D) { return forma(D, ["SOLRED", "SOLRED OFFLINE"]); }, "eur"],
+    ["num", "Numerário", 0, function (D) { return forma(D, ["NUMERARIO"]); }, "eur"],
+    ["tur", "Mês em curso · vendas", 0, function (D) { return D.mes.length ? D.mes.reduce(function (s, r) { return s + r.vendas_c; }, 0) : null; }, "eur"],
+    ["dif", "Mês em curso · diferença", 0, function (D) { return D.mes.length ? D.mes.reduce(function (s, r) { return s + (dif(r) || 0); }, 0) : null; }, "dif"],
+    ["ont", "Ontem · vendas", 0, function (D) { var v = D.mes.concat(D.ant).filter(function (r) { return r.dia === hojeISO(-1); }); return v.length ? v.reduce(function (s, r) { return s + r.vendas_c; }, 0) : null; }, "eur"]
   ];
-  function eur(c) { return fmt(c) + " €"; }
-  function forma(D, ks) { if (!D.f || !D.f.dados.formas) return null; var F = D.f.dados.formas; return eur(ks.reduce(function (s, k) { return s + (F[k] || 0); }, 0)); }
+  var RITMO = {vend: 1, lit: 1, comb: 1, loja: 1};   // somam dia a dia: dá para comparar o valor por dia com o mês anterior
+  function num(n, c) { return n.toLocaleString("pt-PT", {minimumFractionDigits: c, maximumFractionDigits: c, useGrouping: "always"}); }
+  function eur(c) { return num(c / 100, 2) + " €"; }
+  function eur0(c) { return num(Math.round(c / 100), 0) + " €"; }
+  function formato(n, t) { return t === "eur" ? eur(n) : t === "lit" ? num(Math.round(n), 0) + " L" : sinal(Math.round(n)) + " €"; }
+  function forma(D, ks) { if (!D.f || !D.f.dados.formas) return null; var F = D.f.dados.formas; return ks.reduce(function (s, k) { return s + (F[k] || 0); }, 0); }
+  function Maius(t) { return t.replace(/^./, function (l) { return l.toUpperCase(); }); }
   function nomeMes(m) { return new Date(m + "-15").toLocaleDateString("pt-PT", {month: "long"}); }
   function nomeLoja(e) { return e.short_name || e.name; }
   function ler(k) { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch (e) { return null; } }
@@ -42,17 +47,20 @@
       guarda("pedidos", sb.from("msb_pedidos").select("id,estacao,estado,de,ate,visto_em,pasta").eq("estado", "feito").is("visto_em", null).neq("pasta", "PAINEL")),
       guarda("documentos", sb.from("msb_docs").select("estacao,emissao").order("emissao", {ascending: false}).limit(40)),
       guarda("avisos", avisosRecentes(60).then(function (x) { return {data: x}; })),
-      guarda("mês em curso", sb.from("msb_pedidos").select("estacao,estado,de,ate,linhas").eq("pasta", "PAINEL").gte("de", ant + "-01").order("id", {ascending: false}).limit(20))
+      guarda("mês em curso", pedidosMes(mes)),
+      guarda("mês anterior", pedidosMes(ant))
     ]);
-    pedirMes(mes, R[11]);
-    return {cur: R[11], hoje: hoje, mes: mes, ant: ant, tur: R[0], fol: R[1], sai: R[2], enc: R[3], pre: R[4], tms: R[5], vm: R[6], va: R[7], ped: R[8], doc: R[9], avi: R[10], falhas: f};
+    return {cur: (R[11] || []).concat(R[12] || []), hoje: hoje, mes: mes, ant: ant, tur: R[0], fol: R[1], sai: R[2], enc: R[3], pre: R[4], tms: R[5], vm: R[6], va: R[7], ped: R[8], doc: R[9], avi: R[10], falhas: f};
   }
 
-  /* Uma leitura por dia e por loja, até ontem. No dia 1 ainda não há nada do mês */
-  async function pedirMes(mes, P) {
-    var ontem = hojeISO(-1); if (!ADMIN || !P || ontem.slice(0, 7) !== mes) return;
-    var falta = ESTS.filter(function (e) { return !P.some(function (p) { return p.estacao === e.id && p.ate === ontem && p.estado !== "erro"; }); });
-    if (falta.length) await sb.from("msb_pedidos").insert(falta.map(function (e) { return {estacao: e.id, de: mes + "-01", ate: ontem, pasta: "PAINEL", artigo: "", pedido_por: "Painel", visto_em: new Date().toISOString()}; }));
+  function pedidosMes(m) { return sb.from("msb_pedidos").select("id,estacao,estado,de,ate,linhas,dias").eq("pasta", "PAINEL").gte("de", m + "-01").lt("de", addMes(m, 1) + "-01").order("id", {ascending: false}).limit(6); }
+  /* Mês em curso: uma leitura por dia e por loja, até ontem; no dia 1 ainda não há nada. Mês fechado: uma leitura do mês inteiro. Traz também as vendas por dia. */
+  async function pedir(X, m) {
+    var ontem = hojeISO(-1), ate = m === X.mes ? ontem : PN.ultimoDia(m); if (!ADMIN || !X.cur || ate.slice(0, 7) !== m) return;
+    var falta = ESTS.filter(function (e) { return PN.pedir(X.cur, e.id, m, ate); }); if (!falta.length) return;
+    var L = falta.map(function (e) { return {estacao: e.id, de: m + "-01", ate: ate, pasta: "PAINEL", artigo: "", pedido_por: "Painel", visto_em: new Date().toISOString()}; });
+    var r = await sb.from("msb_pedidos").insert(L); if (r.error) throw r.error;
+    X.cur = L.map(function (q) { return Object.assign({estado: "pendente"}, q); }).concat(X.cur);
   }
   function mesCurso(X, id, M) {   // códigos de 1 ou 2 algarismos = combustíveis, como na família do CBOS
     var p = (X.cur || []).find(function (q) { return q.estacao === id && q.de.slice(0, 7) === M && q.estado === "feito" && q.linhas; }); if (!p) return null;
@@ -60,29 +68,31 @@
     p.linhas.forEach(function (l) { var v = Math.round(l[3] * 100); c.total += v; if (/^\d{1,2}$/.test(l[0])) { c.comb += v; c.litros += l[2]; } });
     return c;
   }
-  var MES_V = null, NR_V = 0;   // mês escolhido no Estado das lojas; null = mês em curso
+  var MES_V = null, NR_V = 0, LOJA_V = "todas";   // mês e loja escolhidos; null = mês em curso
+  function idsVer() { return LOJA_V === "todas" ? ESTS.map(function (e) { return e.id; }) : [LOJA_V]; }
+  function lojasVer() { return ESTS.filter(function (e) { return LOJA_V === "todas" || e.id === LOJA_V; }); }
+  async function lerMes(X, m) {
+    var a = await sb.from("msb_folha_fecho").select("estacao,mes,dados").eq("mes", m), b = await pedidosMes(m);
+    if (a.error || b.error) throw a.error || b.error;
+    X.fol = (X.fol || []).filter(function (x) { return x.mes !== m; }).concat(a.data || []);
+    X.cur = (b.data || []).concat((X.cur || []).filter(function (x) { return x.de.slice(0, 7) !== m; }));
+  }
+  /* Enquanto o OCTAN AI lê, volta a ver de 30 em 30 segundos, no máximo 4 minutos */
+  async function aguardar(X, nr) {
+    var M = MES_V || X.mes, A = addMes(M, -1), ids = ESTS.map(function (e) { return e.id; });
+    for (var i = 0; i < 8 && (PN.aLer(X.cur, M, ids) || PN.aLer(X.cur, A, ids)); i++) {
+      await new Promise(function (ok) { setTimeout(ok, 30000); });
+      if (nr !== NR_V || PAGINA !== "ini") return;
+      await lerMes(X, M); await lerMes(X, A); desenhar(X);
+    }
+  }
   async function verMes(X, m) {
     var nr = ++NR_V; MES_V = m === X.mes ? null : m;
-    var fim = addMes(m, 1) + "-01", ult = new Date(new Date(fim + "T12:00:00") - 864e5).toISOString().slice(0, 10);
-    async function ler() {
-      var a = await sb.from("msb_folha_fecho").select("estacao,mes,dados").eq("mes", m), b = await sb.from("msb_pedidos").select("estacao,estado,de,ate,linhas").eq("pasta", "PAINEL").gte("de", m + "-01").lt("de", fim).order("id", {ascending: false}).limit(8);
-      if (a.error || b.error) throw a.error || b.error;
-      X.fol = (X.fol || []).filter(function (x) { return x.mes !== m; }).concat(a.data || []);
-      X.cur = (b.data || []).concat((X.cur || []).filter(function (x) { return x.de.slice(0, 7) !== m; }));
-    }
     try {
-      await ler();
-      if (m !== X.mes) {
-        var pedir = ESTS.filter(function (e) { return !(X.fol || []).some(function (x) { return x.estacao === e.id && x.mes === m; }) && !(X.cur || []).some(function (q) { return q.estacao === e.id && q.de.slice(0, 7) === m && q.ate === ult && q.estado !== "erro"; }); });
-        if (pedir.length) { var r = await sb.from("msb_pedidos").insert(pedir.map(function (e) { return {estacao: e.id, de: m + "-01", ate: ult, pasta: "PAINEL", artigo: "", pedido_por: "Painel", visto_em: new Date().toISOString()}; })); if (r.error) throw r.error; await ler(); }
-      }
+      await lerMes(X, m); await lerMes(X, addMes(m, -1));
+      await pedir(X, m); await pedir(X, addMes(m, -1));
       if (nr !== NR_V || PAGINA !== "ini") return;
-      desenhar(X);
-      for (var i = 0; i < 8 && ESTS.some(function (e) { var D = dadosLoja(X, e); return !D.c && !D.f; }); i++) {   // à espera do OCTAN AI
-        await new Promise(function (ok) { setTimeout(ok, 30000); });
-        if (nr !== NR_V || PAGINA !== "ini") return;
-        await ler(); desenhar(X);
-      }
+      desenhar(X); await aguardar(X, nr);
     } catch (e) { msbAviso("Erro: " + falhou(e)); }
   }
   function porDecidir(X) {
@@ -98,29 +108,128 @@
     (X.enc || []).forEach(function (o) {
       L.push({o: 1, t: "Encomenda por aprovar", s: loja(o.company_id) + " · " + (o.lines || []).length + " artigos", e: o.company_id, p: "enc", b: "Ver"});
     });
-    (X.ped || []).forEach(function (p) { L.push({o: 3, t: "Vendas pedidas prontas", s: loja(p.estacao) + " · " + dmy(p.de) + " a " + dmy(p.ate), p: "avi", b: "Ver", arq: "p" + p.id}); });
+    (X.ped || []).forEach(function (p) { L.push({o: 3, t: "Vendas pedidas prontas", s: loja(p.estacao) + " · " + dmy(p.de) + " a " + dmy(p.ate), e: p.estacao, p: "avi", b: "Ver", arq: "p" + p.id}); });
     var S = {}; (X.sai || []).forEach(function (s) { var a = S[s.estacao] = S[s.estacao] || {n: 0, v: 0}; a.n++; a.v += s.valor_c || 0; });
     Object.keys(S).forEach(function (e) { L.push({o: 3, t: S[e].n === 1 ? "Saída de caixa por entregar" : S[e].n + " saídas de caixa por entregar", s: loja(e) + " · " + eur(S[e].v), e: e, p: "sai", b: "Ver"}); });
-    return L.sort(function (a, b) { return a.o - b.o; });
+    return L.filter(function (x) { return LOJA_V === "todas" || !x.e || x.e === LOJA_V; }).sort(function (a, b) { return a.o - b.o; });
   }
 
-  function dadosLoja(X, e) {
-    var M = MES_V || X.mes, f = (X.fol || []).find(function (x) { return x.estacao === e.id && x.mes === M; }) || null, T = (X.tur || []).filter(function (r) { return r.estacao === e.id; });
+  function dadosLoja(X, e, M) {
+    M = M || MES_V || X.mes;
+    var f = (X.fol || []).find(function (x) { return x.estacao === e.id && x.mes === M; }) || null, T = (X.tur || []).filter(function (r) { return r.estacao === e.id; });
     var c = f ? null : mesCurso(X, e.id, M);
     return {c: c, f: f, mes: T.filter(function (r) { return r.dia.slice(0, 7) === X.mes; }), ant: T.filter(function (r) { return r.dia.slice(0, 7) !== X.mes; }), T: T};
   }
-  function estado(X) {
-    var ativos = indAtivos(), M = MES_V || X.mes, atual = M === X.mes, DL = ESTS.map(function (e) { return dadosLoja(X, e); });
-    var ates = DL.filter(function (D) { return D.c; }).map(function (D) { return D.c.ate; }).sort(), falta = DL.some(function (D) { return !D.c && !D.f; });
-    var tit = nomeMes(M).replace(/^./, function (l) { return l.toUpperCase(); }) + (M.slice(0, 4) !== X.mes.slice(0, 4) ? " " + M.slice(0, 4) : "") + (atual && ates.length ? " até " + dmy(ates[0]).slice(0, 5) : "");
-    var h = "<div class='bl'><h3>Estado das lojas<button class='mini' id='pnPers'>Personalizar</button></h3><div id='pnEdit' hidden></div>" +
-      "<div class='pnMes'><button class='btn' id='pnAnt' aria-label='Mês anterior'>‹</button><b>" + esc(tit) + "</b><button class='btn' id='pnSeg' aria-label='Mês seguinte'" + (atual ? " disabled" : "") + ">›</button></div>" +
-      "<div class='pnT' style='--n:" + ESTS.length + "'><span class='cab'></span>" + ESTS.map(function (e) { return "<button class='cab' data-loja='" + e.id + "'>" + esc(nomeLoja(e)) + "</button>"; }).join("");
-    ativos.forEach(function (k) {
-      var I = IND.find(function (x) { return x[0] === k; });
-      h += "<span class='rot'>" + I[1] + "</span>" + DL.map(function (D) { var v = I[3](D); return "<b class='" + (v === "Sem turnos" || v == null ? "sem" : "") + "'>" + esc(v == null ? "—" : v) + "</b>"; }).join("");
-    });
-    return h + "</div><p class='rod'>" + (falta ? "A ler no CBOS pelo OCTAN AI: os valores aparecem daqui a uns minutos, com o PC ligado." : atual ? "Vendas com IVA, lidas no CBOS pelo OCTAN AI, até ontem." : "Vendas com IVA, do mês inteiro.") + "</p></div>";
+  function soma(X, I, M) {   // soma das lojas escolhidas; só se todas tiverem valor
+    var v = lojasVer().map(function (e) { return I[3](dadosLoja(X, e, M)); });
+    return v.some(function (x) { return x == null; }) ? null : v.reduce(function (a, b) { return a + b; }, 0);
+  }
+  function tituloMes(X) {
+    var M = MES_V || X.mes, ates = lojasVer().map(function (e) { var c = dadosLoja(X, e).c; return c ? c.ate : ""; }).filter(Boolean).sort();
+    return Maius(nomeMes(M)) + (M.slice(0, 4) !== X.mes.slice(0, 4) ? " " + M.slice(0, 4) : "") + (M === X.mes && ates.length ? " até " + dmy(ates[0]).slice(0, 5) : "");
+  }
+  function diasVistos(X, M) {   // dias que o valor do mês cobre
+    var ates = ESTS.map(function (e) { var c = dadosLoja(X, e, M).c; return c ? c.ate : ""; }).filter(Boolean).sort();
+    return ates.length ? +ates[0].slice(8) : PN.diasMes(M);
+  }
+  function cartoes(X) {
+    var M = MES_V || X.mes, A = addMes(M, -1), d = diasVistos(X, M), d0 = PN.diasMes(A), lista = indAtivos();
+    return "<div class='pnKs'>" + lista.map(function (k, i) {
+      var I = IND.find(function (x) { return x[0] === k; }), v = soma(X, I, M), rit = RITMO[k] ? PN.ritmo(v, d, soma(X, I, A), d0) : null, sub = "";
+      if (rit != null) sub = "<span class='pn" + (rit >= 0 ? "Sobe" : "Desce") + "'>" + (rit >= 0 ? "▲ " : "▼ ") + num(Math.abs(rit), 1) + " %</span> por dia face a " + nomeMes(A);
+      if (i === 0 && k === "vend" && v != null) sub += M === X.mes && d < PN.diasMes(M) ? " · a este ritmo, cerca de " + eur0(v / d * PN.diasMes(M)) + " no fim do mês" : (sub ? " · " : "") + eur0(v / d) + " por dia";
+      var porLoja = LOJA_V === "todas" && ESTS.length > 1 ? "<small>" + ESTS.map(function (e) { var x = I[3](dadosLoja(X, e, M)); return esc(nomeLoja(e)) + " " + (x == null ? "—" : k === "lit" ? formato(x, "lit") : I[4] === "eur" ? eur0(x) : formato(x, I[4])); }).join(" · ") + "</small>" : "";
+      return "<div class='pnK" + (i ? "" : " hero") + "'><span class='rt'>" + I[1] + "</span><strong" + (v == null ? ">—" : " data-n='ind-" + k + "' data-v='" + v + "' data-t='" + I[4] + "'>" + formato(v, I[4])) + "</strong><p>" + sub + "</p>" + porLoja + "</div>";
+    }).join("") + "</div>";
+  }
+  var GR = null;   // dados do gráfico que está no ecrã
+  function grafico(X) {
+    var M = MES_V || X.mes, A = addMes(M, -1), ids = idsVer(), a = PN.serie(X.cur, M, ids), b = PN.serie(X.cur, A, ids), nome = LOJA_V === "todas" ? "as duas lojas" : nomeLoja(ESTS.find(function (e) { return e.id === LOJA_V; }));
+    var h = "<section class='bl pnC8'><h3>Vendas por dia · " + esc(nome) + "</h3><p class='pnSub'>Vendas com IVA, lidas no CBOS pelo OCTAN AI. Passa o rato ou o dedo para ver cada dia.</p>";
+    GR = null;
+    if (!a && !b) return h + "<div class='pnVaz'>" + (PN.aLer(X.cur, M, ids) || PN.aLer(X.cur, A, ids) ? "<b>A ler as vendas por dia no CBOS</b>Aparecem aqui daqui a uns minutos, com o PC ligado." : "<b>Sem vendas por dia para mostrar</b>O OCTAN AI ainda não leu este mês no CBOS. Volto a pedir quando abrires o Painel.") + "</div></section>";
+    var N = Math.max(PN.diasMes(M), PN.diasMes(A)), S = function (l) { var r = (l || []).slice(); while (r.length < N) r.push(null); return r; };
+    var A1 = S(a), B1 = S(b), top = PN.escala(Math.max.apply(null, A1.concat(B1).map(function (x) { return x || 0; })));
+    GR = {a: A1, b: B1, top: top, n: N, ma: nomeMes(M), mb: nomeMes(A)};
+    var rot = function (v) { return v >= 1000 ? num(v / 1000, v % 1000 ? 1 : 0) + " mil €" : num(v, 0) + " €"; }, xs = [1, 5, 10, 15, 20, 25, N];
+    return h + "<div class='pnLeg'><span><i></i>" + Maius(GR.ma) + "</span>" + (b ? "<span><i class='b'></i>" + Maius(GR.mb) + "</span>" : "") + "</div>" +
+      "<div class='pnGraf' id='pnGraf'><svg viewBox='0 0 700 230' preserveAspectRatio='none' role='img' aria-label='Vendas por dia de " + esc(GR.ma) + (b ? " comparadas com " + esc(GR.mb) : "") + "'>" +
+      [0, 1, 2, 3].map(function (i) { var y = i * 230 / 3; return "<line class='gl' x1='0' x2='700' y1='" + y + "' y2='" + y + "'></line>"; }).join("") +
+      "<path class='l2' id='pnL2'></path><path class='ar' id='pnAr'></path><path class='l1' id='pnL1'></path></svg>" +
+      [0, 1, 2, 3].map(function (i) { return "<span class='yl' style='top:" + (i * 100 / 3) + "%'>" + rot(top * (3 - i) / 3) + "</span>"; }).join("") +
+      "<span class='gu' id='pnGu' hidden></span><span class='pt' id='pnPt' hidden></span><div class='di' id='pnDi' hidden></div></div>" +
+      "<div class='pnX'>" + xs.map(function (x) { return "<span>" + x + "</span>"; }).join("") + "</div></section>";
+  }
+  function caminho(v) {
+    var d = "", n = GR.n - 1;
+    v.forEach(function (x, i) { if (x == null) return; d += (d ? "L" : "M") + (i * 700 / n).toFixed(1) + " " + (230 - x / GR.top * 230).toFixed(1); });
+    return d;
+  }
+  function pintarLinhas(a, b) {
+    var l1 = $("#pnL1"); if (!l1) return;
+    var d = caminho(a), n = GR.n - 1, ult = -1, pri = -1; a.forEach(function (x, i) { if (x != null) { ult = i; if (pri < 0) pri = i; } });
+    l1.setAttribute("d", d); $("#pnL2").setAttribute("d", caminho(b));
+    $("#pnAr").setAttribute("d", d ? d + "L" + (ult * 700 / n).toFixed(1) + " 230L" + (pri * 700 / n).toFixed(1) + " 230Z" : "");
+  }
+  function ligarGrafico() {
+    var g = $("#pnGraf"); if (!g || !GR) return;
+    var gu = $("#pnGu"), pt = $("#pnPt"), di = $("#pnDi"), G = GR;
+    function sai() { gu.hidden = pt.hidden = di.hidden = true; }
+    g.onpointerleave = sai;
+    g.onpointermove = function (e) {
+      var r = g.getBoundingClientRect(), i = Math.max(0, Math.min(G.n - 1, Math.round((e.clientX - r.left) / r.width * (G.n - 1)))), x = i / (G.n - 1) * 100, a = G.a[i], b = G.b[i];
+      if (a == null && b == null) return sai();
+      gu.hidden = di.hidden = false; gu.style.left = x + "%";
+      pt.hidden = a == null; if (a != null) { pt.style.left = x + "%"; pt.style.top = (100 - a / G.top * 100) + "%"; }
+      di.style.left = Math.min(82, Math.max(18, x)) + "%";
+      di.innerHTML = "<b>Dia " + (i + 1) + "</b><br>" + Maius(G.ma) + ": " + (a == null ? "sem leitura" : eur(a * 100)) + "<br>" + Maius(G.mb) + ": " + (b == null ? "sem leitura" : eur(b * 100));
+    };
+  }
+  function barras(X) {
+    var I = function (k) { return IND.find(function (x) { return x[0] === k; }); }, L = ESTS.map(function (e) { var D = dadosLoja(X, e); return {e: e, c: I("comb")[3](D), l: I("loja")[3](D)}; });
+    var top = Math.max.apply(null, L.map(function (x) { return (x.c || 0) + (x.l || 0); })) || 1;
+    return "<section class='bl pnC4'><h3>Combustível e loja</h3><p class='pnSub'>" + esc(tituloMes(X)) + ", com IVA.</p>" + L.map(function (x) {
+      if (x.c == null) return "<div class='pnBar'><div class='ln'><span>" + esc(nomeLoja(x.e)) + "</span><span>—</span></div></div>";
+      var t = x.c + x.l;
+      return "<div class='pnBar" + (LOJA_V === "todas" || LOJA_V === x.e.id ? "" : " fora") + "'><div class='ln'><span>" + esc(nomeLoja(x.e)) + "</span><span>" + eur0(t) + "</span></div>" +
+        "<div class='tr' role='img' aria-label='" + esc(nomeLoja(x.e)) + ": combustível " + eur0(x.c) + ", loja " + eur0(x.l) + "'><span class='az' data-w='" + (x.c / top * 100) + "' data-n='bc-" + x.e.id + "'></span><span class='lj' data-w='" + (x.l / top * 100) + "' data-n='bl-" + x.e.id + "'></span></div>" +
+        "<small>Loja " + eur0(x.l) + " · " + num(x.l / t * 100, 1) + " % do total</small></div>";
+    }).join("") + "<div class='pnCh'><span><i></i>Combustível</span><span><i class='lj'></i>Loja</span></div></section>";
+  }
+  var FATIAS = [["MB", "Multibanco", "--pn1"], ["SOL", "Solred", "--pn2"], ["NUM", "Numerário", "--pn3"], ["CRE", "Crédito", "--pn4"], ["OUT", "Outros", "--pn5"]];
+  function recebido_(X) {
+    var M = MES_V || X.mes, ms = (X.fol || []).filter(function (f) { return f.mes <= M && f.dados && f.dados.formas; }).map(function (f) { return f.mes; }).sort(), ult = ms.filter(function (m) { return !idsVer().some(function (id) { return !(X.fol || []).some(function (f) { return f.mes === m && f.estacao === id; }); }); }).pop();
+    if (!ult) return "<section class='bl pnC4'><h3>Como recebeste</h3><p class='vz'>Ainda não há Folha de fecho deste mês nem de um mês anterior.</p></section>";
+    var R = PN.formas((X.fol || []).filter(function (f) { return f.mes === ult && idsVer().indexOf(f.estacao) >= 0; }).map(function (f) { return f.dados.formas; }));
+    var T = Object.keys(R).reduce(function (s, k) { return s + R[k]; }, 0) || 1, C = 339.292, ac = 0, L = FATIAS.filter(function (f) { return R[f[0]] > 0; });
+    return "<section class='bl pnC4'><h3>Como recebeste</h3><p class='pnSub'>" + Maius(nomeMes(ult)) + (ult === (MES_V || X.mes) ? "" : ", último mês fechado") + ".</p><div class='pnDon'><div class='an'><svg viewBox='0 0 132 132' role='img' aria-label='" + L.map(function (f) { return f[1] + " " + num(R[f[0]] / T * 100, 1) + " %"; }).join(", ") + "'>" +
+      L.map(function (f) { var p = R[f[0]] / T * 100, of = ac; ac += p; return "<circle cx='66' cy='66' r='54' style='stroke:var(" + f[2] + ")' data-dv='" + (p / 100 * C) + "' data-do='" + (-of / 100 * C) + "' data-n='fa-" + f[0] + "'></circle>"; }).join("") +
+      "</svg><div class='ce'><b>" + eur0(T) + "</b>recebido</div></div><div class='dl'>" + L.map(function (f) { return "<div><i style='background:var(" + f[2] + ")'></i><span>" + f[1] + "</span><b>" + num(R[f[0]] / T * 100, 1) + " %</b></div>"; }).join("") + "</div></div></section>";
+  }
+  var TW = 0, ANTES = {};   // animação em curso e valores que estavam no ecrã
+  function animar(box) {
+    var tw = ++TW, nums = box.querySelectorAll("[data-t]"), bars = box.querySelectorAll("[data-w]"), don = box.querySelectorAll("[data-dv]"), G = GR;
+    var val = function (x) { return ANTES[x.dataset.n] || 0; }, serA = G && ANTES.a && ANTES.a.length === G.n ? ANTES.a : G && G.a.map(function (v) { return v == null ? null : 0; }), serB = G && ANTES.b && ANTES.b.length === G.n ? ANTES.b : G && G.b.map(function (v) { return v == null ? null : 0; });
+    function mistura(a, b, k) { return b.map(function (v, i) { return v == null ? null : (a[i] || 0) + (v - (a[i] || 0)) * k; }); }
+    function passo(k) {
+      nums.forEach(function (x) { var a = val(x), v = +x.dataset.v; x.textContent = formato(a + (v - a) * k, x.dataset.t); });
+      bars.forEach(function (x) { var a = val(x), v = +x.dataset.w; x.style.width = (a + (v - a) * k) + "%"; });
+      don.forEach(function (x) { var a = val(x), v = +x.dataset.dv, p = a + (v - a) * k; x.style.strokeDasharray = p + " 339.292"; x.style.strokeDashoffset = x.dataset.do * k; });
+      if (G) pintarLinhas(mistura(serA, G.a, k), mistura(serB, G.b, k));
+    }
+    function guarda() {
+      ANTES = {}; nums.forEach(function (x) { ANTES[x.dataset.n] = +x.dataset.v; }); bars.forEach(function (x) { ANTES[x.dataset.n] = +x.dataset.w; }); don.forEach(function (x) { ANTES[x.dataset.n] = +x.dataset.dv; });
+      if (G) { ANTES.a = G.a; ANTES.b = G.b; }
+    }
+    var quieto = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (quieto || document.hidden) { passo(1); guarda(); return; }
+    var t0 = performance.now(), dur = 800;
+    (function vai() {
+      if (tw !== TW) return;
+      var k = Math.min(1, (performance.now() - t0) / dur);
+      passo(1 - Math.pow(1 - k, 3));
+      if (k < 1) requestAnimationFrame(vai); else guarda();
+    })();
   }
   function porFechar(X) {
     var ontem = new Date().getDate() - 1;
@@ -149,17 +258,17 @@
       ["Preços ENSE", function (e) { return X.pre ? preco(e.id) : null; }],
       ["Último documento Repsol", function (e) { return X.doc ? doc(e.id) : null; }]
     ];
-    return "<div class='bl'><h3>Por fechar</h3><div class='pnT pnF' style='--n:" + ESTS.length + "'><span class='cab'></span>" + ESTS.map(function (e) { return "<span class='cab'>" + esc(nomeLoja(e)) + "</span>"; }).join("") +
+    return "<section class='bl pnC4'><h3>Por fechar</h3><div class='pnT pnF' style='--n:" + lojasVer().length + "'><span class='cab'></span>" + lojasVer().map(function (e) { return "<span class='cab'>" + esc(nomeLoja(e)) + "</span>"; }).join("") +
       L.map(function (l) {
-        return "<span class='rot'>" + l[0] + "</span>" + ESTS.map(function (e) { var r = l[1](e); return r ? "<button data-e='" + e.id + "' data-p='" + r[2] + "'>" + tag(r[0], r[1]) + "</button>" : "<b class='sem'>—</b>"; }).join("");
-      }).join("") + "</div></div>";
+        return "<span class='rot'>" + l[0] + "</span>" + lojasVer().map(function (e) { var r = l[1](e); return r ? "<button data-e='" + e.id + "' data-p='" + r[2] + "'>" + tag(r[0], r[1]) + "</button>" : "<b class='sem'>—</b>"; }).join("");
+      }).join("") + "</div></section>";
   }
   function pintarDecidir(X) {
     var L = porDecidir(X);
     var arq = L.filter(function (x) { return x.arq; }).map(function (x) { return x.arq; });
-    return "<div class='bl'><h3>Por decidir <span class='nr'>" + L.length + "</span>" + (arq.length > 1 ? "<button class='btn pnArqT' data-arq='" + arq.join(",") + "'>Arquivar tudo (" + arq.length + ")</button>" : "") + "</h3>" + (L.length ? L.map(function (x, i) {
+    return "<section class='bl pnC4 pnDec'><h3>Por decidir <span class='nr'>" + L.length + "</span>" + (arq.length > 1 ? "<button class='btn pnArqT' data-arq='" + arq.join(",") + "'>Arquivar tudo (" + arq.length + ")</button>" : "") + "</h3>" + (L.length ? L.map(function (x, i) {
       return "<div class='fila'><div>" + esc(x.t) + "<small>" + esc(x.s) + "</small></div><span class='pnBt'>" + (x.arq ? "<button class='btn' data-arq='" + x.arq + "' aria-label='" + esc("Arquivar: " + x.t) + "'>Arquivar</button>" : "") + "<button class='btn' data-e='" + (x.e || "") + "' data-p='" + x.p + "' aria-label='" + esc(x.b + ": " + x.t) + "'>" + x.b + "</button></span></div>";
-    }).join("") : "<p class='vz'>Nada à espera da tua decisão.</p>") + "</div>";
+    }).join("") : "<p class='vz'>Nada à espera da tua decisão.</p>") + "</section>";
   }
   async function arquivar(X, chaves) {   // avisos e vendas pedidas ficam no Arquivo da página OCTAN AI
     var u = await sb.auth.getUser(), quem = (u.data && u.data.user && u.data.user.email) || "", agora = new Date().toISOString();
@@ -190,21 +299,35 @@
     function guardar() { gravar("msb_ind", A); pinta(); }
     box.hidden = false; pinta();
   }
+  function topo(X) {
+    var atual = !MES_V || MES_V === X.mes;
+    return "<div class='pnTopo'>" + (ESTS.length > 1 ? "<div class='pnSeg' role='group' aria-label='Escolher loja'>" + [{id: "todas", n: "Todas"}].concat(ESTS.map(function (e) { return {id: e.id, n: nomeLoja(e)}; })).map(function (l) { return "<button data-ver='" + l.id + "' aria-pressed='" + (LOJA_V === l.id) + "' class='" + (LOJA_V === l.id ? "on" : "") + "'>" + esc(l.n) + "</button>"; }).join("") + "</div>" : "") +
+      "<div class='pnMes'><button id='pnAnt' aria-label='Mês anterior'>‹</button><b>" + esc(tituloMes(X)) + "</b><button id='pnSeg' aria-label='Mês seguinte'" + (atual ? " disabled" : "") + ">›</button></div>" +
+      "<button class='mini' id='pnPers'>Personalizar</button></div><div id='pnEdit' hidden></div>";
+  }
   function desenhar(X) {
     var box = $("#iniCorpo");
-    box.innerHTML = (X.falhas.length ? "<div class='aviso'><p>Não consegui ler: " + esc(X.falhas.join(", ")) + ". O que está em baixo pode estar incompleto.</p></div>" : "") +
-      "<div class='pnCol'>" + pintarDecidir(X) + "</div><div class='pnCol'>" + estado(X) + porFechar(X) + "</div>";
+    if (LOJA_V !== "todas" && !ESTS.some(function (e) { return e.id === LOJA_V; })) LOJA_V = "todas";
+    var falta = ESTS.some(function (e) { var D = dadosLoja(X, e); return !D.c && !D.f; }), M = MES_V || X.mes;
+    box.innerHTML = (X.falhas.length ? "<div class='aviso'><p>Não consegui ler: " + esc(X.falhas.join(", ")) + ". O que está em baixo pode estar incompleto.</p></div>" : "") + topo(X) + cartoes(X) +
+      "<div class='pnGrade'>" + grafico(X) + pintarDecidir(X) + barras(X) + recebido_(X) + porFechar(X) + "</div>" +
+      "<p class='rod'>" + (falta ? "A ler no CBOS pelo OCTAN AI: os valores aparecem daqui a uns minutos, com o PC ligado." : M === X.mes ? "Vendas com IVA, lidas no CBOS pelo OCTAN AI, até ontem. O ritmo por dia e a estimativa do mês são contas simples, não são valores do CBOS." : "Vendas com IVA, do mês inteiro.") + "</p>";
     box.querySelectorAll("[data-p]").forEach(function (b) { b.onclick = function () { irLoja(b.dataset.e, b.dataset.p); }; });
     box.querySelectorAll("[data-arq]").forEach(function (b) { b.onclick = function () { b.disabled = true; arquivar(X, b.dataset.arq.split(",")); }; });
-    box.querySelectorAll("[data-loja]").forEach(function (b) { b.onclick = function () { irLoja(b.dataset.loja, "reg"); }; });
+    box.querySelectorAll("[data-ver]").forEach(function (b) { b.onclick = function () { LOJA_V = b.dataset.ver; desenhar(X); }; });
     $("#pnPers").onclick = function () { editarInd(X); };
     $("#pnAnt").onclick = function () { verMes(X, addMes(MES_V || X.mes, -1)); };
     $("#pnSeg").onclick = function () { verMes(X, addMes(MES_V || X.mes, 1)); };
+    ligarGrafico(); animar(box);
   }
   MSB_NAV.painel = async function () {
     var box = $("#iniCorpo"); box.className = "painel";
-    box.innerHTML = "<div class='pnCol'><div class='bl ske' style='height:280px'></div></div><div class='pnCol'><div class='bl ske' style='height:200px'></div><div class='bl ske' style='height:160px'></div></div>";
-    try { var X = await dados(); if (PAGINA === "ini") desenhar(X); aviSelo(); }
+    box.innerHTML = "<div class='pnKs'><div class='pnK hero bl ske' style='height:118px'></div><div class='pnK bl ske'></div><div class='pnK bl ske'></div><div class='pnK bl ske'></div></div><div class='pnGrade'><div class='bl ske pnC8' style='height:340px'></div><div class='bl ske pnC4' style='height:340px'></div></div>";
+    var nr = ++NR_V;
+    try {
+      var X = await dados(); await pedir(X, X.mes); await pedir(X, X.ant);
+      if (nr === NR_V && PAGINA === "ini") { desenhar(X); aviSelo(); aguardar(X, nr); }
+    }
     catch (e) { box.innerHTML = "<div class='aviso'><p>" + esc(falhou(e)) + "</p></div>"; }
   };
 })();
