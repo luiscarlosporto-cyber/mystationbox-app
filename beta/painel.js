@@ -49,7 +49,8 @@
   function porDecidir(X) {
     var L = [], loja = function (id) { var e = ESTS.find(function (x) { return x.id === id; }); return e ? nomeLoja(e) : id; };
     (X.avi || []).filter(function (a) { return !a.lido_em && (a.nivel === "erro" || a.nivel === "atencao"); }).forEach(function (a) {
-      L.push({o: a.nivel === "erro" ? 0 : 2, t: a.titulo, s: loja(a.estacao) + " · OCTAN AI", e: a.estacao, p: "avi", b: "Ver"});
+      var ense = a.tipo === "ense" && /preç|ENSE/i.test(a.titulo || "");   // ENSE é o único crítico: só sai depois de tratado
+      L.push({o: a.nivel === "erro" ? 0 : 2, t: a.titulo, s: loja(a.estacao) + " · OCTAN AI", e: a.estacao, p: "avi", b: "Ver", arq: ense ? "" : "a" + a.id});
     });
     var par = X.avi && aviParado(X.avi); if (par) L.push({o: 0, t: "O OCTAN AI não corre desde " + aviDataHora(par.criado), s: "Confirma se o PC está ligado", p: "avi", b: "Ver"});
     (X.pre || []).filter(function (x) { return x.estado === "lido" && (!x.aprovado_em || x.ense_erro); }).forEach(function (x) {
@@ -58,7 +59,7 @@
     (X.enc || []).forEach(function (o) {
       L.push({o: 1, t: "Encomenda por aprovar", s: loja(o.company_id) + " · " + (o.lines || []).length + " artigos", e: o.company_id, p: "enc", b: "Ver"});
     });
-    (X.ped || []).forEach(function (p) { L.push({o: 3, t: "Vendas pedidas prontas", s: loja(p.estacao) + " · " + dmy(p.de) + " a " + dmy(p.ate), p: "avi", b: "Ver"}); });
+    (X.ped || []).forEach(function (p) { L.push({o: 3, t: "Vendas pedidas prontas", s: loja(p.estacao) + " · " + dmy(p.de) + " a " + dmy(p.ate), p: "avi", b: "Ver", arq: "p" + p.id}); });
     var S = {}; (X.sai || []).forEach(function (s) { var a = S[s.estacao] = S[s.estacao] || {n: 0, v: 0}; a.n++; a.v += s.valor_c || 0; });
     Object.keys(S).forEach(function (e) { L.push({o: 3, t: S[e].n === 1 ? "Saída de caixa por entregar" : S[e].n + " saídas de caixa por entregar", s: loja(e) + " · " + eur(S[e].v), e: e, p: "sai", b: "Ver"}); });
     return L.sort(function (a, b) { return a.o - b.o; });
@@ -114,9 +115,20 @@
   }
   function pintarDecidir(X) {
     var L = porDecidir(X);
-    return "<div class='bl'><h3>Por decidir <span class='nr'>" + L.length + "</span></h3>" + (L.length ? L.map(function (x, i) {
-      return "<div class='fila'><div>" + esc(x.t) + "<small>" + esc(x.s) + "</small></div><button class='btn' data-e='" + (x.e || "") + "' data-p='" + x.p + "' aria-label='" + esc(x.b + ": " + x.t) + "'>" + x.b + "</button></div>";
+    var arq = L.filter(function (x) { return x.arq; }).map(function (x) { return x.arq; });
+    return "<div class='bl'><h3>Por decidir <span class='nr'>" + L.length + "</span>" + (arq.length > 1 ? "<button class='btn pnArqT' data-arq='" + arq.join(",") + "'>Arquivar tudo (" + arq.length + ")</button>" : "") + "</h3>" + (L.length ? L.map(function (x, i) {
+      return "<div class='fila'><div>" + esc(x.t) + "<small>" + esc(x.s) + "</small></div><span class='pnBt'>" + (x.arq ? "<button class='btn' data-arq='" + x.arq + "' aria-label='" + esc("Arquivar: " + x.t) + "'>Arquivar</button>" : "") + "<button class='btn' data-e='" + (x.e || "") + "' data-p='" + x.p + "' aria-label='" + esc(x.b + ": " + x.t) + "'>" + x.b + "</button></span></div>";
     }).join("") : "<p class='vz'>Nada à espera da tua decisão.</p>") + "</div>";
+  }
+  async function arquivar(X, chaves) {   // avisos e vendas pedidas ficam no Arquivo da página OCTAN AI
+    var u = await sb.auth.getUser(), quem = (u.data && u.data.user && u.data.user.email) || "", agora = new Date().toISOString();
+    var av = [], pe = []; chaves.forEach(function (k) { (k[0] === "a" ? av : pe).push(k.slice(1)); });
+    var r1 = av.length ? await sb.from("msb_avisos").update({lido_em: agora, lido_por: quem}).in("id", av) : {};
+    var r2 = pe.length ? await sb.from("msb_pedidos").update({visto_em: agora}).in("id", pe.map(Number)) : {};
+    if (r1.error || r2.error) return msbAviso("Erro: " + falhou(r1.error || r2.error));
+    (X.avi || []).forEach(function (a) { if (av.indexOf(String(a.id)) >= 0) a.lido_em = agora; });
+    X.ped = (X.ped || []).filter(function (p) { return pe.indexOf(String(p.id)) < 0; });
+    desenhar(X); if (window.aviSelo) aviSelo();
   }
   function irLoja(e, pg) {
     if (e && e !== EST) { var s = $("#selEst"); s.value = e; PAGINA = pg; s.onchange(); }
@@ -142,6 +154,7 @@
     box.innerHTML = (X.falhas.length ? "<div class='aviso'><p>Não consegui ler: " + esc(X.falhas.join(", ")) + ". O que está em baixo pode estar incompleto.</p></div>" : "") +
       "<div class='pnCol'>" + pintarDecidir(X) + "</div><div class='pnCol'>" + estado(X) + porFechar(X) + "</div>";
     box.querySelectorAll("[data-p]").forEach(function (b) { b.onclick = function () { irLoja(b.dataset.e, b.dataset.p); }; });
+    box.querySelectorAll("[data-arq]").forEach(function (b) { b.onclick = function () { b.disabled = true; arquivar(X, b.dataset.arq.split(",")); }; });
     box.querySelectorAll("[data-loja]").forEach(function (b) { b.onclick = function () { irLoja(b.dataset.loja, "reg"); }; });
     $("#pnPers").onclick = function () { editarInd(X); };
   }
