@@ -1,6 +1,6 @@
 /* mystationbox beta · Etapa 3: Painel de Gestão do administrador. Três blocos sobre as duas lojas: Por decidir, Estado das lojas, Por fechar.
- * Cada linha abre a página onde a coisa se resolve, já na loja certa. Estado das lojas: mês em curso até ontem, lido no CBOS pelo OCTAN AI
- * (pedido automático, pasta PAINEL, um por dia e por loja). Sem esse valor, mostra o mês fechado da Folha de fecho. */
+ * Cada linha abre a página onde a coisa se resolve, já na loja certa. Estado das lojas: abre no mês em curso até ontem, lido no CBOS pelo OCTAN AI
+ * (pedido automático, pasta PAINEL, um por dia e por loja); ‹ › mudam para meses inteiros: Folha de fecho do CBOS ou, se não houver, leitura pedida ao OCTAN AI. */
 "use strict";
 (function () {
   var IND = [   // indicadores que se podem escolher e ordenar; valor por loja a partir de D (dados da loja)
@@ -11,8 +11,8 @@
     ["mb", "Multibanco", 0, function (D) { return forma(D, ["CARTAO BANCARIO", "BANCARIO OFFLINE"]); }],
     ["sol", "Solred", 0, function (D) { return forma(D, ["SOLRED", "SOLRED OFFLINE"]); }],
     ["num", "Numerário", 0, function (D) { return forma(D, ["NUMERARIO"]); }],
-    ["tur", "Mês em curso · vendas", 1, function (D) { return D.mes.length ? eur(D.mes.reduce(function (s, r) { return s + r.vendas_c; }, 0)) : "Sem turnos"; }],
-    ["dif", "Mês em curso · diferença", 1, function (D) { if (!D.mes.length) return "Sem turnos"; return sinal(D.mes.reduce(function (s, r) { return s + (dif(r) || 0); }, 0)) + " €"; }],
+    ["tur", "Mês em curso · vendas", 0, function (D) { return D.mes.length ? eur(D.mes.reduce(function (s, r) { return s + r.vendas_c; }, 0)) : "Sem turnos"; }],
+    ["dif", "Mês em curso · diferença", 0, function (D) { if (!D.mes.length) return "Sem turnos"; return sinal(D.mes.reduce(function (s, r) { return s + (dif(r) || 0); }, 0)) + " €"; }],
     ["ont", "Ontem · vendas", 0, function (D) { var v = D.mes.concat(D.ant).filter(function (r) { return r.dia === hojeISO(-1); }); return v.length ? eur(v.reduce(function (s, r) { return s + r.vendas_c; }, 0)) : "Sem turnos"; }]
   ];
   function eur(c) { return fmt(c) + " €"; }
@@ -42,7 +42,7 @@
       guarda("pedidos", sb.from("msb_pedidos").select("id,estacao,estado,de,ate,visto_em,pasta").eq("estado", "feito").is("visto_em", null).neq("pasta", "PAINEL")),
       guarda("documentos", sb.from("msb_docs").select("estacao,emissao").order("emissao", {ascending: false}).limit(40)),
       guarda("avisos", avisosRecentes(60).then(function (x) { return {data: x}; })),
-      guarda("mês em curso", sb.from("msb_pedidos").select("estacao,estado,de,ate,linhas").eq("pasta", "PAINEL").gte("de", mes + "-01").order("id", {ascending: false}).limit(20))
+      guarda("mês em curso", sb.from("msb_pedidos").select("estacao,estado,de,ate,linhas").eq("pasta", "PAINEL").gte("de", ant + "-01").order("id", {ascending: false}).limit(20))
     ]);
     pedirMes(mes, R[11]);
     return {cur: R[11], hoje: hoje, mes: mes, ant: ant, tur: R[0], fol: R[1], sai: R[2], enc: R[3], pre: R[4], tms: R[5], vm: R[6], va: R[7], ped: R[8], doc: R[9], avi: R[10], falhas: f};
@@ -54,11 +54,36 @@
     var falta = ESTS.filter(function (e) { return !P.some(function (p) { return p.estacao === e.id && p.ate === ontem && p.estado !== "erro"; }); });
     if (falta.length) await sb.from("msb_pedidos").insert(falta.map(function (e) { return {estacao: e.id, de: mes + "-01", ate: ontem, pasta: "PAINEL", artigo: "", pedido_por: "Painel", visto_em: new Date().toISOString()}; }));
   }
-  function mesCurso(X, id) {   // códigos de 1 ou 2 algarismos = combustíveis, como na família do CBOS
-    var p = (X.cur || []).find(function (q) { return q.estacao === id && q.estado === "feito" && q.linhas; }); if (!p) return null;
+  function mesCurso(X, id, M) {   // códigos de 1 ou 2 algarismos = combustíveis, como na família do CBOS
+    var p = (X.cur || []).find(function (q) { return q.estacao === id && q.de.slice(0, 7) === M && q.estado === "feito" && q.linhas; }); if (!p) return null;
     var c = {ate: p.ate, total: 0, comb: 0, litros: 0};
     p.linhas.forEach(function (l) { var v = Math.round(l[3] * 100); c.total += v; if (/^\d{1,2}$/.test(l[0])) { c.comb += v; c.litros += l[2]; } });
     return c;
+  }
+  var MES_V = null, NR_V = 0;   // mês escolhido no Estado das lojas; null = mês em curso
+  async function verMes(X, m) {
+    var nr = ++NR_V; MES_V = m === X.mes ? null : m;
+    var fim = addMes(m, 1) + "-01", ult = new Date(new Date(fim + "T12:00:00") - 864e5).toISOString().slice(0, 10);
+    async function ler() {
+      var a = await sb.from("msb_folha_fecho").select("estacao,mes,dados").eq("mes", m), b = await sb.from("msb_pedidos").select("estacao,estado,de,ate,linhas").eq("pasta", "PAINEL").gte("de", m + "-01").lt("de", fim).order("id", {ascending: false}).limit(8);
+      if (a.error || b.error) throw a.error || b.error;
+      X.fol = (X.fol || []).filter(function (x) { return x.mes !== m; }).concat(a.data || []);
+      X.cur = (b.data || []).concat((X.cur || []).filter(function (x) { return x.de.slice(0, 7) !== m; }));
+    }
+    try {
+      await ler();
+      if (m !== X.mes) {
+        var pedir = ESTS.filter(function (e) { return !(X.fol || []).some(function (x) { return x.estacao === e.id && x.mes === m; }) && !(X.cur || []).some(function (q) { return q.estacao === e.id && q.de.slice(0, 7) === m && q.ate === ult && q.estado !== "erro"; }); });
+        if (pedir.length) { var r = await sb.from("msb_pedidos").insert(pedir.map(function (e) { return {estacao: e.id, de: m + "-01", ate: ult, pasta: "PAINEL", artigo: "", pedido_por: "Painel", visto_em: new Date().toISOString()}; })); if (r.error) throw r.error; await ler(); }
+      }
+      if (nr !== NR_V || PAGINA !== "ini") return;
+      desenhar(X);
+      for (var i = 0; i < 8 && ESTS.some(function (e) { var D = dadosLoja(X, e); return !D.c && !D.f; }); i++) {   // à espera do OCTAN AI
+        await new Promise(function (ok) { setTimeout(ok, 30000); });
+        if (nr !== NR_V || PAGINA !== "ini") return;
+        await ler(); desenhar(X);
+      }
+    } catch (e) { msbAviso("Erro: " + falhou(e)); }
   }
   function porDecidir(X) {
     var L = [], loja = function (id) { var e = ESTS.find(function (x) { return x.id === id; }); return e ? nomeLoja(e) : id; };
@@ -80,22 +105,22 @@
   }
 
   function dadosLoja(X, e) {
-    var f = (X.fol || []).find(function (x) { return x.estacao === e.id; }) || null, T = (X.tur || []).filter(function (r) { return r.estacao === e.id; });
-    var c = mesCurso(X, e.id); if ((X.cur || []).some(function (q) { return q.estado === "feito" && q.linhas; })) f = null;   // o mês em curso substitui o mês fechado nas duas lojas
+    var M = MES_V || X.mes, f = (X.fol || []).find(function (x) { return x.estacao === e.id && x.mes === M; }) || null, T = (X.tur || []).filter(function (r) { return r.estacao === e.id; });
+    var c = f ? null : mesCurso(X, e.id, M);
     return {c: c, f: f, mes: T.filter(function (r) { return r.dia.slice(0, 7) === X.mes; }), ant: T.filter(function (r) { return r.dia.slice(0, 7) !== X.mes; }), T: T};
   }
   function estado(X) {
-    var ativos = indAtivos(), meses = {};
-    var DL = ESTS.map(function (e) { var D = dadosLoja(X, e); if (D.f) meses[D.f.mes] = 1; return D; });
-    var ms = Object.keys(meses).sort(), ates = DL.filter(function (D) { return D.c; }).map(function (D) { return D.c.ate; }).sort();
-    var tit = ates.length ? nomeMes(X.mes).replace(/^./, function (l) { return l.toUpperCase(); }) + " até " + dmy(ates[0]).slice(0, 5) : ms.length === 1 ? "Mês de " + nomeMes(ms[0]) : "Último mês fechado";
+    var ativos = indAtivos(), M = MES_V || X.mes, atual = M === X.mes, DL = ESTS.map(function (e) { return dadosLoja(X, e); });
+    var ates = DL.filter(function (D) { return D.c; }).map(function (D) { return D.c.ate; }).sort(), falta = DL.some(function (D) { return !D.c && !D.f; });
+    var tit = nomeMes(M).replace(/^./, function (l) { return l.toUpperCase(); }) + (M.slice(0, 4) !== X.mes.slice(0, 4) ? " " + M.slice(0, 4) : "") + (atual && ates.length ? " até " + dmy(ates[0]).slice(0, 5) : "");
     var h = "<div class='bl'><h3>Estado das lojas<button class='mini' id='pnPers'>Personalizar</button></h3><div id='pnEdit' hidden></div>" +
-      "<div class='pnT' style='--n:" + ESTS.length + "'><span class='cab'>" + tit + "</span>" + ESTS.map(function (e) { return "<button class='cab' data-loja='" + e.id + "'>" + esc(nomeLoja(e)) + "</button>"; }).join("");
+      "<div class='pnMes'><button class='btn' id='pnAnt' aria-label='Mês anterior'>‹</button><b>" + esc(tit) + "</b><button class='btn' id='pnSeg' aria-label='Mês seguinte'" + (atual ? " disabled" : "") + ">›</button></div>" +
+      "<div class='pnT' style='--n:" + ESTS.length + "'><span class='cab'></span>" + ESTS.map(function (e) { return "<button class='cab' data-loja='" + e.id + "'>" + esc(nomeLoja(e)) + "</button>"; }).join("");
     ativos.forEach(function (k) {
       var I = IND.find(function (x) { return x[0] === k; });
       h += "<span class='rot'>" + I[1] + "</span>" + DL.map(function (D) { var v = I[3](D); return "<b class='" + (v === "Sem turnos" || v == null ? "sem" : "") + "'>" + esc(v == null ? "—" : v) + "</b>"; }).join("");
     });
-    return h + "</div><p class='rod'>" + (ates.length ? "Vendas com IVA, lidas no CBOS pelo OCTAN AI, até ontem." : "Vendas com IVA, da Folha de fecho do CBOS. O mês em curso aparece depois de o OCTAN AI o ler no CBOS.") + "</p></div>";
+    return h + "</div><p class='rod'>" + (falta ? "A ler no CBOS pelo OCTAN AI: os valores aparecem daqui a uns minutos, com o PC ligado." : atual ? "Vendas com IVA, lidas no CBOS pelo OCTAN AI, até ontem." : "Vendas com IVA, do mês inteiro.") + "</p></div>";
   }
   function porFechar(X) {
     var ontem = new Date().getDate() - 1;
@@ -173,6 +198,8 @@
     box.querySelectorAll("[data-arq]").forEach(function (b) { b.onclick = function () { b.disabled = true; arquivar(X, b.dataset.arq.split(",")); }; });
     box.querySelectorAll("[data-loja]").forEach(function (b) { b.onclick = function () { irLoja(b.dataset.loja, "reg"); }; });
     $("#pnPers").onclick = function () { editarInd(X); };
+    $("#pnAnt").onclick = function () { verMes(X, addMes(MES_V || X.mes, -1)); };
+    $("#pnSeg").onclick = function () { verMes(X, addMes(MES_V || X.mes, 1)); };
   }
   MSB_NAV.painel = async function () {
     var box = $("#iniCorpo"); box.className = "painel";
