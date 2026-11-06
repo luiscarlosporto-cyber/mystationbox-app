@@ -319,12 +319,19 @@
     var ids = linhasEnvio().map(function (l) { return l.colaborador_id; }), c = await sb.from("msb_colab_contactos").select("colaborador_id,email").in("colaborador_id", ids), u = await sb.from("msb_horario_envios").select("estado,para,erro,criado").eq("estacao", EST).eq("mes", X.M).order("id", {ascending: false}).limit(1);
     if (c.error || u.error) return msbAviso("Erro: " + falhou(c.error || u.error));
     X.MAIL = {}; (c.data || []).forEach(function (x) { X.MAIL[x.colaborador_id] = x.email; });
+    try {   // sem email guardado, usa o da conta da app (o email escrito à mão manda sempre)
+      var q = await sb.functions.invoke("msb-equipa", {body: {acao: "listar"}});
+      if (!q.error && q.data && q.data.equipa) {
+        var A = HOR.emailsContas(ids.map(function (i) { return {id: i, nome: (X.C[i] || {}).nome}; }), q.data.equipa.map(function (p) { return {nome: p.display_name, email: p.email, banido: p.banido}; }));
+        X.CONTA = {}; Object.keys(A).forEach(function (i) { if (!X.MAIL[i]) { X.MAIL[i] = A[i]; X.CONTA[i] = 1; } });
+      }
+    } catch (e) { /* sem contas: escreve-se à mão */ }
     X.ultEnv = (u.data || [])[0] || null; X.envio = true; pintar();
   }
   function cartaoEnvio() {
     var u = X.ultEnv, E = {pendente: "Na fila: sai dentro de minutos, com o PC ligado.", a_enviar: "A enviar.", enviado: "Enviado.", erro: "Falhou: "};
-    return "<div class='aviso' style='display:grid;gap:8px'><b>Enviar o horário de " + esc(nomeMes(X.M)) + "</b><div class='mut' style='font-size:13px'>O PDF vai sem a marcação dos turnos extra. Quem tem conta também o vê na app.</div>" +
-      linhasEnvio().map(function (l) { var c = X.C[l.colaborador_id] || {}, m = X.MAIL[l.colaborador_id] || ""; return "<label style='display:grid;grid-template-columns:24px minmax(90px,150px) minmax(0,1fr);gap:8px;align-items:center;margin:0'><input type='checkbox' class='envSim' data-c='" + l.colaborador_id + "'" + (m ? " checked" : "") + " aria-label='Enviar a " + esc(c.curto || "") + "'><span>" + esc(c.curto || "") + "</span><input type='email' class='envMail' data-c='" + l.colaborador_id + "' value='" + esc(m) + "' placeholder='email' autocomplete='off'></label>"; }).join("") +
+    return "<div class='aviso' style='display:grid;gap:8px'><b>Enviar o horário de " + esc(nomeMes(X.M)) + "</b><div class='mut' style='font-size:13px'>O PDF leva os turnos extra assinalados. Quem tem conta também vê o horário na app.</div>" +
+      linhasEnvio().map(function (l) { var c = X.C[l.colaborador_id] || {}, m = X.MAIL[l.colaborador_id] || ""; return "<label style='display:grid;grid-template-columns:24px minmax(90px,150px) minmax(0,1fr);gap:8px;align-items:center;margin:0'><input type='checkbox' class='envSim' data-c='" + l.colaborador_id + "'" + (m ? " checked" : "") + " aria-label='Enviar a " + esc(c.curto || "") + "'><span>" + esc(c.curto || "") + "</span><input type='email' class='envMail' data-c='" + l.colaborador_id + "' value='" + esc(m) + "' placeholder='email' autocomplete='off' title='" + ((X.CONTA || {})[l.colaborador_id] ? "Email da conta da app" : "") + "'></label>"; }).join("") +
       "<div class='bar'><button class='btn p' id='envMail'>Enviar por email</button><button class='btn' id='envPdf'>Partilhar PDF</button><button class='btn' id='envFim'>Fechar</button></div>" +
       (u ? "<div class='mut' style='font-size:13px'>Último envio: " + u.para.length + " pessoa(s) · " + esc(E[u.estado] || "") + (u.estado === "erro" ? esc(u.erro || "") : "") + "</div>" : "") + "</div>";
   }
@@ -344,7 +351,7 @@
     if (!await msbConfirma("Enviar o horário de " + nomeMes(X.M) + " a " + T.ok.length + " pessoa(s)?", "Enviar")) return;
     b.disabled = true;
     try {
-      var C = L.filter(function (x) { return x.e.trim().toLowerCase() !== X.MAIL[x.c]; }).map(function (x) { return {colaborador_id: x.c, email: x.e.trim().toLowerCase()}; });
+      var C = L.filter(function (x) { return x.e.trim().toLowerCase() !== X.MAIL[x.c] || (X.CONTA || {})[x.c]; }).map(function (x) { return {colaborador_id: x.c, email: x.e.trim().toLowerCase()}; });
       if (C.length) { var r0 = await sb.from("msb_colab_contactos").upsert(C, {onConflict: "colaborador_id"}); if (r0.error) throw r0.error; }
       var cam = EST + "/horarios/" + X.M + "_" + Date.now() + ".pdf", r1 = await sb.storage.from("msb-originais").upload(cam, await gerarPdf(true), {contentType: "application/pdf", upsert: false}); if (r1.error) throw r1.error;
       var r2 = await sb.from("msb_horario_envios").insert({estacao: EST, mes: X.M, para: T.ok, assunto: "Horário de " + nomeMes(X.M) + " · " + nomeLoja(), original: cam, pedido_por: quemSou()}); if (r2.error) throw r2.error;
@@ -403,14 +410,15 @@
     X.dias.forEach(function (d) { fundo(d, y - 8, alt + 4); centro(String(d), M + nome + (d - 1) * col, y + 8, B, 9); centro(SEM[new Date(X.M + "-" + String(d).padStart(2, "0") + "T12:00:00").getDay()], M + nome + (d - 1) * col, y - 3, F, 6.5); });
     pg.drawText("Colaborador", {x: M + 3, y: y + 3, size: 9, font: B, color: tx}); y -= 8;
     pg.drawLine({start: {x: M, y: y}, end: {x: W - M, y: y}, thickness: 0.8, color: az});
-    var EX = funcionarios ? {} : mapaExtras(), ver = P.rgb(0.749, 0.902, 0.776), linhas = X.P.filter(function (l) { return Object.keys(X.G[l.colaborador_id] || {}).length; });
+    var EX = mapaExtras(), ver = P.rgb(0.749, 0.902, 0.776), linhas = X.P.filter(function (l) { return Object.keys(X.G[l.colaborador_id] || {}).length; });
     linhas.forEach(function (l) {
       var c = X.C[l.colaborador_id] || {}; y -= alt;
       X.dias.forEach(function (d) { fundo(d, y, alt); var v = (X.G[l.colaborador_id] || {})[d] || "", e = (EX[l.colaborador_id] || []).indexOf(d) >= 0; if (e) pg.drawRectangle({x: M + nome + (d - 1) * col, y: y, width: col, height: alt, color: ver}); if (v) centro(v, M + nome + (d - 1) * col, y + 9, e ? B : F, 9); });
       pg.drawText(c.nome || "", {x: M + 3, y: y + 9, size: 9, font: B, color: tx});
       pg.drawLine({start: {x: M, y: y}, end: {x: W - M, y: y}, thickness: 0.4, color: lin});
     });
-    pg.drawText("M manhã · T tarde" + (X.mt ? " · MT turno M/T" : "") + " · FG folga · F férias · FD feriado" + (funcionarios ? "" : " · verde e negrito: turno extra"), {x: M, y: y - 16, size: 8, font: F, color: tx});
+    pg.drawText("M manhã · T tarde" + (X.mt ? " · MT turno M/T" : "") + " · FG folga · F férias · FD feriado", {x: M, y: y - 16, size: 8, font: F, color: tx});
+    { var lx = M + F.widthOfTextAtSize("M manhã · T tarde" + (X.mt ? " · MT turno M/T" : "") + " · FG folga · F férias · FD feriado", 8) + 14; pg.drawRectangle({x: lx, y: y - 18, width: 11, height: 11, color: ver, borderColor: P.rgb(0.08, 0.19, 0.11), borderWidth: 0.6}); pg.drawText("Turno extra", {x: lx + 15, y: y - 16, size: 8, font: B, color: tx}); }
     await marcaPdf(doc, pg, F, B, M, 18);
     return new Blob([await doc.save()], {type: "application/pdf"});
   }
