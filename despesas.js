@@ -88,15 +88,15 @@ function dspKms(d) {
 function dspCartao(d) {
   var sem = d.valor_c == null;
   return "<div style='display:grid;gap:8px;border:1px solid var(--line,#d9dee3);border-radius:10px;padding:10px'><div><b>" + esc(d.colaborador || d.fornecedor) + "</b> <span class='mut'>· " + esc(d.categoria) + " · " + esc(dspMesPt(d.mes)) + "</span>" +
-    "<div class='mut' style='font-size:13px'>" + dspData(d.dia) + (d.documento ? " · " + esc(d.documento) : "") + (d.debito ? " · débito a " + dspData(d.debito) : "") + (d.no_dl ? " · incluído na liquidação" : "") + (d.valor_c < 0 ? " · nota de crédito ou anulação" : "") + "</div></div>" +
+    "<div class='mut' style='font-size:13px'>" + dspData(d.dia) + (d.documento ? " · " + esc(d.documento) : "") + (d.debito ? " · débito a " + dspData(d.debito) : "") + (d.no_dl ? " · incluído na liquidação" : "") + (d.valor_c < 0 ? " · <b>crédito</b>" : "") + "</div></div>" +
     dspKms(d) + (d.nota ? "<div class='mut' style='font-size:13px'>" + esc(d.nota) + "</div>" : "") +
-    "<div class='bar'><label style='display:grid;gap:2px;font-size:13px'>Valor (€)<input class='dspVal' data-id='" + d.id + "' inputmode='decimal' value='" + (sem ? "" : fmt(d.valor_c)) + "' placeholder='Por preencher' style='width:130px'></label><label style='display:grid;gap:2px;font-size:13px'>IVA incluído (€)<input class='dspIva' data-id='" + d.id + "' inputmode='decimal' value='" + (d.iva_c == null ? "" : fmt(d.iva_c)) + "' style='width:110px'></label>" +
+    "<div class='bar'><label style='display:grid;gap:2px;font-size:13px'>" + (d.valor_c < 0 ? "Crédito (€)" : "Valor (€)") + "<input class='dspVal' data-id='" + d.id + "' inputmode='decimal' value='" + (sem ? "" : fmt(DESPESAS.creditoVisto(d.valor_c))) + "' placeholder='Por preencher' style='width:130px'></label><label style='display:grid;gap:2px;font-size:13px'>IVA incluído (€)<input class='dspIva' data-id='" + d.id + "' inputmode='decimal' value='" + (d.iva_c == null ? "" : fmt(d.iva_c)) + "' style='width:110px'></label>" +
     "<button class='btn p' data-acao='confirmar' data-id='" + d.id + "'>Confirmar</button>" + (d.original ? "<button class='btn' data-acao='ver' data-id='" + d.id + "'>Ver documento</button>" : "") +
     "<button class='btn' data-acao='editar' data-id='" + d.id + "'>Editar</button><button class='btn' data-acao='ignorar' data-id='" + d.id + "'>Ignorar</button></div></div>";
 }
 function dspLinha(d) {
   var ig = d.estado === "ignorada";
-  return "<tr" + (ig ? " style='opacity:.55'" : "") + "><td class='l'>" + esc(d.categoria) + (d.colaborador ? " · " + esc(d.colaborador) : "") + "</td><td class='l'>" + esc(d.fornecedor) + (d.no_dl ? " <span class='mut'>(na liquidação)</span>" : "") + "</td><td class='l'>" + esc(d.documento || "") + (ig ? " <span class='mut'>ignorada</span>" : "") + "</td><td class='n'>" + fmt(d.valor_c) + "</td><td class='l'>" +
+  return "<tr" + (ig ? " style='opacity:.55'" : "") + "><td class='l'>" + esc(d.categoria) + (d.colaborador ? " · " + esc(d.colaborador) : "") + "</td><td class='l'>" + esc(d.fornecedor) + (d.no_dl ? " <span class='mut'>(na liquidação)</span>" : "") + "</td><td class='l'>" + esc(d.documento || "") + (ig ? " <span class='mut'>ignorada</span>" : "") + "</td><td class='n'>" + (d.valor_c < 0 ? "+" + fmt(-d.valor_c) + " <span class='mut'>crédito</span>" : fmt(d.valor_c)) + "</td><td class='l'>" +
     (d.original ? "<button class='btn' data-acao='ver' data-id='" + d.id + "'>Ver</button> " : "") + "<button class='btn' data-acao='editar' data-id='" + d.id + "'>Editar</button></td></tr>";
 }
 function dspAbrir(d) {
@@ -108,10 +108,11 @@ function dspAbrir(d) {
     "<label>Data do documento<input id='dfDia' type='date' style='width:100%' value='" + esc(v.dia) + "'></label>" +
     "<label>Mês da despesa<input id='dfMes' type='month' style='width:100%' value='" + esc(v.mes) + "'></label>" +
     "<label>Documento<input id='dfDoc' style='width:100%' value='" + esc(v.documento || "") + "'></label>" +
-    "<label>Valor com IVA (€)<input id='dfVal' inputmode='decimal' style='width:100%' value='" + (v.valor_c == null ? "" : fmt(v.valor_c)) + "'></label>" +
-    "<label>IVA incluído (€)<input id='dfIva' inputmode='decimal' style='width:100%' value='" + (v.iva_c == null ? "" : fmt(v.iva_c)) + "'></label>" +
+    "<label>Valor com IVA (€)<input id='dfVal' inputmode='decimal' style='width:100%' value='" + (v.valor_c == null ? "" : fmt(DESPESAS.creditoVisto(v.valor_c))) + "'></label>" +
+    "<label>IVA incluído (€)<input id='dfIva' inputmode='decimal' style='width:100%' value='" + (v.iva_c == null ? "" : fmt(DESPESAS.creditoVisto(v.iva_c))) + "'></label>" +
     "<label>Nota<input id='dfNota' style='width:100%' value='" + esc(v.nota || "") + "'></label></div>" +
     "<label style='display:flex;gap:8px;align-items:center'><input type='checkbox' id='dfDl'" + (v.no_dl ? " checked" : "") + "> Incluído na liquidação da Repsol</label>" +
+    "<label style='display:flex;gap:8px;align-items:center'><input type='checkbox' id='dfCred'" + (v.valor_c < 0 ? " checked" : "") + "> É um crédito (nota de crédito, bónus): abate nos custos</label>" +
     "<div class='bar'><button class='btn p' id='dfGravar'>Gravar</button><button class='btn' id='dfFechar'>Fechar</button></div><div id='dfHist' class='mut' style='font-size:13px'></div></div>";
   $("#dfFechar").onclick = function () { $("#dspForm").innerHTML = ""; };
   $("#dfGravar").onclick = dspGravar;
@@ -125,7 +126,7 @@ async function dspHistorico(id) {
 }
 async function dspGravar() {
   var v = DSP.editar, n = {categoria: $("#dfCat").value, fornecedor: $("#dfFor").value.trim(), colaborador: $("#dfCol").value.trim() || null, dia: $("#dfDia").value, mes: $("#dfMes").value, documento: $("#dfDoc").value.trim() || null,
-    valor_c: DESPESAS.valorC($("#dfVal").value), iva_c: DESPESAS.valorC($("#dfIva").value), nota: $("#dfNota").value.trim() || null, no_dl: $("#dfDl").checked, origem: v.origem || "manual"};
+    valor_c: DESPESAS.comSinal(DESPESAS.valorC($("#dfVal").value), $("#dfCred").checked), iva_c: DESPESAS.comSinal(DESPESAS.valorC($("#dfIva").value), $("#dfCred").checked), nota: $("#dfNota").value.trim() || null, no_dl: $("#dfDl").checked, origem: v.origem || "manual"};
   var e = DESPESAS.erros(n); if (e.length) return dspAviso(e.join(". "));
   try {
     if (v.id) {
@@ -146,9 +147,9 @@ async function dspAcao(a, id, b) {
     var alt;
     if (a === "ignorar") { if (!(await msbConfirma("Ignorar esta despesa? Não conta no Lucro, mas fica registada."))) return; alt = {estado: "ignorada"}; }
     else {
-      var val = DESPESAS.valorC(document.querySelector(".dspVal[data-id='" + id + "']").value);
+      var cred = d.valor_c < 0, val = DESPESAS.comSinal(DESPESAS.valorC(document.querySelector(".dspVal[data-id='" + id + "']").value), cred);
       if (val == null || isNaN(val)) return dspAviso("Escreve o valor antes de confirmar: " + d.fornecedor);
-      var iva = DESPESAS.valorC(document.querySelector(".dspIva[data-id='" + id + "']").value);
+      var iva = DESPESAS.comSinal(DESPESAS.valorC(document.querySelector(".dspIva[data-id='" + id + "']").value), cred);
       if (typeof iva === "number" && isNaN(iva)) return dspAviso("IVA inválido: " + d.fornecedor);
       alt = {valor_c: val, iva_c: iva, estado: "confirmada", confirmado_em: new Date().toISOString(), confirmado_por: quemSou()};
     }
