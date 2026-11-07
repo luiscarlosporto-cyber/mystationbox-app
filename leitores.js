@@ -212,6 +212,37 @@ $("#bPdf").onclick = function () { $("#fPdf").click(); };
 $("#fPdf").onchange = function () { var fs = Array.from(this.files || []); this.value = ""; if (fs.length) carregarPdfs(fs); };
 $("#v-rep").addEventListener("dragover", function (e) { if (ADMIN) e.preventDefault(); });
 $("#v-rep").addEventListener("drop", function (e) { if (!ADMIN) return; e.preventDefault(); var fs = Array.from(e.dataTransfer.files || []).filter(function (f) { return /pdf$/i.test(f.name) || f.type === "application/pdf"; }); if (fs.length) carregarPdfs(fs); });
+/* Grava um documento Repsol já lido e, sendo liquidação, os créditos MB deste posto. Serve o PDF carregado à mão e o que vem da Saphety. */
+async function guardarDocRepsol(rec, caminho) {
+  var chave = rec.tipo + "|" + rec.numero, ex = await sb.from("msb_docs").select("chave").eq("estacao", EST).eq("chave", chave).maybeSingle();
+  var r = await sb.from("msb_docs").upsert({estacao: EST, chave: chave, tipo: rec.tipo, numero: rec.numero, emissao: rec.emissao || null, dados: rec, pdf: caminho}, {onConflict: "estacao,chave"});
+  if (r.error) throw r.error;
+  var mb = 0;
+  if (rec.tipo === "LIQ") {
+    var cr = rec.itens.filter(function (it) { return it.tipo.indexOf("Visa") === 0 && it.pos.replace(/^0+/, "") === posEst(); }).map(function (it) {
+      return {estacao: EST, chave: it.pos + "|" + it.fecho + "|" + it.numdoc, doc: rec.liq, emissao: rec.emissao || null, data: it.data, valor_c: Math.round(it.valor * 100), pos: it.pos, fecho: it.fecho, numdoc: it.numdoc}; });
+    if (cr.length) { var r2 = await sb.from("msb_creditos_mb").upsert(cr, {onConflict: "estacao,chave"}); if (r2.error) throw r2.error; }
+    mb = cr.length;
+  }
+  return {mb: mb, existia: !!ex.data};
+}
+/* Liquidações recolhidas pelo OCTAN AI na Saphety («Extrato de Conta», 07/11/2026): lidas aqui pelo mesmo leitor do PDF carregado à mão.
+   O original fica onde a Saphety o guardou. O que não for liquidação reconhecida fica marcado «outro» e não grava nada. */
+async function importarLiqSaphety() {
+  if (!ADMIN) return 0;
+  var r = await sb.from("msb_saphety_docs").select("numero,original").eq("estacao", EST).eq("tipo", "Extrato de Conta").eq("estado", "recolhido"); if (r.error) throw r.error;
+  var n = 0;
+  for (var i = 0; i < (r.data || []).length; i++) {
+    var d = r.data[i], estado = "outro";
+    try {
+      var f = await sb.storage.from("msb-originais").download(d.original); if (f.error) throw f.error;
+      var rec = MOTOR.lerDocumento(await MOTOR.pdfPaginas(new Uint8Array(await f.data.arrayBuffer()), inflar));
+      if (rec.tipo === "LIQ" && rec.ok) { await guardarDocRepsol(rec, d.original); estado = "liquidacao"; n++; }
+    } catch (e) { continue; }   // sem rede ou original em falta: tenta na próxima vez
+    var u = await sb.from("msb_saphety_docs").update({estado: estado}).eq("estacao", EST).eq("numero", d.numero).eq("estado", "recolhido"); if (u.error) throw u.error;
+  }
+  return n;
+}
 async function carregarPdfs(files) {
   var box = $("#repProg"), linhas = [], ultimo = null; box.hidden = false;
   function mostra() { box.innerHTML = "<b>📄 Documentos</b>" + linhas.map(function (l) { return "<div style='font-size:14px'>" + l + "</div>"; }).join(""); }
@@ -223,16 +254,7 @@ async function carregarPdfs(files) {
       var rec = MOTOR.lerDocumento(pags);
       if (!rec.tipo || !rec.ok) throw new Error("Não reconheci este documento (use os PDF originais da Repsol)");
       var caminho = await guardarOriginal(EST + "/repsol/" + rec.tipo + "_" + String(rec.numero).replace(/\W/g, "") + "_" + await sha(bytes) + ".pdf", f, "application/pdf");
-      var chave = rec.tipo + "|" + rec.numero, ex = await sb.from("msb_docs").select("chave").eq("estacao", EST).eq("chave", chave).maybeSingle();
-      var r = await sb.from("msb_docs").upsert({estacao: EST, chave: chave, tipo: rec.tipo, numero: rec.numero, emissao: rec.emissao || null, dados: rec, pdf: caminho}, {onConflict: "estacao,chave"});
-      if (r.error) throw r.error;
-      var mb = 0;
-      if (rec.tipo === "LIQ") {
-        var cr = rec.itens.filter(function (it) { return it.tipo.indexOf("Visa") === 0 && it.pos.replace(/^0+/, "") === posEst(); }).map(function (it) {
-          return {estacao: EST, chave: it.pos + "|" + it.fecho + "|" + it.numdoc, doc: rec.liq, emissao: rec.emissao || null, data: it.data, valor_c: Math.round(it.valor * 100), pos: it.pos, fecho: it.fecho, numdoc: it.numdoc}; });
-        if (cr.length) { var r2 = await sb.from("msb_creditos_mb").upsert(cr, {onConflict: "estacao,chave"}); if (r2.error) throw r2.error; }
-        mb = cr.length;
-      }
+      var g = await guardarDocRepsol(rec, caminho), mb = g.mb, ex = {data: g.existia};
       var nomes = {LIQ: "Liquidação", CCS: "Fatura consignação", NDC: "Nota de crédito", VF: "Autofatura Solred"};
       linhas[linhas.length - 1] = "✅ " + nomes[rec.tipo] + " " + esc(rec.numero) + (rec.emissao ? " · " + dmy(rec.emissao) : "") + (mb ? " · " + mb + " crédito(s) MB" : "") + (ex.data ? " · já existia (atualizado)" : "");
       if (rec.emissao) ultimo = rec.emissao.slice(0, 7);
@@ -264,6 +286,7 @@ function ligarCreditos(creditos, turnos) {
 async function carregarRepsol() {
   var M = $("#rMes").value || MES, docsBox = $("#repDocs"); docsBox.innerHTML = "<div class='mut'>A carregar…</div>"; $("#repChecks").innerHTML = ""; $("#mbTotem").innerHTML = "";
   try {
+    try { await importarLiqSaphety(); } catch (e) { msbAviso("Não consegui ler as liquidações da Saphety: " + falhou(e)); }
     var rd = await sb.from("msb_docs").select("chave,tipo,numero,emissao,dados,pdf").eq("estacao", EST); if (rd.error) throw rd.error;
     var rc = await sb.from("msb_creditos_mb").select("*").eq("estacao", EST); if (rc.error) throw rc.error;
     var rx = await sb.from("msb_transferencias").select("*").eq("estacao", EST); if (rx.error) throw rx.error;
