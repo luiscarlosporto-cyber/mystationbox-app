@@ -41,7 +41,7 @@
     var app = $("#vApp"), lat = document.createElement("aside"), topo = document.createElement("div");
     lat.id = "bLat"; lat.setAttribute("aria-label", "Menu");
     lat.innerHTML = "<div class='marca'><img src='logo.svg' alt=''><img class='wm' src='marca_clara.png' alt='mystationbox'></div><div id='bAreas'></div>" +
-      "<div class='fim'><span id='bQuem'></span><button id='bVolta' title='Abrir a versão anterior da app'>" + ic("s") + "<span class='tx'>Versão anterior</span></button><button id='bRec' title='Recolher o menu'>" + ic("r") + "<span class='tx'>Recolher menu</span></button></div>";
+      "<div class='fim'><span id='bQuem'></span><button id='bRec' title='Recolher o menu'>" + ic("r") + "<span class='tx'>Recolher menu</span></button></div>";
     topo.id = "bTopo";
     topo.innerHTML = "<div id='bCam'></div><button id='bBusca' aria-label='Procurar'>" + ic("b") + "<span>Procurar</span><kbd>Ctrl K</kbd></button><button id='bNovo' aria-haspopup='menu'>" + ic("m") + "<span>Novo</span></button>";
     var main = app.querySelector("main"), chips = document.createElement("div"), barra = document.createElement("nav");
@@ -67,7 +67,6 @@
       fecharTudo(); var a = AREAS.find(function (x) { return x.id === b.dataset.a; }); ir(paginasDe(a)[0][0]);
     };
     $("#bRec").onclick = function () { recolhido = !recolhido; gravar("msb_lat", recolhido ? "1" : "0"); acertarLargura(); };
-    $("#bVolta").onclick = function () { location.href = "anterior/"; };
     $("#bBusca").onclick = abrirPesquisa;
     $("#bNovo").onclick = function (e) { e.stopPropagation(); alternarNovo(); };
     addEventListener("resize", acertarLargura); acertarLargura();
@@ -194,11 +193,10 @@
     fecharTudo();
     var el = document.createElement("div"); el.id = "bMais";
     el.innerHTML = "<div>" + areasVisiveis().filter(function (a) { return AREAS_TEL.indexOf(a.id) < 0; }).map(function (a) { return "<button data-a='" + a.id + "'>" + ic(IC_AREA[a.id]) + nomeArea(a) + "</button>"; }).join("") +
-      "<button data-x='volta'>" + ic("s") + "Versão anterior</button><button data-x='sair'>" + ic("s") + "Sair</button></div>";
+      "<button data-x='sair'>" + ic("s") + "Sair</button></div>";
     el.onclick = function (e) {
       var b = e.target.closest("button"); fecharTudo(); if (!b) return;
-      if (b.dataset.x === "volta") location.href = "anterior/";
-      else if (b.dataset.x === "sair") $("#bSair").click();
+      if (b.dataset.x === "sair") $("#bSair").click();
       else { var a = AREAS.find(function (x) { return x.id === b.dataset.a; }); ir(paginasDe(a)[0][0]); }
     };
     $("#vApp").appendChild(el);
