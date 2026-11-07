@@ -327,3 +327,18 @@ table.hor .l small{display:block;font-weight:400;font-size:10.5px;color:var(--mu
 .pnQd .l2{fill:none;stroke:var(--azul);stroke-opacity:.5;stroke-width:1.3;vector-effect:non-scaling-stroke;stroke-linejoin:round}
 .pnQd .ar{fill:var(--laranja);fill-opacity:.1}
 .pnQd .ex{display:flex;justify-content:space-between;font-size:11px;color:var(--mut);margin-top:2px}
+
+/* Painel: faixa dos preços ENSE (07/11/2026). Verde = publicados; laranja = não */
+.pnEnse{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-bottom:12px}
+.pnEn{display:flex;gap:14px;align-items:center;width:100%;text-align:left;font:inherit;cursor:pointer;border-radius:14px;padding:14px 16px;border:1.5px solid}
+.pnEn.ok{background:#E7F6EC;border-color:#2E9E52;color:#14592C}
+.pnEn.at{background:#FFF1E6;border-color:#F36C21;color:#8A3A0C}
+.pnEn .ic{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-size:22px;font-weight:700;color:#FFF}
+.pnEn.ok .ic{background:#2E9E52}.pnEn.at .ic{background:#F36C21}
+.pnEn .tx{flex:1;min-width:0}.pnEn small{display:block;font-size:12.5px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;opacity:.85}
+.pnEn strong{display:block;font-size:19px;line-height:1.25;margin:2px 0}.pnEn .ds{display:block;font-size:13.5px}
+.pnEn .vai{flex:none;font-size:13.5px;font-weight:600;border:1px solid currentColor;border-radius:8px;padding:6px 10px}
+.pnEn:focus-visible{outline:3px solid var(--azul);outline-offset:2px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pnEn.ok{background:#163423;color:#9FE0B5}:root:not([data-theme="light"]) .pnEn.at{background:#3A2416;color:#FFC7A3}}
+:root[data-theme="dark"] .pnEn.ok{background:#163423;color:#9FE0B5}:root[data-theme="dark"] .pnEn.at{background:#3A2416;color:#FFC7A3}
+@media (max-width:640px){.pnEn .vai{display:none}}

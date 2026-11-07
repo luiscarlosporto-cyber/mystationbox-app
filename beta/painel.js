@@ -40,7 +40,7 @@
       guarda("folha de fecho", sb.from("msb_folha_fecho").select("estacao,mes,dados").order("mes", {ascending: false}).limit(8)),
       guarda("saídas", sb.from("msb_saidas").select("estacao,valor_c").is("recebido", null)),
       guarda("encomendas", sb.from("orders").select("id,company_id,lines,created_at").eq("status", "pendente")),
-      guarda("preços", sb.from("msb_precos").select("estacao,dia,estado,aprovado_em,ense_erro").order("dia", {ascending: false}).limit(12)),
+      guarda("preços", sb.from("msb_precos").select("estacao,dia,estado,aprovado_em,ense_erro,comunicado_em").order("dia", {ascending: false}).limit(12)),
       guarda("TMS", sb.from("msb_tms").select("estacao").eq("mes", ant)),
       guarda("relatórios", sb.from("msb_vendas_mes").select("estacao").eq("mes", ant)),
       guarda("vendas por artigo", sb.from("msb_vendas_artigos").select("estacao,de,ate").lte("de", ant + "-01").gte("ate", ant + "-28")),
@@ -289,9 +289,8 @@
       return n === 3 ? ["Completos", "ok", "ense"] : [n + " de 3", "at", n ? "ense" : "ense"];
     }
     function preco(e) {
-      var u = (X.pre || []).find(function (x) { return x.estacao === e; });
-      if (!u) return ["Sem tabela", "at", "pre"];
-      return u.estado === "comunicado" ? ["Em dia · " + dmy(u.dia).slice(0, 5), "ok", "pre"] : ["Por comunicar · " + dmy(u.dia).slice(0, 5), "at", "pre"];
+      var u = PN.ense(X.pre, e), d = (X.pre || []).filter(function (x) { return x.estacao === e; }).map(function (x) { return x.dia; }).sort().pop();
+      return [u.t + (d ? " · " + dmy(d).slice(0, 5) : ""), u.tom, "pre"];
     }
     function doc(e) { var d = (X.doc || []).find(function (x) { return x.estacao === e; }); return d ? [dmy(d.emissao).slice(0, 5), "az", "rep"] : ["Nenhum", "at", "rep"]; }
     var L = [
@@ -342,6 +341,12 @@
     function guardar() { gravar("msb_ind", A); pinta(); }
     box.hidden = false; pinta();
   }
+  /* Preços ENSE no topo (aprovado a 07/11/2026): verde quando publicados, laranja quando não */
+  function faixaEnse(X) {
+    if (!X.pre) return "";
+    return "<div class='pnEnse'>" + lojasVer().map(function (e) { var u = PN.ense(X.pre, e.id);
+      return "<button class='pnEn " + u.tom + "' data-e='" + e.id + "' data-p='pre' aria-label='" + esc("Preços ENSE de " + nomeLoja(e) + ": " + u.t) + "'><span class='ic' aria-hidden='true'>" + (u.tom === "ok" ? "✓" : "!") + "</span><span class='tx'><small>Preços ENSE · " + esc(nomeLoja(e)) + "</small><strong>" + esc(u.t) + "</strong><span class='ds'>" + esc(u.s) + "</span></span><span class='vai'>Ver preços</span></button>"; }).join("") + "</div>";
+  }
   function topo(X) {
     var atual = !MES_V || MES_V === X.mes;
     return "<div class='pnTopo'>" + (ESTS.length > 1 ? "<div class='pnSeg' role='group' aria-label='Escolher estação'>" + [{id: "todas", n: "Todas"}].concat(ESTS.map(function (e) { return {id: e.id, n: nomeLoja(e)}; })).map(function (l) { return "<button data-ver='" + l.id + "' aria-pressed='" + (LOJA_V === l.id) + "' class='" + (LOJA_V === l.id ? "on" : "") + "'>" + esc(l.n) + "</button>"; }).join("") + "</div>" : "") +
@@ -352,7 +357,7 @@
     var box = $("#iniCorpo");
     if (LOJA_V !== "todas" && !ESTS.some(function (e) { return e.id === LOJA_V; })) LOJA_V = "todas";
     var falta = ESTS.some(function (e) { var D = dadosLoja(X, e); return !D.c && !D.f; }), M = MES_V || X.mes;
-    box.innerHTML = (X.falhas.length ? "<div class='aviso'><p>Não consegui ler: " + esc(X.falhas.join(", ")) + ". O que está em baixo pode estar incompleto.</p></div>" : "") + topo(X) + cartoes(X) +
+    box.innerHTML = (X.falhas.length ? "<div class='aviso'><p>Não consegui ler: " + esc(X.falhas.join(", ")) + ". O que está em baixo pode estar incompleto.</p></div>" : "") + topo(X) + faixaEnse(X) + cartoes(X) +
       "<div class='pnGrade'>" + grafico(X) + pintarDecidir(X) + barras(X) + recebido_(X) + porFechar(X) + tabelaFam(X) + "</div>" +
       "<p class='rod'>" + (falta ? "A ler no CBOS pelo OCTAN AI: os valores aparecem daqui a uns minutos, com o PC ligado." : M === X.mes ? "Vendas com IVA, lidas no CBOS pelo OCTAN AI, até ontem. O ritmo por dia e a estimativa do mês são contas simples, não são valores do CBOS." : "Vendas com IVA, do mês inteiro.") + "</p>";
     box.querySelectorAll("[data-p]").forEach(function (b) { b.onclick = function () { irLoja(b.dataset.e, b.dataset.p); }; });

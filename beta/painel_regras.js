@@ -56,6 +56,17 @@
     FF.forEach(function (F) { Object.keys(F || {}).forEach(function (k) { var g = Object.keys(G).find(function (x) { return G[x].indexOf(k) >= 0; }) || "OUT"; r[g] += F[k] || 0; }); });
     return r;
   }
-  var PN = {totaisFam: totaisFam, serieFam: serieFam, diasMes: diasMes, ultimoDia: ultimoDia, serie: serie, aLer: aLer, pedir: pedir, escala: escala, ritmo: ritmo, formas: formas};
+  /* Preços ENSE de uma estação (07/11/2026): verde só quando a tabela mais recente já está na ENSE; tudo o resto é laranja e diz porquê */
+  function hora(iso) { var d = new Date(iso), f = function (o) { return d.toLocaleString("pt-PT", Object.assign({timeZone: "Europe/Lisbon"}, o)); }; return f({day: "2-digit", month: "2-digit"}) + " às " + f({hour: "2-digit", minute: "2-digit", hour12: false}); }
+  function ense(P, id) {
+    var u = (P || []).filter(function (x) { return x.estacao === id; }).sort(function (a, b) { return a.dia < b.dia ? 1 : -1; })[0];
+    if (!u) return {tom: "at", t: "Sem tabela", s: "Ainda não há tabela de preços desta estação."};
+    var dia = u.dia.slice(8, 10) + "/" + u.dia.slice(5, 7);
+    if (u.estado === "comunicado") return {tom: "ok", t: "Publicados", s: "Tabela em vigor a " + dia + (u.comunicado_em ? ", publicada na ENSE a " + hora(u.comunicado_em) : ", publicada na ENSE") + "."};
+    if (u.ense_erro) return {tom: "at", t: "Erro ao publicar", s: "Tabela em vigor a " + dia + ". " + u.ense_erro};
+    if (!u.aprovado_em) return {tom: "at", t: "Por aprovar", s: "Tabela em vigor a " + dia + ": falta a tua aprovação."};
+    return {tom: "at", t: "Por publicar", s: "Tabela em vigor a " + dia + " aprovada a " + hora(u.aprovado_em) + ". O OCTAN AI publica com o PC ligado."};
+  }
+  var PN = {ense: ense, totaisFam: totaisFam, serieFam: serieFam, diasMes: diasMes, ultimoDia: ultimoDia, serie: serie, aLer: aLer, pedir: pedir, escala: escala, ritmo: ritmo, formas: formas};
   if (typeof module !== "undefined" && module.exports) module.exports = PN; else raiz.PN = PN;
 })(this);
