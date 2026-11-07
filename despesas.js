@@ -89,9 +89,10 @@ function dspCartao(d) {
   var sem = d.valor_c == null;
   return "<div style='display:grid;gap:8px;border:1px solid var(--line,#d9dee3);border-radius:10px;padding:10px'><div><b>" + esc(d.colaborador || d.fornecedor) + "</b> <span class='mut'>· " + esc(d.categoria) + " · " + esc(dspMesPt(d.mes)) + "</span>" +
     "<div class='mut' style='font-size:13px'>" + dspData(d.dia) + (d.documento ? " · " + esc(d.documento) : "") + (d.debito ? " · débito a " + dspData(d.debito) : "") + (d.no_dl ? " · incluído na liquidação" : "") + (d.valor_c < 0 ? " · <b>crédito</b>" : "") + "</div></div>" +
-    dspKms(d) + (d.nota ? "<div class='mut' style='font-size:13px'>" + esc(d.nota) + "</div>" : "") +
+    dspKms(d) + (d.categoria === DESPESAS.IRS_GUIA ? "<div class='mut' style='font-size:13px'>ℹ️ Pagamento ao Estado: não conta no Lucro (o IRS já está na renda, nas faturas e nos salários).</div>" : d.categoria === DESPESAS.SS_RETIDA ? "<div class='mut' style='font-size:13px'>ℹ️ Retida ao trabalhador: já está no salário bruto. Serve para separar a guia (empresa = guia − retida).</div>" : "") + (d.nota ? "<div class='mut' style='font-size:13px'>" + esc(d.nota) + "</div>" : "") +
     "<div class='bar'><label style='display:grid;gap:2px;font-size:13px'>" + (DESPESAS.emPositivo(d) ? "Crédito (€)" : "Valor (€)") + "<input class='dspVal' data-id='" + d.id + "' inputmode='decimal' value='" + (sem ? "" : fmt(DESPESAS.visto(d.valor_c, d))) + "' placeholder='Por preencher' style='width:130px'></label><label style='display:grid;gap:2px;font-size:13px'>IVA incluído (€)<input class='dspIva' data-id='" + d.id + "' inputmode='decimal' value='" + (d.iva_c == null ? "" : fmt(d.iva_c)) + "' style='width:110px'></label>" +
     "<button class='btn p' data-acao='confirmar' data-id='" + d.id + "'>Confirmar</button>" + (d.original ? "<button class='btn' data-acao='ver' data-id='" + d.id + "'>Ver documento</button>" : "") +
+    (d.categoria === DESPESAS.SS && sem && d.original ? "<button class='btn' data-acao='lerguia' data-id='" + d.id + "'>Ler guia</button>" : "") +
     "<button class='btn' data-acao='editar' data-id='" + d.id + "'>Editar</button><button class='btn' data-acao='ignorar' data-id='" + d.id + "'>Ignorar</button></div></div>";
 }
 function dspLinha(d) {
@@ -140,10 +141,27 @@ async function dspGravar() {
     DSP.mes = n.mes; await carregarDespesas(); dspAviso("Gravado. Fica no histórico.", true);
   } catch (x) { dspAviso(/msb_despesas_doc|duplicate/.test(falhou(x)) ? "Este documento já está registado." : falhouDesp(x)); }
 }
+/* Guia da Segurança Social: vem desenhada, sem texto. Lê-se a 1.ª página com o reconhecimento de texto e preenche-se o valor; confirmar é sempre do dono. */
+async function dspLerGuia(d, b) {
+  b.disabled = true; var t0 = b.textContent; b.textContent = "A ler…";
+  try {
+    var f = await sb.storage.from("msb-despesas").download(d.original); if (f.error) throw f.error;
+    await carregarPdfJsCBOS(); await carregarTesseract();
+    var doc = await pdfjsLib.getDocument({data: new Uint8Array(await f.data.arrayBuffer())}).promise, pg = await doc.getPage(1), vp = pg.getViewport({scale: 2.5});
+    var c = document.createElement("canvas"); c.width = vp.width; c.height = vp.height; await pg.render({canvasContext: c.getContext("2d"), viewport: vp}).promise;
+    var w = await Tesseract.createWorker("eng"), res = await w.recognize(c); await w.terminate();
+    var g = DESPESAS.lerGuiaSS(res.data.text);
+    if (!g) return dspAviso("Não consegui ler esta guia com certeza. Abre o documento e escreve o valor à mão.");
+    document.querySelector(".dspVal[data-id='" + d.id + "']").value = fmt(g.valor_c); document.querySelector(".dspIva[data-id='" + d.id + "']").value = fmt(0);
+    dspAviso("Guia lida: " + fmt(g.valor_c) + " €" + (g.entidade ? " · entidade " + g.entidade : "") + (g.referencia ? " · referência " + g.referencia : "") + (g.validade ? " · pagar até " + dspData(g.validade) : "") + ". Confere com o documento e carrega em Confirmar.", true);
+  } catch (e) { dspAviso(falhouDesp(e)); }
+  finally { b.disabled = false; b.textContent = t0; }
+}
 async function dspAcao(a, id, b) {
   var d = DSP.lista.find(function (x) { return x.id === id; }); if (!d) return;
   if (a === "ver") return verDocumentoDespesa(d.original);
   if (a === "editar") return dspAbrir(d);
+  if (a === "lerguia") return dspLerGuia(d, b);
   try {
     var alt;
     if (a === "ignorar") { if (!(await msbConfirma("Ignorar esta despesa? Não conta no Lucro, mas fica registada."))) return; alt = {estado: "ignorada"}; }

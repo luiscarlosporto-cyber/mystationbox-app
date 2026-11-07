@@ -35,6 +35,16 @@ var DESPESAS = (function () {
     return {linhas: linhas, total_c: linhas.reduce(function (s, l) { return s + l.valor_c; }, 0), reais: Object.keys(reais).length};
   }
 
+  /* Guia da Segurança Social lida por reconhecimento de texto (vem desenhada, sem texto). Os dois valores da guia («Valor a pagar» e o do quadro MB)
+     têm de ser iguais; senão não se lê nada (falhar com clareza). */
+  function lerGuiaSS(texto) {
+    var t = String(texto || "").replace(/[ \t]+/g, " ");
+    var vs = []; t.replace(/Valor(?: a pagar)?\s*:?\s*(\d{1,3}(?:[.\s]\d{3})*,\d{2})/gi, function (_, v) { vs.push(valorC(v.replace(/\s/g, "."))); });
+    if (!vs.length || vs.some(function (v) { return v !== vs[0]; })) return null;
+    var ent = /Entidade\s*:?\s*(\d{5})\b/i.exec(t), ref = /Refer[eê]ncia\s*:?\s*(\d{9})\b/i.exec(t), val = /validade\s*(\d{4}-\d{2}-\d{2})/i.exec(t) || /(\d{4}-\d{2}-\d{2})\s*$/m.exec(t.split(/Nome/)[0] || "");
+    return {valor_c: vs[0], entidade: ent ? ent[1] : null, referencia: ref ? ref[1] : null, validade: val ? val[1] : null, lidos: vs.length};
+  }
+
   /* Famílias da Conta do mês. Custo fixo «Taxa de exploração · …» é da Repsol. */
   var FAMILIAS = [["Pessoal", ["Salários", SS, "Kms do gerente"]], ["Repsol", ["Outros bónus", "My Repsol", "Taxa combustíveis"]], ["Instalações", ["Renda", "Luz", "Água", "Limpeza", "Alarmes", "Seguros"]], ["Serviços", ["Comunicações", "Contabilidade"]]];
   function familia(nome) {
@@ -102,6 +112,6 @@ var DESPESAS = (function () {
       return d.estado === "por_confirmar" && d.origem === "email" && d.valor_c != null && !d.nota && (d.categoria === "Salários" || d.categoria === SS || d.categoria === SS_RETIDA);
     });
   }
-  return {SS: SS, SS_RETIDA: SS_RETIDA, IRS_GUIA: IRS_GUIA, familia: familia, porFamilia: porFamilia, emPositivo: emPositivo, comSinal: comSinal, visto: visto, deSaphety: deSaphety, CATEGORIAS: CATEGORIAS, valorC: valorC, custosDoMes: custosDoMes, resumo: resumo, erros: erros, valorMapaKms: valorMapaKms, compararKms: compararKms, recibosJuntos: recibosJuntos};
+  return {lerGuiaSS: lerGuiaSS, SS: SS, SS_RETIDA: SS_RETIDA, IRS_GUIA: IRS_GUIA, familia: familia, porFamilia: porFamilia, emPositivo: emPositivo, comSinal: comSinal, visto: visto, deSaphety: deSaphety, CATEGORIAS: CATEGORIAS, valorC: valorC, custosDoMes: custosDoMes, resumo: resumo, erros: erros, valorMapaKms: valorMapaKms, compararKms: compararKms, recibosJuntos: recibosJuntos};
 })();
 if (typeof module !== "undefined") module.exports = DESPESAS;
