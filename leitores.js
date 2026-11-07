@@ -226,18 +226,18 @@ async function guardarDocRepsol(rec, caminho) {
   }
   return {mb: mb, existia: !!ex.data};
 }
-/* Liquidações recolhidas pelo OCTAN AI na Saphety («Extrato de Conta», 07/11/2026): lidas aqui pelo mesmo leitor do PDF carregado à mão.
+/* Liquidações («Extrato de Conta») e autofaturas Solred (Z3AF) recolhidas pelo OCTAN AI na Saphety (07/11/2026): lidas aqui pelo mesmo leitor do PDF carregado à mão.
    O original fica onde a Saphety o guardou. O que não for liquidação reconhecida fica marcado «outro» e não grava nada. */
 async function importarLiqSaphety() {
   if (!ADMIN) return 0;
-  var r = await sb.from("msb_saphety_docs").select("numero,original").eq("estacao", EST).eq("tipo", "Extrato de Conta").eq("estado", "recolhido"); if (r.error) throw r.error;
+  var r = await sb.from("msb_saphety_docs").select("numero,original").eq("estacao", EST).eq("estado", "recolhido").or("tipo.eq.Extrato de Conta,numero.like.Z3AF*"); if (r.error) throw r.error;
   var n = 0;
   for (var i = 0; i < (r.data || []).length; i++) {
     var d = r.data[i], estado = "outro";
     try {
       var f = await sb.storage.from("msb-originais").download(d.original); if (f.error) throw f.error;
       var rec = MOTOR.lerDocumento(await MOTOR.pdfPaginas(new Uint8Array(await f.data.arrayBuffer()), inflar));
-      if (rec.tipo === "LIQ" && rec.ok) { await guardarDocRepsol(rec, d.original); estado = "liquidacao"; n++; }
+      if ((rec.tipo === "LIQ" || rec.tipo === "VF") && rec.ok) { await guardarDocRepsol(rec, d.original); estado = rec.tipo === "LIQ" ? "liquidacao" : "autofatura"; n++; }
     } catch (e) { continue; }   // sem rede ou original em falta: tenta na próxima vez
     var u = await sb.from("msb_saphety_docs").update({estado: estado}).eq("estacao", EST).eq("numero", d.numero).eq("estado", "recolhido"); if (u.error) throw u.error;
   }

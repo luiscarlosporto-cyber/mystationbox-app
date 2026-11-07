@@ -5,10 +5,11 @@
 "use strict";
 var AREAS = [   // ordem aprovada a 05/11/2026: decisão, operação e controlo, obrigações e regras. Terceiro campo: g = subgrupo, adm = só administrador.
   {id: "ini", n: "🏠 Painel", p: [["ini", "Painel de Gestão"], ["avi", "OCTAN AI", {adm: 1}]]},
+  {id: "ens", n: "⛽ ENSE", adm: 1, p: [["pre", "Preços ENSE", {g: "ENSE"}], ["ense", "Reporte mensal", {g: "ENSE"}]]},   // área própria, fora da Conformidade (dono, 07/11/2026)
   {id: "des", n: "📊 Desempenho", adm: 1, p: [["luc", "Lucro", {g: "Resultados"}], ["mes", "Resultado mensal", {g: "Resultados"}], ["liv", "Livro de movimentos", {g: "Resultados"}], ["ven", "Vendas e margens", {g: "Vendas"}], ["va", "Relatório de vendas", {g: "Vendas"}], ["maq", "Máquina de tabaco", {g: "Vendas"}], ["fun", "Por funcionário", {g: "Análise"}]]},
   {id: "tes", n: "💶 Tesouraria", p: [["reg", "Registo diário", {g: "Caixa"}], ["sai", "Saídas de caixa", {g: "Caixa"}], ["his", "Histórico", {g: "Caixa"}], ["rep", "Repsol e Multibanco", {g: "Conferências", adm: 1}], ["tms", "Fecho mensal TMS", {g: "Conferências", adm: 1}], ["dsp", "Despesas", {g: "Despesas", adm: 1}], ["ban", "Banco", {g: "Banco", adm: 1}]]},
   {id: "cst", n: "🛒 Compras e Stocks", c: "Compras", p: [["enc", "Por aprovar", {g: "Compras", adm: 1}], ["nova", "Nova encomenda", {g: "Compras", adm: 1}], ["comh", "Encomendas feitas", {g: "Compras", adm: 1}], ["ent", "Entrada de mercadoria", {g: "Receções", adm: 1}], ["dig", "Digitalizar fatura", {g: "Receções", adm: 1}], ["comb", "Entrada de combustível", {g: "Receções", adm: 1}], ["contar", "Contar", {g: "Stock"}], ["ler", "Ler código", {g: "Stock"}], ["stock", "Stock atual", {g: "Stock"}], ["inv", "Inventário", {g: "Stock"}], ["mov", "Movimentos", {g: "Stock"}]]},
-  {id: "con", n: "📋 Conformidade", adm: 1, p: [["pre", "Preços ENSE", {g: "ENSE"}], ["ense", "Reporte mensal", {g: "ENSE"}], ["kms", "Mapa de kms do gerente", {g: "Contabilidade"}]]},
+  {id: "con", n: "📋 Conformidade", adm: 1, p: [["kms", "Mapa de kms do gerente", {g: "Contabilidade"}]]},
   {id: "adm", n: "⚙️ Administração", adm: 1, p: [["eq", "Equipa e acessos", {g: "Pessoas"}], ["mrg", "Margens e custos", {g: "Regras"}], ["prod", "Produtos e códigos", {g: "Regras"}], ["cfg", "Configuração do stock", {g: "Regras"}]]}
 ];
 /* páginas do módulo de stock: separador e cartões (pelo título, ou "#id" do cartão) a mostrar ou esconder.
