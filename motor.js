@@ -23,7 +23,12 @@ function fixo(x, n) {   // "%.nf" do Python (arredondamento correto do valor bin
   var s = x.toFixed(n);
   return s === "-0" + (n ? "." + "0".repeat(n) : "") ? s.slice(1) : s;
 }
-function pt(x) { return f2(x).replace(".", ","); }
+function pt(x) {   // só para mensagens: pt_txt do util.py (espaço que não parte a linha nos milhares)
+  var s = f2(x).replace(".", ","), sinal = s.charAt(0) === "-" ? "-" : "";
+  s = s.slice(sinal.length);
+  var i = s.indexOf(","), int = s.slice(0, i);
+  return sinal + int.replace(/\B(?=(\d{3})+$)/g, " ") + s.slice(i);
+}
 function _r(v) { return Math.round((v + 1e-9) * 100) / 100; }
 function eur(v) { return pt(v) + " €"; }
 
