@@ -10,6 +10,12 @@ function falhouBanco(e) { var m = falhou(e); return /msb_extratos|msb_contas_ban
 function banAviso(t, ok) { var s = $("#banSt"); if (s) { s.className = "st " + (ok ? "ok" : "bad"); s.textContent = (ok ? "✔ " : "⚠ ") + t; } }
 function banMesPt(m) { return new Date(m + "-15").toLocaleDateString("pt-PT", {month: "long", year: "numeric"}); }
 function banTipos(sel) { return Object.keys(EXTRATOS.TIPOS).map(function (k) { return "<option value='" + k + "'" + (k === sel ? " selected" : "") + ">" + esc(EXTRATOS.TIPOS[k]) + "</option>"; }).join(""); }
+/* categorias já usadas nesta estação: o dono pode escrever uma nova (ex.: o nome de um cliente a crédito), que fica na lista */
+function banCategorias() {
+  var c = {}; Object.keys(EXTRATOS.TIPOS).forEach(function (k) { if (k !== "por_classificar") c[EXTRATOS.TIPOS[k]] = 1; });
+  BAN.movs.concat(BAN.regras).forEach(function (m) { if (m.categoria) c[m.categoria] = 1; });
+  return "<datalist id='banCats'>" + Object.keys(c).sort(function (a, b) { return a.localeCompare(b, "pt"); }).map(function (x) { return "<option value='" + esc(x) + "'>"; }).join("") + "</datalist>";
+}
 function banSinal(c) { return "<span class='" + (c < 0 ? "bad" : "ok") + "'>" + (c > 0 ? "+" : "") + fmt(c) + "</span>"; }
 
 /* Só lê o princípio do ficheiro para saber se é um extrato (usado pelo 📥 Carregar). */
@@ -75,12 +81,12 @@ function banPorClassificar(porCl) {
   if (!porCl.length) return "<div class='card' style='padding:14px'>✔ Todos os movimentos estão classificados.</div>";
   BAN.grupos = banGrupos(porCl);
   return "<div class='card' style='padding:14px;display:grid;gap:10px'><h2 style='margin:0'>Por classificar · " + porCl.length + " movimentos</h2>" +
-    "<p class='mut' style='margin:0;font-size:13px'>Classifique cada nome uma vez: os movimentos seguintes com o mesmo nome passam a vir já classificados.</p>" +
+    "<p class='mut' style='margin:0;font-size:13px'>Classifique cada nome uma vez: os movimentos seguintes com o mesmo nome passam a vir já classificados. Na categoria pode escrever um nome novo (por exemplo, o nome do cliente a crédito): fica guardado para as próximas vezes.</p>" + banCategorias() +
     BAN.grupos.map(function (g, i) {
       var um = g.movs.length === 1 ? g.movs[0] : null;
       return "<div class='bar' style='flex-wrap:wrap;gap:8px;border-top:1px solid var(--line, #e5e9ed);padding-top:8px'><div style='flex:1;min-width:200px'><b>" + esc(g.nome || um.descricao) + "</b><br><span class='mut' style='font-size:13px'>" +
         g.movs.length + (g.movs.length === 1 ? " movimento · " + dmy(um.dia) : " movimentos") + " · " + (g.sinal === "C" ? "entrada" : "saída") + "</span></div><div>" + banSinal(g.total) + " €</div>" +
-        "<select id='banT" + i + "'>" + banTipos(g.sinal === "C" ? "recebimento" : "fornecedor") + "</select><input id='banC" + i + "' placeholder='Categoria (opcional)' style='width:170px'>" +
+        "<select id='banT" + i + "'>" + banTipos(g.sinal === "C" ? "recebimento" : "fornecedor") + "</select><input id='banC" + i + "' list='banCats' placeholder='Categoria' title='Escolha da lista ou escreva uma nova' style='width:200px'>" +
         "<button class='btn p' data-grupo='" + i + "'>" + (g.nome ? "Classificar e lembrar" : "Classificar") + "</button></div>";
     }).join("") + "</div>";
 }

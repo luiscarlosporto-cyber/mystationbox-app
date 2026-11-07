@@ -12,8 +12,8 @@ var EXTRATOS = (function () {
   var TIPOS = {
     deposito: "Depósito de numerário", credito_repsol: "Crédito da Repsol", liquidacao_repsol: "Pagamento de liquidação Repsol",
     debito_repsol: "Débito direto Repsol", salario: "Salários", seguranca_social: "Segurança Social", estado: "Impostos (Estado)",
-    despesa: "Despesa", fornecedor: "Fornecedor", recebimento: "Recebimento", cartao: "Compra com cartão", comissao: "Comissões bancárias",
-    juros: "Juros", emprestimo: "Empréstimo", por_classificar: "Por classificar"
+    despesa: "Despesa", fornecedor: "Fornecedor", recebimento: "Recebimento", cliente_credito: "Clientes a crédito", cartao: "Compra com cartão", comissao: "Comissões bancárias",
+    juros: "Juros", emprestimo: "Empréstimo", transferencia_interna: "Transferência entre contas", outro: "Outro", por_classificar: "Por classificar"
   };
   /* Por ordem: a primeira regra que serve decide. sinal: "C" só créditos, "D" só débitos. cat = categoria das despesas, quando a há. */
   var REGRAS = [
