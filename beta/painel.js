@@ -154,10 +154,11 @@
     var lit = FAM_V === "COMBUSTIVEIS", a = PN.serieFam(X.cur, M, ids, FAM_V), b = PN.serieFam(X.cur, A, ids, FAM_V), nome = LOJA_V === "todas" ? "as duas estações" : nomeLoja(ESTS.find(function (e) { return e.id === LOJA_V; }));
     var fv = function (v) { return v == null ? "—" : lit ? num(Math.round(v), 0) + " L" : eur(v * 100); };
     var d = diasVistos(X, M), d0 = PN.diasMes(A), sa = somaSerie(a), sb2 = somaSerie(b), r = PN.ritmo(sa, d, sb2, d0);
-    var h = "<section class='bl pnC8'><h3>Vendas por dia · " + esc(nomeFam(FAM_V)) + " · " + esc(nome) + "</h3><p class='pnSub'>" + (lit ? "Litros vendidos" : "Vendas com IVA") + ", lidas no CBOS pelo OCTAN AI. Passa o rato ou o dedo para ver cada dia.</p>" +
+    var h = "<section class='bl pnC8'><h3>Vendas por dia · " + esc(nomeFam(FAM_V)) + " · " + esc(nome) + "</h3><p class='pnSub'>" + (FAM_V === "TODAS" && Object.keys(TF).length ? "Combustíveis em litros, as outras famílias em € com IVA, lidas no CBOS pelo OCTAN AI. Toca numa família para a ver dia a dia." : (lit ? "Litros vendidos" : "Vendas com IVA") + ", lidas no CBOS pelo OCTAN AI. Passa o rato ou o dedo para ver cada dia.") + "</p>" +
       "<div class='pnChips'>" + lista.map(function (f) { return "<button data-fam='" + esc(f) + "' class='" + (f === FAM_V ? "on" : "") + "' aria-pressed='" + (f === FAM_V) + "'>" + esc(nomeFam(f)) + "</button>"; }).join("") + "</div>" +
       "<div class='pnKp'><div><small>" + esc(tituloMes(X)) + "</small><b>" + fv(sa) + "</b></div><div><small>" + esc(Maius(nomeMes(A))) + "</small><b>" + fv(sb2) + "</b></div><div><small>Por dia, face a " + esc(nomeMes(A)) + "</small><b class='" + (r == null ? "" : r >= 0 ? "pnSobe" : "pnDesce") + "'>" + (r == null ? "—" : (r >= 0 ? "▲ " : "▼ ") + num(Math.abs(r), 1) + " %") + "</b></div></div>";
     GR = null;
+    if (FAM_V === "TODAS" && Object.keys(TF).length) return h.replace(/<div class='pnKp'>[\s\S]*$/, "") + quadros(X, M, A, ids, TF) + "</section>";
     if (!a && !b) return h + "<div class='pnVaz'>" + (PN.aLer(X.cur, M, ids) || PN.aLer(X.cur, A, ids) ? "<b>A ler as vendas por dia no CBOS</b>Aparecem aqui daqui a uns minutos, com o PC ligado." : "<b>Sem vendas por dia para mostrar</b>O OCTAN AI ainda não leu este mês no CBOS. Volto a pedir quando abrires o Painel.") + "</div></section>";
     var N = Math.max(PN.diasMes(M), PN.diasMes(A)), S = function (l) { var r = (l || []).slice(); while (r.length < N) r.push(null); return r; };
     var A1 = S(a), B1 = S(b), top = PN.escala(Math.max.apply(null, A1.concat(B1).map(function (x) { return x || 0; })));
@@ -170,6 +171,25 @@
       [0, 1, 2, 3].map(function (i) { return "<span class='yl' style='top:" + (i * 100 / 3) + "%'>" + rot(top * (3 - i) / 3) + "</span>"; }).join("") +
       "<span class='gu' id='pnGu' hidden></span><span class='pt' id='pnPt' hidden></span><div class='di' id='pnDi' hidden></div></div>" +
       "<div class='pnX'>" + xs.map(function (x) { return "<span style='left:" + ((x - 1) / (N - 1) * 100) + "%'>" + x + "</span>"; }).join("") + "</div></section>";
+  }
+  /* «Todas» (aprovado a 07/11/2026): um quadro por família, porque litros e euros não se somam. Combustíveis em litros e em grande; o resto em € com IVA */
+  function quadros(X, M, A, ids, TF) {
+    var FN = PN.totaisFam(X.cur, M, ids) || {}, d = diasVistos(X, M), d0 = PN.diasMes(A), N = Math.max(PN.diasMes(M), PN.diasMes(A));
+    var ks = Object.keys(TF).concat(Object.keys(FN).filter(function (k) { return !TF[k]; })).filter(function (k) { return k !== "COMBUSTIVEIS"; })
+      .sort(function (x, y) { return ((TF[y] || FN[y])[1]) - ((TF[x] || FN[x])[1]); });
+    if (TF.COMBUSTIVEIS || FN.COMBUSTIVEIS) ks.unshift("COMBUSTIVEIS");
+    var linha = function (v, top, H) { var r = ""; (v || []).forEach(function (x, i) { if (x == null) return; r += (r ? "L" : "M") + (i * 300 / (N - 1)).toFixed(1) + " " + (H - x / top * H).toFixed(1); }); return r; };
+    return "<div class='pnLeg'><span><i></i>" + Maius(nomeMes(M)) + "</span><span><i class='b'></i>" + Maius(nomeMes(A)) + "</span></div><div class='pnQds'>" + ks.map(function (f) {
+      var lit = f === "COMBUSTIVEIS", a = PN.serieFam(X.cur, M, ids, f), b = PN.serieFam(X.cur, A, ids, f), sa = somaSerie(a), sb = somaSerie(b), r = PN.ritmo(sa, d, sb, d0), H = lit ? 120 : 64;
+      var fv = function (v) { return v == null ? "—" : lit ? num(Math.round(v), 0) + " L" : eur(v * 100); };
+      var top = Math.max.apply(null, (a || []).concat(b || []).map(function (x) { return x || 0; })) * 1.1 || 1, l1 = linha(a, top, H), ult = -1, pri = -1;
+      (a || []).forEach(function (x, i) { if (x != null) { ult = i; if (pri < 0) pri = i; } });
+      var ar = l1 ? l1 + "L" + (ult * 300 / (N - 1)).toFixed(1) + " " + H + "L" + (pri * 300 / (N - 1)).toFixed(1) + " " + H + "Z" : "";
+      return "<button class='pnQd" + (lit ? " gr" : "") + "' data-fam='" + esc(f) + "' title='Ver " + esc(nomeFam(f)) + " dia a dia'><span class='cb'><b>" + esc(nomeFam(f)) + "</b><span class='un'>" + (lit ? "litros" : "€ com IVA") + "</span></span>" +
+        "<span class='ns'><strong>" + fv(sa) + "</strong><small>" + esc(nomeMes(A)) + " " + fv(sb) + "</small>" + (r == null ? "" : "<em class='" + (r >= 0 ? "pnSobe" : "pnDesce") + "'>" + (r >= 0 ? "▲ " : "▼ ") + num(Math.abs(r), 1) + " % por dia</em>") + "</span>" +
+        "<svg viewBox='0 0 300 " + H + "' preserveAspectRatio='none' aria-hidden='true' style='height:" + H + "px'><path class='ar' d='" + ar + "'></path><path class='l2' d='" + linha(b, top, H) + "'></path><path class='l1' d='" + l1 + "'></path></svg>" +
+        "<span class='ex'><span>1</span><span>15</span><span>" + N + "</span></span></button>";
+    }).join("") + "</div>";
   }
   function caminho(v) {
     var d = "", n = GR.n - 1;
