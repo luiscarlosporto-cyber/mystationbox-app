@@ -97,7 +97,7 @@
   }
   function porDecidir(X) {
     var L = [], loja = function (id) { var e = ESTS.find(function (x) { return x.id === id; }); return e ? nomeLoja(e) : id; };
-    (X.avi || []).filter(function (a) { return !a.lido_em && (a.nivel === "erro" || a.nivel === "atencao"); }).forEach(function (a) {
+    (X.avi || []).filter(function (a) { return !a.lido_em && (a.nivel === "erro" || a.nivel === "atencao") && !PN.avisoAprovado(a, X.pre); }).forEach(function (a) {
       var ense = a.tipo === "ense" && /preç|ENSE/i.test(a.titulo || "");   // ENSE é o único crítico: só sai depois de tratado
       L.push({o: a.nivel === "erro" ? 0 : 2, t: a.titulo, s: loja(a.estacao) + " · OCTAN AI", e: a.estacao, p: "avi", b: "Ver", arq: ense ? "" : "a" + a.id});
     });

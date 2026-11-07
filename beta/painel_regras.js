@@ -65,8 +65,14 @@
     if (u.estado === "comunicado") return {tom: "ok", t: "Publicados", s: "Tabela em vigor a " + dia + (u.comunicado_em ? ", publicada na ENSE a " + hora(u.comunicado_em) : ", publicada na ENSE") + "."};
     if (u.ense_erro) return {tom: "at", t: "Erro ao publicar", s: "Tabela em vigor a " + dia + ". " + u.ense_erro};
     if (!u.aprovado_em) return {tom: "at", t: "Por aprovar", s: "Tabela em vigor a " + dia + ": falta a tua aprovação."};
-    return {tom: "at", t: "Por publicar", s: "Tabela em vigor a " + dia + " aprovada a " + hora(u.aprovado_em) + ". O OCTAN AI publica com o PC ligado."};
+    return {tom: "at", t: "Por publicar", s: "Tabela em vigor a " + dia + " aprovada a " + hora(u.aprovado_em) + ". O OCTAN AI grava-a na ENSE às 00:30, com o PC ligado."};
   }
-  var PN = {ense: ense, totaisFam: totaisFam, serieFam: serieFam, diasMes: diasMes, ultimoDia: ultimoDia, serie: serie, aLer: aLer, pedir: pedir, escala: escala, ritmo: ritmo, formas: formas};
+  /* Aviso do OCTAN AI «Novos preços em vigor a dd/mm/aaaa: falta a tua aprovação» que já foi aprovado: deixa de estar por decidir */
+  function avisoAprovado(a, P) {
+    var m = a && a.tipo === "ense" && /em vigor a (\d{2})\/(\d{2})\/(\d{4}): falta a tua aprovação/.exec(a.titulo || ""); if (!m) return false;
+    var dia = m[3] + "-" + m[2] + "-" + m[1];
+    return (P || []).some(function (x) { return x.estacao === a.estacao && x.dia === dia && (x.aprovado_em || x.estado === "comunicado"); });
+  }
+  var PN = {ense: ense, avisoAprovado: avisoAprovado, totaisFam: totaisFam, serieFam: serieFam, diasMes: diasMes, ultimoDia: ultimoDia, serie: serie, aLer: aLer, pedir: pedir, escala: escala, ritmo: ritmo, formas: formas};
   if (typeof module !== "undefined" && module.exports) module.exports = PN; else raiz.PN = PN;
 })(this);
