@@ -168,6 +168,43 @@ function diasEntre(a, b) { return Math.round((new Date(b) - new Date(a)) / 864e5
 function eurL(v) { return v == null ? "—" : FORMATOS.numero(v, 3, 4); }
 function litros2(cl) { return FORMATOS.numero(cl / 100, 2); }
 
+/* As contas do Lucro de um mês, sem ecrã: usadas pelo Lucro e pela Conta do mês (uma só fonte). null se não houver relatório de vendas. */
+async function dadosLucro(m) {
+  var rv = await sb.from("msb_vendas_mes").select("de,ate,dados,fonte").eq("estacao", EST).eq("mes", m).maybeSingle(); if (rv.error) throw rv.error;
+  if (!rv.data) return null;
+  var V = rv.data, D = V.dados, M = await lerMargens(), C = await lerCustos();
+  var rt = await sb.from("msb_tms").select("dados").eq("estacao", EST).eq("mes", m).order("ate", {ascending: false}).limit(1);
+  var DESC = descontoTMS(rt.data && rt.data[0] && rt.data[0].dados), falta = [];
+  /* combustível */
+  var BL = bonusLitro(M), tBon = 0;
+  var rx = await sb.from("msb_taxas_mes").select("myrepsol_c,combustiveis_c,fatura").eq("estacao", EST).eq("mes", m).maybeSingle(); if (rx.error) throw rx.error;
+  var TMR = rx.data, txEstimada = BL.tx;
+  if (TMR) { BL.cons += BL.tx; BL.desc += BL.tx; BL.tx = 0; }   // há valor real da fatura: sai a estimativa em €/m³
+  var prods = Object.keys(Object.assign({}, D.comb.consigna || {}, D.comb.solred || {})).sort(), tl = {cons: 0, desc: 0, sol: 0}, mC = 0;
+  var comb = prods.map(function (p) {
+    var t = premium(p) ? "premium" : "simples", cons = ((D.comb.consigna || {})[p] || [0])[0], sol = ((D.comb.solred || {})[p] || [0])[0];
+    var desc = DESC ? Math.min(cons, Math.max(0, Math.round(DESC[p] || 0))) : 0, pura = cons - desc;
+    var mc = M["comb:consignacao:" + t], md = M["comb:desconto:" + t], ms = M["comb:solred:" + t];
+    [["consignação", mc], ["desconto imediato", md], ["Solred", ms]].forEach(function (x) { if (x[1] == null && falta.indexOf("combustível: " + x[0] + " " + t) < 0) falta.push("combustível: " + x[0] + " " + t); });
+    var bon = (pura / 100) * BL.cons + (desc / 100) * BL.desc, mg = (pura / 100) * (mc || 0) + (desc / 100) * (md || 0) + (sol / 100) * (ms || 0) + bon; tBon += bon;
+    mC += mg; tl.cons += pura; tl.desc += desc; tl.sol += sol;
+    return {p: p, t: t, cons: cons, desc: desc, pura: pura, sol: sol, bon: bon, mg: mg};
+  });
+  /* loja */
+  var fams = {}; (D.loja || []).forEach(function (l) {
+    var kSub = chaveLoja(l[0], l[1]), usaSub = M[kSub] != null, cat = usaSub ? l[0] + " · " + l[1] : l[0], k = usaSub ? kSub : chaveLoja(l[0]);
+    var f = fams[cat] || (fams[cat] = {base: 0, liq: 0, k: k}); f.base += l[3]; f.liq += l[4];
+  });
+  var mL = 0, loja = Object.keys(fams).sort(function (a, b) { return fams[b].base - fams[a].base; }).map(function (c) {
+    var f = fams[c], pct = M[f.k], pv = pct == null ? null : pctVenda(pct), mg = pv == null ? null : f.base * pv / 100; if (mg != null) mL += mg; else falta.push("loja: " + c);
+    return {cat: c, base: f.base, pct: pct, pv: pv, mg: mg};
+  });
+  /* resultado e projeção */
+  var CM = await custosRealDoMes(C, m), custos = (CM.total_c + (TMR ? TMR.myrepsol_c + (TMR.combustiveis_c || 0) : 0)) / 100;   // a despesa confirmada substitui o custo fixo da mesma categoria
+  var diasMes = new Date(+m.slice(0, 4), +m.slice(5, 7), 0).getDate(), dias = V.de && V.ate ? diasEntre(V.de, V.ate) : diasMes, fator = dias < diasMes ? diasMes / dias : 1;
+  var totM = mC + mL / 100, res = totM - custos * Math.min(1, dias / diasMes), proj = totM * fator - custos;
+  return {V: V, C: C, DESC: DESC, BL: BL, TMR: TMR, txEstimada: txEstimada, comb: comb, tl: tl, tBon: tBon, mC: mC, loja: loja, mL: mL, CM: CM, custos: custos, diasMes: diasMes, dias: dias, fator: fator, res: res, proj: proj, falta: falta};
+}
 async function carregarLucro() {
   var box = $("#lucCorpo"); box.innerHTML = "<div class='mut'>A carregar…</div>";
   try {
@@ -175,52 +212,24 @@ async function carregarLucro() {
       var ul = await sb.from("msb_vendas_mes").select("mes").eq("estacao", EST).order("mes", {ascending: false}).limit(1);
       $("#lMes").value = (ul.data && ul.data[0] && ul.data[0].mes) || MES;
     }
-    var m = $("#lMes").value;
-    var rv = await sb.from("msb_vendas_mes").select("de,ate,dados,fonte").eq("estacao", EST).eq("mes", m).maybeSingle(); if (rv.error) throw rv.error;
-    if (!rv.data) { box.innerHTML = "<div class='vazio'>Sem relatório de vendas deste mês. Carregue o relatório \"Turno por formas de cobrança\" do mês (ou até hoje, para a projeção): no CBOS, imprimir → <b>Guardar como PDF</b>.</div>"; return; }
-    var V = rv.data, D = V.dados, M = await lerMargens(), C = await lerCustos();
-    var rt = await sb.from("msb_tms").select("dados").eq("estacao", EST).eq("mes", m).order("ate", {ascending: false}).limit(1);
-    var DESC = descontoTMS(rt.data && rt.data[0] && rt.data[0].dados);
-    var h = "", totM = 0, falta = [];
-    /* combustível */
-    var BL = bonusLitro(M), tBon = 0;
-    var rx = await sb.from("msb_taxas_mes").select("myrepsol_c,combustiveis_c,fatura").eq("estacao", EST).eq("mes", m).maybeSingle(); if (rx.error) throw rx.error;
-    var TMR = rx.data, txEstimada = BL.tx;
-    if (TMR) { BL.cons += BL.tx; BL.desc += BL.tx; BL.tx = 0; }   // há valor real da fatura: sai a estimativa em €/m³
-    var prods = Object.keys(Object.assign({}, D.comb.consigna || {}, D.comb.solred || {})).sort(), linhas = "", tl = {cons: 0, desc: 0, sol: 0}, mC = 0;
-    prods.forEach(function (p) {
-      var t = premium(p) ? "premium" : "simples", cons = ((D.comb.consigna || {})[p] || [0])[0], sol = ((D.comb.solred || {})[p] || [0])[0];
-      var desc = DESC ? Math.min(cons, Math.max(0, Math.round(DESC[p] || 0))) : 0, pura = cons - desc;
-      var mc = M["comb:consignacao:" + t], md = M["comb:desconto:" + t], ms = M["comb:solred:" + t];
-      [["consignação", mc], ["desconto imediato", md], ["Solred", ms]].forEach(function (x) { if (x[1] == null && falta.indexOf("combustível: " + x[0] + " " + t) < 0) falta.push("combustível: " + x[0] + " " + t); });
-      var bon = (pura / 100) * BL.cons + (desc / 100) * BL.desc, mg = (pura / 100) * (mc || 0) + (desc / 100) * (md || 0) + (sol / 100) * (ms || 0) + bon; tBon += bon;
-      mC += mg; tl.cons += pura; tl.desc += desc; tl.sol += sol;
-      linhas += "<tr><td class='l'>" + esc(p) + " <span class='mut' style='font-size:12px'>" + t + "</span></td><td class='n'>" + litros2(cons) + "</td><td class='n'>" + litros2(desc) + "</td><td class='n'><b>" + litros2(pura) + "</b></td><td class='n'>" + litros2(sol) + "</td><td class='n'>" + fmt(Math.round(bon * 100)) + "</td><td class='n'><b>" + fmt(Math.round(mg * 100)) + "</b></td></tr>";
-    });
-    totM += mC;
+    var m = $("#lMes").value, L = await dadosLucro(m);
+    if (!L) { box.innerHTML = "<div class='vazio'>Sem relatório de vendas deste mês. Carregue o relatório \"Turno por formas de cobrança\" do mês (ou até hoje, para a projeção): no CBOS, imprimir → <b>Guardar como PDF</b>.</div>"; return; }
+    var V = L.V, C = L.C, DESC = L.DESC, BL = L.BL, TMR = L.TMR, txEstimada = L.txEstimada, tl = L.tl, tBon = L.tBon, mC = L.mC, mL = L.mL, CM = L.CM, custos = L.custos, diasMes = L.diasMes, dias = L.dias, fator = L.fator, res = L.res, proj = L.proj, falta = L.falta;
+    var h = "", linhas = L.comb.map(function (x) {
+      return "<tr><td class='l'>" + esc(x.p) + " <span class='mut' style='font-size:12px'>" + x.t + "</span></td><td class='n'>" + litros2(x.cons) + "</td><td class='n'>" + litros2(x.desc) + "</td><td class='n'><b>" + litros2(x.pura) + "</b></td><td class='n'>" + litros2(x.sol) + "</td><td class='n'>" + fmt(Math.round(x.bon * 100)) + "</td><td class='n'><b>" + fmt(Math.round(x.mg * 100)) + "</b></td></tr>";
+    }).join("");
     h += "<div class='card' style='padding:14px;display:grid;gap:8px'><h2 style='margin:0'>⛽ Combustível</h2>" +
       (DESC ? "<p class='mut' style='margin:0;font-size:13px'>Consignação = litros em consignação − litros com desconto imediato (fecho mensal TMS, já sem os reembolsos).</p>"
             : "<div class='aviso'><p>⚠ Sem fecho mensal TMS deste mês: não sei os litros com desconto imediato, por isso todo o consignado conta como consignação. Carregue o TMS para o valor certo.</p></div>") +
       "<p class='mut' style='margin:0;font-size:13px'>" + (BL.cons || BL.desc ? "Bónus (política 2026): consignação " + num4(Math.round(BL.cons * 10000) / 10) + " €/m³ · desconto imediato " + num4(Math.round(BL.desc * 10000) / 10) + " €/m³ (variáveis " + num4(Math.round(BL.var * 10000) / 10) + ", My Repsol " + num4(Math.round(BL.mr * 10000) / 10) + ", dinamização " + num4(Math.round(BL.din * 10000) / 10) + (BL.tx ? ", taxa My Repsol −" + num4(Math.round(BL.tx * 10000) / 10) : "") + ")." : "Sem bónus marcados (Gestão → Margens e custos).") + "</p>" +
       "<div class='sc'><table><thead><tr><th class='l'>Produto</th><th>Consignado (L)</th><th>− Desconto imediato (L)</th><th>= Consignação (L)</th><th>Solred (L)</th><th>dos quais bónus €</th><th>Margem €</th></tr></thead><tbody>" + linhas +
       "</tbody><tfoot><tr><td class='l'>Total</td><td class='n'>" + litros2(tl.cons + tl.desc) + "</td><td class='n'>" + litros2(tl.desc) + "</td><td class='n'>" + litros2(tl.cons) + "</td><td class='n'>" + litros2(tl.sol) + "</td><td class='n'>" + fmt(Math.round(tBon * 100)) + "</td><td class='n'><b>" + fmt(Math.round(mC * 100)) + "</b></td></tr></tfoot></table></div></div>";
-    /* loja */
-    var fams = {}; (D.loja || []).forEach(function (l) {
-      var kSub = chaveLoja(l[0], l[1]), usaSub = M[kSub] != null, cat = usaSub ? l[0] + " · " + l[1] : l[0], k = usaSub ? kSub : chaveLoja(l[0]);
-      var f = fams[cat] || (fams[cat] = {base: 0, liq: 0, k: k}); f.base += l[3]; f.liq += l[4];
-    });
-    var mL = 0, lj = Object.keys(fams).sort(function (a, b) { return fams[b].base - fams[a].base; }).map(function (c) {
-      var f = fams[c], pct = M[f.k], pv = pct == null ? null : pctVenda(pct), mg = pv == null ? null : f.base * pv / 100; if (mg != null) mL += mg; else falta.push("loja: " + c);
-      return "<tr><td class='l'>" + esc(c) + "</td><td class='n'>" + fmt(f.base) + "</td><td class='n'>" + (pct == null ? "<a href='#' data-ir='mrg' class='mut'>por definir</a>" : pct >= 100 ? num4(pct) + " % s/ custo<br><small class='mut'>= " + num4(Math.round(pv * 10) / 10) + " % da venda</small>" : num4(pct) + " %") + "</td><td class='n'><b>" + (mg == null ? "—" : fmt(Math.round(mg))) + "</b></td></tr>";
+    var lj = L.loja.map(function (x) {
+      return "<tr><td class='l'>" + esc(x.cat) + "</td><td class='n'>" + fmt(x.base) + "</td><td class='n'>" + (x.pct == null ? "<a href='#' data-ir='mrg' class='mut'>por definir</a>" : x.pct >= 100 ? num4(x.pct) + " % s/ custo<br><small class='mut'>= " + num4(Math.round(x.pv * 10) / 10) + " % da venda</small>" : num4(x.pct) + " %") + "</td><td class='n'><b>" + (x.mg == null ? "—" : fmt(Math.round(x.mg))) + "</b></td></tr>";
     }).join("");
-    totM += mL / 100;
     h += "<div class='card' style='padding:14px;display:grid;gap:8px'><h2 style='margin:0'>🛍️ Loja</h2><div class='sc'><table><thead><tr><th class='l'>Categoria</th><th>Vendas sem IVA €</th><th>Margem</th><th>Margem €</th></tr></thead><tbody>" + lj +
-      "</tbody><tfoot><tr><td class='l'>Total</td><td class='n'>" + fmt(Object.keys(fams).reduce(function (s, c) { return s + fams[c].base; }, 0)) + "</td><td></td><td class='n'><b>" + fmt(Math.round(mL)) + "</b></td></tr></tfoot></table></div></div>";
-    /* resultado e projeção */
-    var CM = await custosRealDoMes(C, m), custos = (CM.total_c + (TMR ? TMR.myrepsol_c + (TMR.combustiveis_c || 0) : 0)) / 100;   // a despesa confirmada substitui o custo fixo da mesma categoria
-    var diasMes = new Date(+m.slice(0, 4), +m.slice(5, 7), 0).getDate(), dias = V.de && V.ate ? diasEntre(V.de, V.ate) : diasMes, fator = dias < diasMes ? diasMes / dias : 1;
+      "</tbody><tfoot><tr><td class='l'>Total</td><td class='n'>" + fmt(L.loja.reduce(function (s, x) { return s + x.base; }, 0)) + "</td><td></td><td class='n'><b>" + fmt(Math.round(mL)) + "</b></td></tr></tfoot></table></div></div>";
     var c2 = function (v) { return fmt(Math.round(v * 100)); };
-    var res = totM - custos * Math.min(1, dias / diasMes), proj = totM * fator - custos;
     h = "<section class='totem'><div class='t'>Lucro estimado · " + esc(new Date(m + "-15").toLocaleDateString("pt-PT", {month: "long", year: "numeric"})) + " · " + dmy(V.de) + " a " + dmy(V.ate) + "</div>" +
       "<div><div class='k'>Margem combustível</div><div class='v'>" + c2(mC) + "<small>€</small></div></div>" +
       "<div><div class='k'>Margem loja</div><div class='v'>" + c2(mL / 100) + "<small>€</small></div></div>" +

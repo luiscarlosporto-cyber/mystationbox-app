@@ -6,7 +6,8 @@
 var AREAS = [   // ordem aprovada a 05/11/2026: decisão, operação e controlo, obrigações e regras. Terceiro campo: g = subgrupo, adm = só administrador.
   {id: "ini", n: "🏠 Painel", p: [["ini", "Painel de Gestão"], ["avi", "OCTAN AI", {adm: 1}]]},
   {id: "ens", n: "⛽ ENSE", adm: 1, p: [["pre", "Preços ENSE", {g: "ENSE"}], ["ense", "Reporte mensal", {g: "ENSE"}]]},   // área própria, fora da Conformidade (dono, 07/11/2026)
-  {id: "des", n: "📊 Desempenho", adm: 1, p: [["luc", "Lucro", {g: "Resultados"}], ["mes", "Resultado mensal", {g: "Resultados"}], ["liv", "Livro de movimentos", {g: "Resultados"}], ["ven", "Vendas e margens", {g: "Vendas"}], ["va", "Relatório de vendas", {g: "Vendas"}], ["maq", "Máquina de tabaco", {g: "Vendas"}], ["fun", "Por funcionário", {g: "Análise"}]]},
+  {id: "res", n: "💰 Resultados", adm: 1, p: [["cdm", "Conta do mês"], ["luc", "Lucro (margens)"], ["mes", "Resultado mensal"]]},   // área própria (dono, 07/11/2026)
+  {id: "des", n: "📊 Desempenho", adm: 1, p: [["liv", "Livro de movimentos", {g: "Movimentos"}], ["ven", "Vendas e margens", {g: "Vendas"}], ["va", "Relatório de vendas", {g: "Vendas"}], ["maq", "Máquina de tabaco", {g: "Vendas"}], ["fun", "Por funcionário", {g: "Análise"}]]},
   {id: "tes", n: "💶 Tesouraria", p: [["reg", "Registo diário", {g: "Caixa"}], ["sai", "Saídas de caixa", {g: "Caixa"}], ["his", "Histórico", {g: "Caixa"}], ["rep", "Repsol e Multibanco", {g: "Conferências", adm: 1}], ["tms", "Fecho mensal TMS", {g: "Conferências", adm: 1}], ["dsp", "Despesas", {g: "Despesas", adm: 1}], ["ban", "Banco", {g: "Banco", adm: 1}]]},
   {id: "cst", n: "🛒 Compras e Stocks", c: "Compras", p: [["enc", "Por aprovar", {g: "Compras", adm: 1}], ["nova", "Nova encomenda", {g: "Compras", adm: 1}], ["comh", "Encomendas feitas", {g: "Compras", adm: 1}], ["ent", "Entrada de mercadoria", {g: "Receções", adm: 1}], ["dig", "Digitalizar fatura", {g: "Receções", adm: 1}], ["comb", "Entrada de combustível", {g: "Receções", adm: 1}], ["contar", "Contar", {g: "Stock"}], ["ler", "Ler código", {g: "Stock"}], ["stock", "Stock atual", {g: "Stock"}], ["inv", "Inventário", {g: "Stock"}], ["mov", "Movimentos", {g: "Stock"}]]},
   {id: "con", n: "📋 Conformidade", adm: 1, p: [["kms", "Mapa de kms do gerente", {g: "Contabilidade"}]]},
@@ -24,7 +25,7 @@ var NEXP = {
   prod: {tab: "settings", only: ["Gestão de produtos"]},
   cfg: {tab: "settings", only: ["Configuração da base de dados central", "Importante"]}
 };
-var VISTA_DA = {avi: "avi", ini: "ini", reg: "reg", sai: "sai", his: "his", ven: "tab", comh: "tab", mov: "tab", rep: "rep", tms: "tms", mes: "mes", fun: "fun", eq: "ges", luc: "luc", mrg: "mrg", comb: "comb", ense: "ense", va: "va", kms: "kms", pre: "pre", dig: "dig", dsp: "dsp", ban: "ban", liv: "liv"};
+var VISTA_DA = {avi: "avi", ini: "ini", reg: "reg", sai: "sai", his: "his", ven: "tab", comh: "tab", mov: "tab", rep: "rep", tms: "tms", mes: "mes", fun: "fun", eq: "ges", luc: "luc", cdm: "cdm", mrg: "mrg", comb: "comb", ense: "ense", va: "va", kms: "kms", pre: "pre", dig: "dig", dsp: "dsp", ban: "ban", liv: "liv"};
 var PAGINA = "ini";
 /* confirmação: na beta é uma janela da app; na versão atual continua a do navegador */
 function msbConfirma(t, acao) { return window.MSB_NAV ? MSB_NAV.confirma(t, acao) : Promise.resolve(confirm(t)); }
@@ -78,6 +79,7 @@ window.depoisVista = function (v) {
   if (v === "pre") carregarPrecos();
   if (v === "avi") carregarAvisos();
   if (v === "dsp") carregarDespesas();
+  if (v === "cdm") carregarConta();
   if (v === "ban") carregarBanco();
   if (v === "liv") carregarNucleo();
 };

@@ -1,7 +1,10 @@
 /* mystationbox · regras das despesas, sem ecrã, para se poderem testar: node app/testes/despesas.js */
 "use strict";
 var DESPESAS = (function () {
-  var CATEGORIAS = ["Salários", "Segurança Social", "Renda", "Luz", "Água", "Comunicações", "Seguros", "Contabilidade", "Limpeza", "Alarmes", "Kms do gerente", "Outros bónus", "Outros"];
+  /* Segurança Social (dono, 07/11/2026): o recibo traz a parte RETIDA ao trabalhador, que já está dentro do salário bruto (não é custo a mais).
+     A guia da contabilidade paga as duas partes juntas; o custo da empresa é guia − retida. As guias de IRS só entregam ao Estado o que já foi retido: nunca são custo. */
+  var SS = "Segurança Social", SS_RETIDA = "Segurança Social · retida", IRS_GUIA = "IRS · guia", TAXA_EMPRESA = 2375, TAXA_TRAB = 1100;
+  var CATEGORIAS = ["Salários", SS, SS_RETIDA, IRS_GUIA, "Renda", "Luz", "Água", "Comunicações", "Seguros", "Contabilidade", "Limpeza", "Alarmes", "Kms do gerente", "Outros bónus", "Outros"];
 
   /* "1.234,56", "1 234,56", "-336,93" ou "28.04" → cêntimos, sem passar por float. Devolve null se estiver vazio e NaN se for inválido. */
   function valorC(t) {
@@ -14,15 +17,36 @@ var DESPESAS = (function () {
 
   /* Custos do mês, sem IVA: a despesa confirmada substitui o custo fixo da mesma categoria; as outras somam-se. */
   function custosDoMes(fixos, despesas) {
-    var reais = {};
+    var reais = {}, retida = 0, guia = null;
     (despesas || []).forEach(function (d) {
       if (d.estado !== "confirmada") return;
+      if (d.categoria === SS_RETIDA) { retida += d.valor_c; return; }
+      if (d.categoria === IRS_GUIA) return;
+      if (d.categoria === SS) { guia = (guia || 0) + d.valor_c; return; }
       var k = d.categoria.toLowerCase();
       (reais[k] = reais[k] || {nome: d.categoria, valor_c: 0, origem: "real"}).valor_c += d.valor_c - (d.iva_c || 0);
     });
+    /* Parte da empresa: com guia, guia − retida; só com recibos, estimada à taxa da empresa até chegar a guia */
+    var kss = SS.toLowerCase();
+    if (guia != null) reais[kss] = {nome: SS, valor_c: guia - retida, origem: "real", guia_c: guia, retida_c: retida};
+    else if (retida) reais[kss] = {nome: SS, valor_c: Math.round(retida * TAXA_EMPRESA / TAXA_TRAB), origem: "estimada", retida_c: retida};
     var linhas = (fixos || []).filter(function (c) { return !reais[c.nome.toLowerCase()]; }).map(function (c) { return {nome: c.nome, valor_c: c.valor_c, origem: "fixo"}; });
     Object.keys(reais).forEach(function (k) { linhas.push(reais[k]); });
     return {linhas: linhas, total_c: linhas.reduce(function (s, l) { return s + l.valor_c; }, 0), reais: Object.keys(reais).length};
+  }
+
+  /* Famílias da Conta do mês. Custo fixo «Taxa de exploração · …» é da Repsol. */
+  var FAMILIAS = [["Pessoal", ["Salários", SS, "Kms do gerente"]], ["Repsol", ["Outros bónus", "My Repsol", "Taxa combustíveis"]], ["Instalações", ["Renda", "Luz", "Água", "Limpeza", "Alarmes", "Seguros"]], ["Serviços", ["Comunicações", "Contabilidade"]]];
+  function familia(nome) {
+    if (/^taxa de explora/i.test(nome)) return "Repsol";
+    var f = FAMILIAS.find(function (x) { return x[1].some(function (c) { return c.toLowerCase() === String(nome).toLowerCase(); }); });
+    return f ? f[0] : "Outros";
+  }
+  function porFamilia(linhas) {
+    var F = {};
+    (linhas || []).forEach(function (l) { var n = familia(l.nome), f = F[n] = F[n] || {nome: n, valor_c: 0, linhas: []}; f.valor_c += l.valor_c; f.linhas.push(l); });
+    var ordem = FAMILIAS.map(function (x) { return x[0]; }).concat(["Outros"]);
+    return Object.keys(F).sort(function (a, b) { return ordem.indexOf(a) - ordem.indexOf(b); }).map(function (k) { F[k].linhas.sort(function (a, b) { return b.valor_c - a.valor_c; }); return F[k]; });
   }
 
   /* Totais da página: confirmadas por categoria e o que falta tratar. */
@@ -75,9 +99,9 @@ var DESPESAS = (function () {
   /* O que se pode confirmar de uma vez: salários e Segurança Social dos recibos. Recibo refeito e tudo o resto vê-se um a um. */
   function recibosJuntos(lista) {
     return (lista || []).filter(function (d) {
-      return d.estado === "por_confirmar" && d.origem === "email" && d.valor_c != null && !d.nota && (d.categoria === "Salários" || d.categoria === "Segurança Social");
+      return d.estado === "por_confirmar" && d.origem === "email" && d.valor_c != null && !d.nota && (d.categoria === "Salários" || d.categoria === SS || d.categoria === SS_RETIDA);
     });
   }
-  return {emPositivo: emPositivo, comSinal: comSinal, visto: visto, deSaphety: deSaphety, CATEGORIAS: CATEGORIAS, valorC: valorC, custosDoMes: custosDoMes, resumo: resumo, erros: erros, valorMapaKms: valorMapaKms, compararKms: compararKms, recibosJuntos: recibosJuntos};
+  return {SS: SS, SS_RETIDA: SS_RETIDA, IRS_GUIA: IRS_GUIA, familia: familia, porFamilia: porFamilia, emPositivo: emPositivo, comSinal: comSinal, visto: visto, deSaphety: deSaphety, CATEGORIAS: CATEGORIAS, valorC: valorC, custosDoMes: custosDoMes, resumo: resumo, erros: erros, valorMapaKms: valorMapaKms, compararKms: compararKms, recibosJuntos: recibosJuntos};
 })();
 if (typeof module !== "undefined") module.exports = DESPESAS;
