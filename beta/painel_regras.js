@@ -18,10 +18,31 @@
     }
     return v;
   }
+  /* Vendas por família, lidas no campo `familias`: {dia: {família: [quantidade, €]}}. Sem todas as lojas, nada. */
+  function doMesFam(P, id, m) { return (P || []).find(function (q) { return q.estacao === id && q.de.slice(0, 7) === m && q.estado === "feito" && q.familias && Object.keys(q.familias).length; }) || null; }
+  function totaisFam(P, m, ids) {
+    var L = ids.map(function (id) { return doMesFam(P, id, m); }); if (!L.length || L.some(function (p) { return !p; })) return null;
+    var r = {}; L.forEach(function (p) { Object.keys(p.familias).forEach(function (d) { Object.keys(p.familias[d]).forEach(function (f) { var v = p.familias[d][f]; r[f] = r[f] || [0, 0]; r[f][0] += v[0]; r[f][1] += v[1]; }); }); });
+    Object.keys(r).forEach(function (f) { r[f] = [Math.round(r[f][0] * 100) / 100, Math.round(r[f][1] * 100) / 100]; });
+    return r;
+  }
+  /* Um valor por dia: COMBUSTIVEIS em litros; TODAS, RESTO (tudo menos combustíveis) e cada família em €. null nos dias sem leitura. */
+  function serieFam(P, m, ids, fam) {
+    if (fam === "TODAS") return serie(P, m, ids);
+    var L = ids.map(function (id) { return doMesFam(P, id, m); }); if (!L.length || L.some(function (p) { return !p; })) return null;
+    var v = [];
+    for (var i = 1; i <= diasMes(m); i++) {
+      var d = m + "-" + String(i).padStart(2, "0"), s = null;
+      L.forEach(function (p) { var F = p.familias[d]; if (!F) return; s = s || 0;
+        Object.keys(F).forEach(function (f) { if (fam === "RESTO" ? f !== "COMBUSTIVEIS" : f === fam) s += fam === "COMBUSTIVEIS" ? F[f][0] : F[f][1]; }); });
+      v.push(s === null ? null : Math.round(s * 100) / 100);
+    }
+    return v;
+  }
   /* Ainda há leitura a caminho? Um pedido feito com `dias` vazio não conta: já foi lido */
   function aLer(P, m, ids) { return ids.some(function (id) { return (P || []).some(function (q) { return q.estacao === id && q.de.slice(0, 7) === m && (q.estado === "pendente" || q.estado === "a_ler"); }); }); }
   /* Falta pedir este período? Um pedido antigo, feito sem `dias`, volta a pedir-se; um erro também */
-  function pedir(P, id, m, ate) { return !(P || []).some(function (q) { return q.estacao === id && q.de.slice(0, 7) === m && q.ate === ate && q.estado !== "erro" && (q.estado !== "feito" || q.dias != null); }); }
+  function pedir(P, id, m, ate) { return !(P || []).some(function (q) { return q.estacao === id && q.de.slice(0, 7) === m && q.ate === ate && q.estado !== "erro" && (q.estado !== "feito" || (q.dias != null && q.familias != null)); }); }
   /* Topo redondo do eixo, dividido em 3 */
   function escala(max) {
     var b = Math.pow(10, Math.floor(Math.log10(Math.max(max, 3) / 3))), p = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find(function (x) { return x * b * 3 >= max; });
@@ -35,6 +56,6 @@
     FF.forEach(function (F) { Object.keys(F || {}).forEach(function (k) { var g = Object.keys(G).find(function (x) { return G[x].indexOf(k) >= 0; }) || "OUT"; r[g] += F[k] || 0; }); });
     return r;
   }
-  var PN = {diasMes: diasMes, ultimoDia: ultimoDia, serie: serie, aLer: aLer, pedir: pedir, escala: escala, ritmo: ritmo, formas: formas};
+  var PN = {totaisFam: totaisFam, serieFam: serieFam, diasMes: diasMes, ultimoDia: ultimoDia, serie: serie, aLer: aLer, pedir: pedir, escala: escala, ritmo: ritmo, formas: formas};
   if (typeof module !== "undefined" && module.exports) module.exports = PN; else raiz.PN = PN;
 })(this);

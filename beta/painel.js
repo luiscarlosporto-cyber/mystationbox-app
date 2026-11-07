@@ -53,7 +53,7 @@
     return {cur: (R[11] || []).concat(R[12] || []), hoje: hoje, mes: mes, ant: ant, tur: R[0], fol: R[1], sai: R[2], enc: R[3], pre: R[4], tms: R[5], vm: R[6], va: R[7], ped: R[8], doc: R[9], avi: R[10], falhas: f};
   }
 
-  function pedidosMes(m) { return sb.from("msb_pedidos").select("id,estacao,estado,de,ate,linhas,dias").eq("pasta", "PAINEL").gte("de", m + "-01").lt("de", addMes(m, 1) + "-01").order("id", {ascending: false}).limit(6); }
+  function pedidosMes(m) { return sb.from("msb_pedidos").select("id,estacao,estado,de,ate,linhas,dias,familias").eq("pasta", "PAINEL").gte("de", m + "-01").lt("de", addMes(m, 1) + "-01").order("id", {ascending: false}).limit(6); }
   /* Mês em curso: uma leitura por dia e por loja, até ontem; no dia 1 ainda não há nada. Mês fechado: uma leitura do mês inteiro. Traz também as vendas por dia. */
   async function pedir(X, m) {
     var ontem = hojeISO(-1), ate = m === X.mes ? ontem : PN.ultimoDia(m); if (!ADMIN || !X.cur || ate.slice(0, 7) !== m) return;
@@ -142,16 +142,27 @@
       return "<div class='pnK" + (i ? "" : " hero") + "'><span class='rt'>" + I[1] + "</span><strong" + (v == null ? ">—" : " data-n='ind-" + k + "' data-v='" + v + "' data-t='" + I[4] + "'>" + formato(v, I[4])) + "</strong><p>" + sub + "</p>" + porLoja + "</div>";
     }).join("") + "</div>";
   }
-  var GR = null;   // dados do gráfico que está no ecrã
+  var GR = null, FAM_V = "TODAS";   // dados do gráfico que está no ecrã; família escolhida
+  var NOMES_FAM = {TODAS: "Todas", COMBUSTIVEIS: "Combustíveis", RESTO: "Loja e restantes", TABACO: "Tabaco", LOJA: "Loja", CAFETARIA: "Cafetaria", GAS: "Gás", LAVAGEM: "Lavagem", IMPRENSA: "Imprensa", LUBRIFICANTES: "Lubrificantes", "ADBLUE EMBALADO": "AdBlue embalado", "PROMOCOES REPSOL": "Promoções Repsol", "SEM FAMÍLIA": "Sem família"};
+  function nomeFam(f) { return NOMES_FAM[f] || Maius(f.toLowerCase()); }
+  function somaSerie(v) { return v ? v.reduce(function (s, x) { return s + (x || 0); }, 0) : null; }
+  /* Vendas por família e por dia (aprovado a 06/11/2026): combustíveis em litros, o resto em dinheiro, o mês contra o anterior */
   function grafico(X) {
-    var M = MES_V || X.mes, A = addMes(M, -1), ids = idsVer(), a = PN.serie(X.cur, M, ids), b = PN.serie(X.cur, A, ids), nome = LOJA_V === "todas" ? "as duas lojas" : nomeLoja(ESTS.find(function (e) { return e.id === LOJA_V; }));
-    var h = "<section class='bl pnC8'><h3>Vendas por dia · " + esc(nome) + "</h3><p class='pnSub'>Vendas com IVA, lidas no CBOS pelo OCTAN AI. Passa o rato ou o dedo para ver cada dia.</p>";
+    var M = MES_V || X.mes, A = addMes(M, -1), ids = idsVer(), TF = PN.totaisFam(X.cur, A, ids) || PN.totaisFam(X.cur, M, ids) || {};
+    var lista = ["TODAS", "COMBUSTIVEIS", "RESTO"].concat(Object.keys(TF).filter(function (f) { return f !== "COMBUSTIVEIS"; }).sort(function (x, y) { return TF[y][1] - TF[x][1]; }).slice(0, 6));
+    if (lista.indexOf(FAM_V) < 0) lista.push(FAM_V);
+    var lit = FAM_V === "COMBUSTIVEIS", a = PN.serieFam(X.cur, M, ids, FAM_V), b = PN.serieFam(X.cur, A, ids, FAM_V), nome = LOJA_V === "todas" ? "as duas lojas" : nomeLoja(ESTS.find(function (e) { return e.id === LOJA_V; }));
+    var fv = function (v) { return v == null ? "—" : lit ? num(Math.round(v), 0) + " L" : eur(v * 100); };
+    var d = diasVistos(X, M), d0 = PN.diasMes(A), sa = somaSerie(a), sb2 = somaSerie(b), r = PN.ritmo(sa, d, sb2, d0);
+    var h = "<section class='bl pnC8'><h3>Vendas por dia · " + esc(nomeFam(FAM_V)) + " · " + esc(nome) + "</h3><p class='pnSub'>" + (lit ? "Litros vendidos" : "Vendas com IVA") + ", lidas no CBOS pelo OCTAN AI. Passa o rato ou o dedo para ver cada dia.</p>" +
+      "<div class='pnChips'>" + lista.map(function (f) { return "<button data-fam='" + esc(f) + "' class='" + (f === FAM_V ? "on" : "") + "' aria-pressed='" + (f === FAM_V) + "'>" + esc(nomeFam(f)) + "</button>"; }).join("") + "</div>" +
+      "<div class='pnKp'><div><small>" + esc(tituloMes(X)) + "</small><b>" + fv(sa) + "</b></div><div><small>" + esc(Maius(nomeMes(A))) + "</small><b>" + fv(sb2) + "</b></div><div><small>Por dia, face a " + esc(nomeMes(A)) + "</small><b class='" + (r == null ? "" : r >= 0 ? "pnSobe" : "pnDesce") + "'>" + (r == null ? "—" : (r >= 0 ? "▲ " : "▼ ") + num(Math.abs(r), 1) + " %") + "</b></div></div>";
     GR = null;
     if (!a && !b) return h + "<div class='pnVaz'>" + (PN.aLer(X.cur, M, ids) || PN.aLer(X.cur, A, ids) ? "<b>A ler as vendas por dia no CBOS</b>Aparecem aqui daqui a uns minutos, com o PC ligado." : "<b>Sem vendas por dia para mostrar</b>O OCTAN AI ainda não leu este mês no CBOS. Volto a pedir quando abrires o Painel.") + "</div></section>";
     var N = Math.max(PN.diasMes(M), PN.diasMes(A)), S = function (l) { var r = (l || []).slice(); while (r.length < N) r.push(null); return r; };
     var A1 = S(a), B1 = S(b), top = PN.escala(Math.max.apply(null, A1.concat(B1).map(function (x) { return x || 0; })));
-    GR = {a: A1, b: B1, top: top, n: N, ma: nomeMes(M), mb: nomeMes(A)};
-    var rot = function (v) { return v >= 1000 ? num(v / 1000, v % 1000 ? 1 : 0) + " mil €" : num(v, 0) + " €"; }, xs = [1, 5, 10, 15, 20, 25, N];
+    GR = {a: A1, b: B1, top: top, n: N, ma: nomeMes(M), mb: nomeMes(A), lit: lit};
+    var rot = function (v) { return lit ? num(v, 0) + " L" : v >= 1000 ? num(v / 1000, v % 1000 ? 1 : 0) + " mil €" : num(v, 0) + " €"; }, xs = [1, 5, 10, 15, 20, 25, N];
     return h + "<div class='pnLeg'><span><i></i>" + Maius(GR.ma) + "</span>" + (b ? "<span><i class='b'></i>" + Maius(GR.mb) + "</span>" : "") + "</div>" +
       "<div class='pnGraf' id='pnGraf'><svg viewBox='0 0 700 230' preserveAspectRatio='none' role='img' aria-label='Vendas por dia de " + esc(GR.ma) + (b ? " comparadas com " + esc(GR.mb) : "") + "'>" +
       [0, 1, 2, 3].map(function (i) { var y = i * 230 / 3; return "<line class='gl' x1='0' x2='700' y1='" + y + "' y2='" + y + "'></line>"; }).join("") +
@@ -182,8 +193,20 @@
       gu.hidden = di.hidden = false; gu.style.left = x + "%";
       pt.hidden = a == null; if (a != null) { pt.style.left = x + "%"; pt.style.top = (100 - a / G.top * 100) + "%"; }
       di.style.left = Math.min(82, Math.max(18, x)) + "%";
-      di.innerHTML = "<b>Dia " + (i + 1) + "</b><br>" + Maius(G.ma) + ": " + (a == null ? "sem leitura" : eur(a * 100)) + "<br>" + Maius(G.mb) + ": " + (b == null ? "sem leitura" : eur(b * 100));
+      di.innerHTML = "<b>Dia " + (i + 1) + "</b><br>" + Maius(G.ma) + ": " + (a == null ? "sem leitura" : G.lit ? num(Math.round(a), 0) + " L" : eur(a * 100)) + "<br>" + Maius(G.mb) + ": " + (b == null ? "sem leitura" : G.lit ? num(Math.round(b), 0) + " L" : eur(b * 100));
     };
+  }
+  /* Todas as famílias: quantidade e dinheiro do mês contra o anterior; tocar numa família mostra os dias */
+  function tabelaFam(X) {
+    var M = MES_V || X.mes, A = addMes(M, -1), ids = idsVer(), FN = PN.totaisFam(X.cur, M, ids), FO = PN.totaisFam(X.cur, A, ids);
+    var h = "<section class='bl pnC12'><h3>Vendas por família</h3><p class='pnSub'>Quantidade e dinheiro com IVA. Litros nos combustíveis, unidades nas outras famílias. «Por dia» compara a média diária.</p>";
+    if (!FN && !FO) return h + "<p class='vz'>" + (PN.aLer(X.cur, M, ids) || PN.aLer(X.cur, A, ids) ? "A ler as famílias no CBOS: aparecem daqui a uns minutos, com o PC ligado." : "Ainda não há vendas por família deste mês.") + "</p></section>";
+    FN = FN || {}; FO = FO || {};
+    var d = diasVistos(X, M), d0 = PN.diasMes(A), ks = Object.keys(FO).concat(Object.keys(FN).filter(function (k) { return !FO[k]; })).sort(function (x, y) { return (FO[y] || [0, 0])[1] - (FO[x] || [0, 0])[1] || (FN[y] || [0, 0])[1] - (FN[x] || [0, 0])[1]; });
+    return h + "<div class='sc'><table class='pnFam'><thead><tr><th class='l'>Família</th><th>" + esc(Maius(nomeMes(M))) + " €</th><th>" + esc(Maius(nomeMes(A))) + " €</th><th>" + esc(Maius(nomeMes(M))) + " qtd.</th><th>" + esc(Maius(nomeMes(A))) + " qtd.</th><th>Por dia</th></tr></thead><tbody>" +
+      ks.map(function (k) { var a = FN[k] || [0, 0], b = FO[k] || [0, 0], r = PN.ritmo(a[1], d, b[1], d0);
+        return "<tr class='" + (FAM_V === k ? "sel" : "") + "'><td class='l'><button data-fam='" + esc(k) + "'>" + esc(nomeFam(k)) + "</button></td><td>" + eur(a[1] * 100) + "</td><td>" + eur(b[1] * 100) + "</td><td>" + num(Math.round(a[0]), 0) + "</td><td>" + num(Math.round(b[0]), 0) + "</td><td class='" + (r == null ? "" : r >= 0 ? "pnSobe" : "pnDesce") + "'>" + (r == null ? "—" : (r >= 0 ? "▲ " : "▼ ") + num(Math.abs(r), 1) + " %") + "</td></tr>"; }).join("") +
+      "</tbody></table></div></section>";
   }
   function barras(X) {
     var I = function (k) { return IND.find(function (x) { return x[0] === k; }); }, L = ESTS.map(function (e) { var D = dadosLoja(X, e); return {e: e, c: I("comb")[3](D), l: I("loja")[3](D)}; });
@@ -310,11 +333,12 @@
     if (LOJA_V !== "todas" && !ESTS.some(function (e) { return e.id === LOJA_V; })) LOJA_V = "todas";
     var falta = ESTS.some(function (e) { var D = dadosLoja(X, e); return !D.c && !D.f; }), M = MES_V || X.mes;
     box.innerHTML = (X.falhas.length ? "<div class='aviso'><p>Não consegui ler: " + esc(X.falhas.join(", ")) + ". O que está em baixo pode estar incompleto.</p></div>" : "") + topo(X) + cartoes(X) +
-      "<div class='pnGrade'>" + grafico(X) + pintarDecidir(X) + barras(X) + recebido_(X) + porFechar(X) + "</div>" +
+      "<div class='pnGrade'>" + grafico(X) + pintarDecidir(X) + barras(X) + recebido_(X) + porFechar(X) + tabelaFam(X) + "</div>" +
       "<p class='rod'>" + (falta ? "A ler no CBOS pelo OCTAN AI: os valores aparecem daqui a uns minutos, com o PC ligado." : M === X.mes ? "Vendas com IVA, lidas no CBOS pelo OCTAN AI, até ontem. O ritmo por dia e a estimativa do mês são contas simples, não são valores do CBOS." : "Vendas com IVA, do mês inteiro.") + "</p>";
     box.querySelectorAll("[data-p]").forEach(function (b) { b.onclick = function () { irLoja(b.dataset.e, b.dataset.p); }; });
     box.querySelectorAll("[data-arq]").forEach(function (b) { b.onclick = function () { b.disabled = true; arquivar(X, b.dataset.arq.split(",")); }; });
     box.querySelectorAll("[data-ver]").forEach(function (b) { b.onclick = function () { LOJA_V = b.dataset.ver; desenhar(X); }; });
+    box.querySelectorAll("[data-fam]").forEach(function (b) { b.onclick = function () { FAM_V = b.dataset.fam; ANTES.a = ANTES.b = null; desenhar(X); if (b.closest(".pnFam")) $("#pnGraf") && box.querySelector(".pnChips").scrollIntoView({block: "nearest", behavior: "smooth"}); }; });
     $("#pnPers").onclick = function () { editarInd(X); };
     $("#pnAnt").onclick = function () { verMes(X, addMes(MES_V || X.mes, -1)); };
     $("#pnSeg").onclick = function () { verMes(X, addMes(MES_V || X.mes, 1)); };

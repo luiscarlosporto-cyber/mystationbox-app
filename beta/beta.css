@@ -198,6 +198,19 @@ main .wrap:has(#v-ini:not([hidden])){max-width:1700px}
 .pnGraf .di{position:absolute;top:0;background:var(--fg);color:var(--card);border-radius:8px;padding:6px 10px;font-size:12.5px;line-height:1.4;white-space:nowrap;pointer-events:none;transform:translateX(-50%);z-index:2}
 .pnGraf [hidden]{display:none}
 .pnX{position:relative;height:18px;margin:6px 0 0 54px;font-size:12px;color:var(--mut)}.pnX span{position:absolute;transform:translateX(-50%)}
+.pnChips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}
+.pnChips button{border:1px solid var(--bd);background:var(--card);border-radius:999px;padding:5px 12px;font:500 13.5px var(--f-body);min-height:36px;cursor:pointer;color:var(--fg)}
+.pnChips button.on{background:var(--azul);border-color:var(--azul);color:#FFF}
+.pnKp{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.pnKp div{background:var(--soft);border-radius:9px;padding:8px 11px}
+.pnKp small{display:block;font-size:12.5px;color:var(--mut)}.pnKp b{font-size:18px}
+.pnC12{grid-column:span 12}
+table.pnFam{width:100%;border-collapse:collapse;min-width:640px;font-size:14px}
+table.pnFam th{font-size:12.5px;color:var(--mut);font-weight:600;text-align:right;padding:6px 8px;border-bottom:1px solid var(--bd)}
+table.pnFam td{text-align:right;padding:7px 8px;border-bottom:1px solid var(--soft)}
+table.pnFam .l{text-align:left}table.pnFam tr.sel td{background:var(--soft)}
+table.pnFam button{border:0;background:none;font:600 14px var(--f-body);color:var(--azul);cursor:pointer;padding:0;min-height:32px;text-align:left}
+@media (max-width:680px){.pnKp{grid-template-columns:1fr}}
 .pnVaz{height:262px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:var(--soft);border-radius:9px;padding:18px;color:var(--mut);font-size:14px}
 .pnVaz b{color:var(--fg);font-size:15px;margin-bottom:3px}
 .pnBar{margin-bottom:14px}.pnBar.fora{opacity:.5}
