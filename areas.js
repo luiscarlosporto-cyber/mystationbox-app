@@ -6,7 +6,7 @@
 var AREAS = [   // ordem aprovada a 05/11/2026: decisão, operação e controlo, obrigações e regras. Terceiro campo: g = subgrupo, adm = só administrador.
   {id: "ini", n: "🏠 Painel", p: [["ini", "Painel de Gestão"], ["avi", "OCTAN AI", {adm: 1}]]},
   {id: "des", n: "📊 Desempenho", adm: 1, p: [["luc", "Lucro", {g: "Resultados"}], ["mes", "Resultado mensal", {g: "Resultados"}], ["ven", "Vendas e margens", {g: "Vendas"}], ["va", "Relatório de vendas", {g: "Vendas"}], ["maq", "Máquina de tabaco", {g: "Vendas"}], ["fun", "Por funcionário", {g: "Análise"}]]},
-  {id: "tes", n: "💶 Tesouraria", p: [["reg", "Registo diário", {g: "Caixa"}], ["sai", "Saídas de caixa", {g: "Caixa"}], ["his", "Histórico", {g: "Caixa"}], ["rep", "Repsol e Multibanco", {g: "Conferências", adm: 1}], ["tms", "Fecho mensal TMS", {g: "Conferências", adm: 1}], ["dsp", "Despesas", {g: "Despesas", adm: 1}]]},
+  {id: "tes", n: "💶 Tesouraria", p: [["reg", "Registo diário", {g: "Caixa"}], ["sai", "Saídas de caixa", {g: "Caixa"}], ["his", "Histórico", {g: "Caixa"}], ["rep", "Repsol e Multibanco", {g: "Conferências", adm: 1}], ["tms", "Fecho mensal TMS", {g: "Conferências", adm: 1}], ["dsp", "Despesas", {g: "Despesas", adm: 1}], ["ban", "Banco", {g: "Banco", adm: 1}]]},
   {id: "cst", n: "🛒 Compras e Stocks", c: "Compras", p: [["enc", "Por aprovar", {g: "Compras", adm: 1}], ["nova", "Nova encomenda", {g: "Compras", adm: 1}], ["comh", "Encomendas feitas", {g: "Compras", adm: 1}], ["ent", "Entrada de mercadoria", {g: "Receções", adm: 1}], ["dig", "Digitalizar fatura", {g: "Receções", adm: 1}], ["comb", "Entrada de combustível", {g: "Receções", adm: 1}], ["contar", "Contar", {g: "Stock"}], ["ler", "Ler código", {g: "Stock"}], ["stock", "Stock atual", {g: "Stock"}], ["inv", "Inventário", {g: "Stock"}], ["mov", "Movimentos", {g: "Stock"}]]},
   {id: "con", n: "📋 Conformidade", adm: 1, p: [["pre", "Preços ENSE", {g: "ENSE"}], ["ense", "Reporte mensal", {g: "ENSE"}], ["kms", "Mapa de kms do gerente", {g: "Contabilidade"}]]},
   {id: "adm", n: "⚙️ Administração", adm: 1, p: [["eq", "Equipa e acessos", {g: "Pessoas"}], ["mrg", "Margens e custos", {g: "Regras"}], ["prod", "Produtos e códigos", {g: "Regras"}], ["cfg", "Configuração do stock", {g: "Regras"}]]}
@@ -23,7 +23,7 @@ var NEXP = {
   prod: {tab: "settings", only: ["Gestão de produtos"]},
   cfg: {tab: "settings", only: ["Configuração da base de dados central", "Importante"]}
 };
-var VISTA_DA = {avi: "avi", ini: "ini", reg: "reg", sai: "sai", his: "his", ven: "tab", comh: "tab", mov: "tab", rep: "rep", tms: "tms", mes: "mes", fun: "fun", eq: "ges", luc: "luc", mrg: "mrg", comb: "comb", ense: "ense", va: "va", kms: "kms", pre: "pre", dig: "dig", dsp: "dsp"};
+var VISTA_DA = {avi: "avi", ini: "ini", reg: "reg", sai: "sai", his: "his", ven: "tab", comh: "tab", mov: "tab", rep: "rep", tms: "tms", mes: "mes", fun: "fun", eq: "ges", luc: "luc", mrg: "mrg", comb: "comb", ense: "ense", va: "va", kms: "kms", pre: "pre", dig: "dig", dsp: "dsp", ban: "ban"};
 var PAGINA = "ini";
 /* confirmação: na beta é uma janela da app; na versão atual continua a do navegador */
 function msbConfirma(t, acao) { return window.MSB_NAV ? MSB_NAV.confirma(t, acao) : Promise.resolve(confirm(t)); }
@@ -77,6 +77,7 @@ window.depoisVista = function (v) {
   if (v === "pre") carregarPrecos();
   if (v === "avi") carregarAvisos();
   if (v === "dsp") carregarDespesas();
+  if (v === "ban") carregarBanco();
 };
 
 /* ---------------- módulo de stock embutido ---------------- */
@@ -245,9 +246,11 @@ async function carregarFicheiros(fs) {
   var g = {pdf: [], precos: [], cbos: [], folha: [], foto: [], fatura: [], xls: [], tms: [], vendas: [], csv: [], "": []};
   for (var i = 0; i < fs.length; i++) g[await tipoFicheiro(fs[i])].push(fs[i]);
   /* Excel de créditos MB/Solred por transferência: reconhece-se pelo cabeçalho (N.º doc. · Mont. em MI) */
+  /* extrato do banco (Crédito Agrícola): reconhece-se pela primeira linha «Operação: Consulta de Movimentos de Contas» */
+  var ext = []; if (ADMIN) for (var x = g.vendas.length - 1; x >= 0; x--) if (await ehExtrato(g.vendas[x])) ext.push(g.vendas.splice(x, 1)[0]);
   var trf = []; for (var k = g.vendas.length - 1; k >= 0; k--) if (await ehTransferencias(g.vendas[k])) trf.push(g.vendas.splice(k, 1)[0]);
   if (g[""].length || g.csv.length) ir("reg");      // a mensagem aparece na barra do Registo
-  if (g[""].length) status(false, "⚠ Não reconheço: " + g[""].map(function (f) { return f.name; }).join(", ") + ". Ficheiros aceites: folha de turno (.xls), fotografia do talão, PDF da Repsol, fecho mensal TMS (.csv), relatório de vendas de tabaco (Excel .xlsx), relatório «Turno por formas de cobrança» (PDF feito com «Guardar como PDF»).");
+  if (g[""].length) status(false, "⚠ Não reconheço: " + g[""].map(function (f) { return f.name; }).join(", ") + ". Ficheiros aceites: folha de turno (.xls), fotografia do talão, PDF da Repsol, fecho mensal TMS (.csv), relatório de vendas de tabaco (Excel .xlsx), extrato do banco (Excel), relatório «Turno por formas de cobrança» (PDF feito com «Guardar como PDF»).");
   if (g.csv.length) status(false, "⚠ " + g.csv.map(function (f) { return f.name; }).join(", ") + ": o relatório de vendas tem de ser em Excel (.xlsx), porque o CSV não diz de que estação é.");
   if (g.tms.length) { ir("tms"); for (var j = 0; j < g.tms.length; j++) await importarTMS(g.tms[j]); }
   if (g.pdf.length) { ir("rep"); carregarPdfs(g.pdf); }
@@ -258,6 +261,7 @@ async function carregarFicheiros(fs) {
   if (g.fatura.length) digitalizarFatura(g.fatura[0]);
   if (g.foto.length) escolherFoto(g.foto[0]);
   if (trf.length) await importarTransferencias(trf[0]);
+  if (ext.length) await importarExtrato(ext[0]);
   if (g.vendas.length) escolherVendas(g.vendas[0]);
   var varios = g.xls.length + g.foto.length + g.vendas.length > (g.xls.length ? 1 : 0) + (g.foto.length ? 1 : 0) + (g.vendas.length ? 1 : 0);
   if (varios) status(false, "⚠ Só se lê uma folha de turno, um talão e um relatório de vendas de cada vez: carregue os restantes depois.");
