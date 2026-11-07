@@ -127,8 +127,8 @@ async function importarHistCarburante(f, c, existentes) {
       novos.push({estacao: EST, dia: d[3] + "-" + d[2] + "-" + d[1], produto: p, qtd: Math.round(v * 100), kg: ENSE_PROD[p].kg ? Math.round(v / c.gpl_kg_litros * 100) : null, guia: String(r[iN]).trim(), nota: String(r[iTq]).trim() + " · do sistema Repsol"});
     });
     var ps = Object.keys(postos), est = ESTS.find(function (x) { return (x.posto_repsol || "").toUpperCase() === ps[0]; });
-    if (ps.length !== 1) throw new Error(ps.length ? "O ficheiro tem várias lojas (" + ps.join(", ") + "). Exporte só uma." : "O ficheiro não diz de que loja é (coluna Loja).");
-    if (!est || est.id !== EST) throw new Error("Este ficheiro é do posto " + ps[0] + (est ? " (" + (est.short_name || est.name) + ")" : "") + ", mas está a trabalhar em " + $("#hEst").textContent + ". Mude de loja no topo e carregue de novo.");
+    if (ps.length !== 1) throw new Error(ps.length ? "O ficheiro tem várias estações (" + ps.join(", ") + "). Exporte só uma." : "O ficheiro não diz de que estação é (coluna Loja).");
+    if (!est || est.id !== EST) throw new Error("Este ficheiro é do posto " + ps[0] + (est ? " (" + (est.short_name || est.name) + ")" : "") + ", mas está a trabalhar em " + $("#hEst").textContent + ". Mude de estação no topo e carregue de novo.");
     if (!novos.length) throw new Error("Não há receções de combustível no ficheiro.");
     /* não repetir: o que já existe com o mesmo dia, guia, produto e quantidade */
     var dias = novos.map(function (x) { return x.dia; }).sort(), ex = await sb.from("msb_comb_entradas").select("dia,guia,produto,qtd").eq("estacao", EST).gte("dia", dias[0]).lte("dia", dias[dias.length - 1]);
@@ -339,8 +339,8 @@ async function importarFolhaFecho(f) {
   try {
     var bytes = new Uint8Array(await f.arrayBuffer()), L = await linhasPdf(bytes.slice()), r = MOTOR.lerFolhaFecho(L);
     var est = ESTS.find(function (x) { return (x.posto_repsol || "").toUpperCase() === r.posto; });
-    if (!est) throw new Error("A folha é do posto " + r.posto + " - " + r.nome_posto + ", que não é nenhuma das suas lojas.");
-    if (est.id !== EST) throw new Error("Esta folha é de " + (est.name || est.short_name) + " (posto " + r.posto + "), mas está a trabalhar em " + $("#hEst").textContent + ". Mude de loja no topo e carregue de novo.");
+    if (!est) throw new Error("A folha é do posto " + r.posto + " - " + r.nome_posto + ", que não é nenhuma das suas estações.");
+    if (est.id !== EST) throw new Error("Esta folha é de " + (est.name || est.short_name) + " (posto " + r.posto + "), mas está a trabalhar em " + $("#hEst").textContent + ". Mude de estação no topo e carregue de novo.");
     var erros = r.verificacoes.filter(function (v) { return v.nivel === "erro"; });
     if (erros.length) throw new Error("As contas da folha não batem certo; não foi gravada. " + erros.map(function (v) { return v.msg; }).join(" "));
     var h = await sha(bytes), caminho = EST + "/vendas/folha_fecho_" + r.mes + "_" + h + ".pdf";

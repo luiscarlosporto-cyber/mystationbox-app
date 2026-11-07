@@ -63,7 +63,7 @@ var AVI_PASTAS = [["TODAS", "Tudo"], ["ADBLUE EMBALADO", "AdBlue embalado"], ["C
 function aviForm() {
   return "<div class='card' style='padding:12px 14px'><b>🔎 Pedir vendas ao OCTAN AI</b>" +
     "<div style='display:grid;gap:8px;margin-top:8px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))'>" +
-    "<label>Loja<select id='pvLoja'>" + (ESTS || []).map(function (e) { return "<option value='" + e.id + "'" + (e.id === EST ? " selected" : "") + ">" + esc(e.name) + "</option>"; }).join("") + "</select></label>" +
+    "<label>Estação<select id='pvLoja'>" + (ESTS || []).map(function (e) { return "<option value='" + e.id + "'" + (e.id === EST ? " selected" : "") + ">" + esc(e.name) + "</option>"; }).join("") + "</select></label>" +
     "<label>O quê<select id='pvPasta'>" + AVI_PASTAS.map(function (p) { return "<option value='" + p[0] + "'>" + p[1] + "</option>"; }).join("") + "</select></label>" +
     "<label>De<input type='date' id='pvDe' value='" + hojeISO(-7) + "'></label><label>Até<input type='date' id='pvAte' value='" + hojeISO(-1) + "'></label>" +
     "<label>Artigo (opcional)<input id='pvArtigo' placeholder='ex.: TEREA'></label></div>" +
@@ -85,8 +85,8 @@ function aviPedidos(L) {
 /* Usa as vendas lidas no CBOS na Nova encomenda, pelo mesmo caminho do relatório em Excel: mesmas regras, confirmação e aprovação. */
 async function aviUsar(id, sup) {
   var p = AVI_PD.find(function (x) { return x.id === id; }), e = (ESTS || []).find(function (x) { return x.id === p.estacao; });
-  if (p.estacao !== EST) return status(false, "⚠ Este pedido é de " + aviLoja(p.estacao) + ". Mude de loja no cabeçalho e carregue de novo.");
-  if (!e || !e.posto_repsol) return status(false, "⚠ A loja não tem o posto Repsol configurado.");
+  if (p.estacao !== EST) return status(false, "⚠ Este pedido é de " + aviLoja(p.estacao) + ". Mude de estação no cabeçalho e carregue de novo.");
+  if (!e || !e.posto_repsol) return status(false, "⚠ A estação não tem o posto Repsol configurado.");
   var dias = [], d = new Date(p.de + "T12:00:00"), fim = new Date(p.ate + "T12:00:00");
   for (; d <= fim; d.setDate(d.getDate() + 1)) dias.push(dmy(d.toISOString().slice(0, 10)) + " - Quantidade");
   ir("nova");
@@ -137,7 +137,7 @@ async function carregarAvisos() {
   try {
     var L = await avisosRecentes(100), p = aviParado(L), h = "", P = await precosPorAprovar();
     h += P.map(aviQuadro).join("") + AVI_PRECOS.filter(function (x) { return x.estado === "lido" && x.aprovado_em && !x.ense_erro; }).map(aviEspera).join("");
-    if (p) h += "<div class='bad'>⚠️ O OCTAN AI não corre desde " + aviDataHora(p.criado) + ". Confirma se o portátil da loja está ligado.</div>";
+    if (p) h += "<div class='bad'>⚠️ O OCTAN AI não corre desde " + aviDataHora(p.criado) + ". Confirma se o portátil do OCTAN AI está ligado.</div>";
     var porLer = L.filter(function (a) { return !a.lido_em && a.nivel !== "info"; });
     if (porLer.length) h += "<div class='bar'><button class='btn' id='aviTudo'>✔ Marcar tudo como visto (" + porLer.length + ")</button></div>";
     if (!L.length) h += "<div class='mut'>Ainda não há avisos.</div>";

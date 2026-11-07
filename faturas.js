@@ -71,7 +71,7 @@ function desenharFatura() {
     (d.qr ? "<div class='msgOk' style='padding:8px 10px;border-radius:8px'>✔ QR fiscal lido: fornecedor, cliente, data, número, IVA e total vêm dele.</div>" : "<div class='mut' style='font-size:13px'>Sem QR fiscal lido: confira o número, a data e os totais com atenção.</div>") +
     "<div class='fc-g'><div>" + (FD.url ? "<img class='fc-img' style='max-height:760px' src='" + FD.url + "' alt='fatura'>" : "") + "</div><div style='display:grid;gap:10px;align-content:start'>" +
     "<div class='ff'><label>Fornecedor<select id='dF'><option value=''>Escolher…</option>" + Object.keys(FATURAS.FORN).map(function (k) { return "<option value='" + k + "'" + (d.fornecedor === k ? " selected" : "") + ">" + esc(FATURAS.FORN[k].nome) + "</option>"; }).join("") + "</select></label>" +
-    "<label>Loja<select id='dL'>" + Object.keys(FATURAS.NIF_LOJA).map(function (k) { var e = ESTS.find(function (x) { return x.id === k; }); return "<option value='" + k + "'" + (loja === k ? " selected" : "") + ">" + esc(e ? e.name : k) + "</option>"; }).join("") + "</select></label>" +
+    "<label>Estação<select id='dL'>" + Object.keys(FATURAS.NIF_LOJA).map(function (k) { var e = ESTS.find(function (x) { return x.id === k; }); return "<option value='" + k + "'" + (loja === k ? " selected" : "") + ">" + esc(e ? e.name : k) + "</option>"; }).join("") + "</select></label>" +
     "<label>Número<input id='dN' value='" + esc(d.numero) + "'></label><label>Data<input type='date' id='dD' value='" + esc(d.data) + "'></label></div>" +
     "<div style='overflow-x:auto'><table style='min-width:560px'><thead><tr><th>Código</th><th>Artigo</th><th>Qtd.</th><th>Valor sem IVA €</th><th>IVA %</th><th></th></tr></thead><tbody id='dLs'></tbody></table></div>" +
     "<div class='bar'><button class='btn' id='dMais'>+ Acrescentar linha</button></div>" +
@@ -107,7 +107,7 @@ function lerCartao() {
 function conferirCartao() {
   lerCartao();
   var e = FATURAS.verificar(FD.d), loja = $("#dL").value;
-  if (loja !== EST) e.push("Mude a loja no cabeçalho para a loja desta fatura");
+  if (loja !== EST) e.push("Mude a estação no cabeçalho para a estação desta fatura");
   $("#dChk").innerHTML = e.length ? "<div class='msgErr' style='padding:8px 10px;border-radius:8px'>" + e.map(function (x) { return "<div>• " + esc(x) + "</div>"; }).join("") + "</div>" : "<div class='msgOk' style='padding:8px 10px;border-radius:8px'>✔ As contas batem certo.</div>";
   $("#dOk").disabled = !!e.length || !$("#dV").checked;
 }
@@ -134,7 +134,7 @@ async function carregarFaturasDig(msg) {
     var L = q.data || [];
     c.innerHTML = (msg ? "<div class='msgOk' style='padding:8px 10px;border-radius:8px'>" + esc(msg) + "</div>" : "") + "<div class='card'><div class='cb' style='display:grid;gap:8px'><h3 style='margin:0'>Faturas enviadas</h3>" +
       (L.length ? "<div style='overflow-x:auto'><table><thead><tr><th>Data</th><th>Fornecedor</th><th>Número</th><th>Total</th><th>Estado</th><th>Visto</th><th></th></tr></thead><tbody>" + L.map(function (x, i) {
-        return "<tr><td>" + dmy(x.dia) + "</td><td>" + esc((FATURAS.FORN[x.fornecedor] || {}).nome || x.fornecedor) + "</td><td>" + esc(x.numero) + "</td><td>" + FORMATOS.euros(x.total_c || 0) + " €</td><td>" + (x.estado === "no_pc" ? "✔ No PC" : "⏳ A caminho do PC") + "</td><td>" + esc(x.visto_por) + "</td><td><button class='btn' data-o='" + i + "'>📄</button></td></tr>"; }).join("") + "</tbody></table></div>" : "<p class='mut' style='margin:0'>Ainda não há faturas digitalizadas nesta loja.</p>") + "</div></div>";
+        return "<tr><td>" + dmy(x.dia) + "</td><td>" + esc((FATURAS.FORN[x.fornecedor] || {}).nome || x.fornecedor) + "</td><td>" + esc(x.numero) + "</td><td>" + FORMATOS.euros(x.total_c || 0) + " €</td><td>" + (x.estado === "no_pc" ? "✔ No PC" : "⏳ A caminho do PC") + "</td><td>" + esc(x.visto_por) + "</td><td><button class='btn' data-o='" + i + "'>📄</button></td></tr>"; }).join("") + "</tbody></table></div>" : "<p class='mut' style='margin:0'>Ainda não há faturas digitalizadas nesta estação.</p>") + "</div></div>";
     $$("#digCorpo [data-o]").forEach(function (b) { b.onclick = function () { abrirOriginal(L[+b.dataset.o].original); }; });
   } catch (e) { c.innerHTML = "<div class='bad'>✖ " + esc(falhou(e)) + "</div>"; }
 }

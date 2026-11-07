@@ -15,7 +15,7 @@ var AREAS = [   // ordem aprovada a 05/11/2026: decisão, operação e controlo,
    O cartão da encomenda muda de título ("Encomenda LOGISTA · Penafiel · por validar"), por isso vai pelo id. */
 var NEXP = {
   contar: {tab: "count", hide: ["Encomenda para validar", "#ordCard"]},
-  enc: {tab: "count", only: ["Encomenda para validar", "#ordCard"], vazio: "Não há encomendas por aprovar nesta loja. Faça uma em Compras → Nova encomenda."},
+  enc: {tab: "count", only: ["Encomenda para validar", "#ordCard"], vazio: "Não há encomendas por aprovar nesta estação. Faça uma em Compras → Nova encomenda."},
   ler: {tab: "scan"}, stock: {tab: "stock"}, inv: {tab: "inventory"},
   nova: {tab: "settings", only: ["Encomenda a partir das vendas", "Encomenda manual"]},
   ent: {tab: "settings", only: ["Entrada de mercadoria"]},
@@ -248,7 +248,7 @@ async function carregarFicheiros(fs) {
   var trf = []; for (var k = g.vendas.length - 1; k >= 0; k--) if (await ehTransferencias(g.vendas[k])) trf.push(g.vendas.splice(k, 1)[0]);
   if (g[""].length || g.csv.length) ir("reg");      // a mensagem aparece na barra do Registo
   if (g[""].length) status(false, "⚠ Não reconheço: " + g[""].map(function (f) { return f.name; }).join(", ") + ". Ficheiros aceites: folha de turno (.xls), fotografia do talão, PDF da Repsol, fecho mensal TMS (.csv), relatório de vendas de tabaco (Excel .xlsx), relatório «Turno por formas de cobrança» (PDF feito com «Guardar como PDF»).");
-  if (g.csv.length) status(false, "⚠ " + g.csv.map(function (f) { return f.name; }).join(", ") + ": o relatório de vendas tem de ser em Excel (.xlsx), porque o CSV não diz de que loja é.");
+  if (g.csv.length) status(false, "⚠ " + g.csv.map(function (f) { return f.name; }).join(", ") + ": o relatório de vendas tem de ser em Excel (.xlsx), porque o CSV não diz de que estação é.");
   if (g.tms.length) { ir("tms"); for (var j = 0; j < g.tms.length; j++) await importarTMS(g.tms[j]); }
   if (g.pdf.length) { ir("rep"); carregarPdfs(g.pdf); }
   for (var q = 0; q < g.precos.length; q++) await importarPrecos(g.precos[q]);

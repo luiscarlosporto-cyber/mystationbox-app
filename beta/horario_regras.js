@@ -47,7 +47,7 @@
         run = TRAB[v[i]] ? run + 1 : 0;
         if (run > 5 && i >= off) erro(i - off + 1, p.nome + ": mais de 5 dias seguidos até ao dia " + (i - off + 1));
       }
-      if (!op.mt && p.dias.indexOf("MT") >= 0) erro(p.dias.indexOf("MT") + 1, p.nome + ": MT não existe nesta loja");
+      if (!op.mt && p.dias.indexOf("MT") >= 0) erro(p.dias.indexOf("MT") + 1, p.nome + ": MT não existe nesta estação");
       if (p.escala === false) return;
       var seq = {M: "T", T: "FG", FG: "M"}, prev = p.fdsAnt || "";
       for (var s = 1; s < n; s++) {

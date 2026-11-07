@@ -151,7 +151,7 @@
     var M = MES_V || X.mes, A = addMes(M, -1), ids = idsVer(), TF = PN.totaisFam(X.cur, A, ids) || PN.totaisFam(X.cur, M, ids) || {};
     var lista = ["TODAS", "COMBUSTIVEIS", "RESTO"].concat(Object.keys(TF).filter(function (f) { return f !== "COMBUSTIVEIS"; }).sort(function (x, y) { return TF[y][1] - TF[x][1]; }).slice(0, 6));
     if (lista.indexOf(FAM_V) < 0) lista.push(FAM_V);
-    var lit = FAM_V === "COMBUSTIVEIS", a = PN.serieFam(X.cur, M, ids, FAM_V), b = PN.serieFam(X.cur, A, ids, FAM_V), nome = LOJA_V === "todas" ? "as duas lojas" : nomeLoja(ESTS.find(function (e) { return e.id === LOJA_V; }));
+    var lit = FAM_V === "COMBUSTIVEIS", a = PN.serieFam(X.cur, M, ids, FAM_V), b = PN.serieFam(X.cur, A, ids, FAM_V), nome = LOJA_V === "todas" ? "as duas estações" : nomeLoja(ESTS.find(function (e) { return e.id === LOJA_V; }));
     var fv = function (v) { return v == null ? "—" : lit ? num(Math.round(v), 0) + " L" : eur(v * 100); };
     var d = diasVistos(X, M), d0 = PN.diasMes(A), sa = somaSerie(a), sb2 = somaSerie(b), r = PN.ritmo(sa, d, sb2, d0);
     var h = "<section class='bl pnC8'><h3>Vendas por dia · " + esc(nomeFam(FAM_V)) + " · " + esc(nome) + "</h3><p class='pnSub'>" + (lit ? "Litros vendidos" : "Vendas com IVA") + ", lidas no CBOS pelo OCTAN AI. Passa o rato ou o dedo para ver cada dia.</p>" +
@@ -324,7 +324,7 @@
   }
   function topo(X) {
     var atual = !MES_V || MES_V === X.mes;
-    return "<div class='pnTopo'>" + (ESTS.length > 1 ? "<div class='pnSeg' role='group' aria-label='Escolher loja'>" + [{id: "todas", n: "Todas"}].concat(ESTS.map(function (e) { return {id: e.id, n: nomeLoja(e)}; })).map(function (l) { return "<button data-ver='" + l.id + "' aria-pressed='" + (LOJA_V === l.id) + "' class='" + (LOJA_V === l.id ? "on" : "") + "'>" + esc(l.n) + "</button>"; }).join("") + "</div>" : "") +
+    return "<div class='pnTopo'>" + (ESTS.length > 1 ? "<div class='pnSeg' role='group' aria-label='Escolher estação'>" + [{id: "todas", n: "Todas"}].concat(ESTS.map(function (e) { return {id: e.id, n: nomeLoja(e)}; })).map(function (l) { return "<button data-ver='" + l.id + "' aria-pressed='" + (LOJA_V === l.id) + "' class='" + (LOJA_V === l.id ? "on" : "") + "'>" + esc(l.n) + "</button>"; }).join("") + "</div>" : "") +
       "<div class='pnMes'><button id='pnAnt' aria-label='Mês anterior'>‹</button><b>" + esc(tituloMes(X)) + "</b><button id='pnSeg' aria-label='Mês seguinte'" + (atual ? " disabled" : "") + ">›</button></div>" +
       "<button class='mini' id='pnPers'>Personalizar</button></div><div id='pnEdit' hidden></div>";
   }

@@ -104,7 +104,7 @@ async function pintarTaxasSaphety(C) {
       var bytes = new Uint8Array(await f.data.arrayBuffer()), t;
       try { t = MOTOR.lerTaxasRepsol(await linhasPdf(bytes)); }
       catch (x) { var u = await sb.from("msb_saphety_docs").update({estado: "outro"}).eq("estacao", est).eq("numero", d.numero); if (u.error) throw u.error; continue; }
-      L.push({d: d, t: t, erros: t.verificacoes.filter(function (v) { return v.nivel === "erro"; }).map(function (v) { return v.texto; }).concat(e && e.posto_repsol && t.posto !== e.posto_repsol ? ["o posto da fatura (" + t.posto + ") não é o desta loja"] : [])});
+      L.push({d: d, t: t, erros: t.verificacoes.filter(function (v) { return v.nivel === "erro"; }).map(function (v) { return v.texto; }).concat(e && e.posto_repsol && t.posto !== e.posto_repsol ? ["o posto da fatura (" + t.posto + ") não é o desta estação"] : [])});
     }
     if (est !== EST || !$("#txSaphety")) return;
     var fixo = function (n) { var c = C.find(function (x) { return x.nome === n; }); return c ? c.valor_c : 0; };
@@ -281,8 +281,8 @@ async function importarVendasCBOS(f) {
     var L = await linhasPdf(bytes.slice()), r = MOTOR.lerVendasCBOS(L);
     var est = ESTS.find(function (x) { return x.posto_repsol && x.posto_repsol.toUpperCase() === r.posto; }) ||
               ESTS.find(function (x) { return !x.posto_repsol && semAcentosCBOS(r.nome_posto).indexOf(semAcentosCBOS(x.short_name || x.name)) >= 0; });
-    if (!est) throw new Error("O relatório é do posto " + r.posto + " - " + r.nome_posto + ", que não é nenhuma das suas lojas.");
-    if (est.id !== EST) throw new Error("Este relatório é de " + (est.name || est.short_name) + " (posto " + r.posto + "), mas está a trabalhar em " + $("#hEst").textContent + ". Mude de loja no topo e carregue de novo.");
+    if (!est) throw new Error("O relatório é do posto " + r.posto + " - " + r.nome_posto + ", que não é nenhuma das suas estações.");
+    if (est.id !== EST) throw new Error("Este relatório é de " + (est.name || est.short_name) + " (posto " + r.posto + "), mas está a trabalhar em " + $("#hEst").textContent + ". Mude de estação no topo e carregue de novo.");
     var erros = r.verificacoes.filter(function (v) { return v.nivel === "erro"; });
     if (erros.length) throw new Error("O relatório tem contas que não batem certo; não foi gravado. " + erros.map(function (v) { return v.msg; }).join(" "));
     var h = await sha(bytes), caminho = EST + "/vendas/cbos_" + r.mes + "_" + h + ".pdf";

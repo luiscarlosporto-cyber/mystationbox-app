@@ -162,7 +162,7 @@ async function dspAcao(a, id, b) {
 function dspFontes() {
   return "<div class='sc'><table><thead><tr><th class='l'>Despesa</th><th class='l'>Remetente</th><th class='l'>Assunto contém</th><th class='l'>Ativa</th></tr></thead><tbody>" + DSP.fontes.map(function (f) {
     return "<tr><td class='l'>" + esc(f.fornecedor) + " <span class='mut'>· " + esc(f.categoria) + "</span>" + (f.nota ? "<div class='mut' style='font-size:12px'>" + esc(f.nota) + "</div>" : "") + "</td><td class='l'>" + esc(f.remetente) + "</td><td class='l'>" + esc(f.assunto) + "</td><td class='l'><input type='checkbox' class='dfAtiva' data-id='" + f.id + "' aria-label='Ativa'" + (f.ativo ? " checked" : "") + "></td></tr>"; }).join("") + "</tbody></table></div>" +
-    "<p class='mut' style='margin:0;font-size:13px'>Fornecedor novo: entra por preencher, com o documento ao lado. A loja é a da conta de email que o recebe.</p>" +
+    "<p class='mut' style='margin:0;font-size:13px'>Fornecedor novo: entra por preencher, com o documento ao lado. A estação é a da conta de email que o recebe.</p>" +
     "<div style='display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))'><label>Remetente<input id='ffRem' type='email' style='width:100%' placeholder='faturas@fornecedor.pt'></label><label>Assunto contém<input id='ffAss' style='width:100%'></label><label>Fornecedor<input id='ffFor' style='width:100%'></label><label>Categoria<select id='ffCat' style='width:100%'><option value=''>Escolher…</option>" + dspOpcoes("") + "</select></label></div><div class='bar'><button class='btn' id='ffNova'>+ Acrescentar fonte</button></div>";
 }
 document.addEventListener("click", async function (ev) {

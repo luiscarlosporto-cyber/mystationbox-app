@@ -1,5 +1,5 @@
 /* mystationbox beta · Etapa 5: páginas novas (só leem) e ajudas às páginas longas.
- * Comparar lojas lê a Folha de fecho do CBOS; Documentos reúne os originais já guardados, por mês. */
+ * Comparar estações lê a Folha de fecho do CBOS; Documentos reúne os originais já guardados, por mês. */
 "use strict";
 (function () {
   function eur(c) { return fmt(c) + " €"; }
@@ -14,7 +14,7 @@
     }};
   }
 
-  /* ---- Comparar lojas ---- */
+  /* ---- Comparar estações ---- */
   var CMP_M = null;
   async function comparar(M) {
     var box = $("#v-cmp");
@@ -135,7 +135,7 @@
   MSB_NAV.paginas = function () {
     var D = AREAS.find(function (a) { return a.id === "des"; }), C = AREAS.find(function (a) { return a.id === "con"; });
     var i = D.p.findIndex(function (p) { return p[0] === "fun"; });
-    D.p.splice(i, 0, ["cmp", "Comparar lojas", {g: "Análise"}]); C.p.push(["doc", "Documentos", {g: "Contabilidade"}]);
+    D.p.splice(i, 0, ["cmp", "Comparar estações", {g: "Análise"}]); C.p.push(["doc", "Documentos", {g: "Contabilidade"}]);
     AREAS[0].p.splice(1, 0, ["hor", "Horário"]);
     VISTA_DA.cmp = "cmp"; VISTA_DA.doc = "doc"; VISTA_DA.hor = "hor";
     var w = $("main .wrap");

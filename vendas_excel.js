@@ -40,8 +40,8 @@ async function guardarVendasExcel(f) {
   var r = await lerVendasExcel(f);
   if (!r.posto) throw new Error("O ficheiro não diz de que posto é (falta a linha «Posto»). Exporte de novo do software Repsol.");
   var est = ESTS.find(function (x) { return (x.posto_repsol || "").toUpperCase() === r.posto; });
-  if (!est) throw new Error("O relatório é do posto " + r.posto + ", que não é nenhuma das suas lojas.");
-  if (est.id !== EST) throw new Error("Este relatório é de " + (est.name || est.short_name) + " (posto " + r.posto + "), mas está a trabalhar em " + $("#hEst").textContent + ". Mude de loja no topo e carregue de novo.");
+  if (!est) throw new Error("O relatório é do posto " + r.posto + ", que não é nenhuma das suas estações.");
+  if (est.id !== EST) throw new Error("Este relatório é de " + (est.name || est.short_name) + " (posto " + r.posto + "), mas está a trabalhar em " + $("#hEst").textContent + ". Mude de estação no topo e carregue de novo.");
   var g = await sb.from("msb_vendas_artigos").upsert({estacao: EST, de: r.de, ate: r.ate, dias: r.dias, posto: r.posto, linhas: r.linhas, fonte: f.name + (r.no ? " · nó " + r.no : ""), criado: new Date().toISOString()}, {onConflict: "estacao,de,ate"});
   if (g.error) throw g.error;
   return r;
@@ -64,7 +64,7 @@ async function carregarVendasArtigos() {
     box.innerHTML = "<div class='card'><div class='cb'><p class='mut' style='margin:0 0 8px'>Relatório de vendas por artigo exportado do software Repsol, em Excel. Para o mês, exporte de dia 1 ao último dia e com <b>todas as famílias</b> (não só TABACO). Fica guardado e é usado na app (ENSE: garrafas de gás; e o que mais precisar).</p>" +
       (L.length ? "<div class='sc'><table><thead><tr><th class='l'>Período</th><th>Dias</th><th>Artigos</th><th>Montante</th><th class='l'>Ficheiro</th><th class='l'>Carregado</th></tr></thead><tbody>" +
         L.map(function (x) { var t = x.linhas.reduce(function (s, l) { return s + (l[3] || 0); }, 0); return "<tr><td class='l'>" + dmy(x.de) + " a " + dmy(x.ate) + "</td><td class='n'>" + x.dias + "</td><td class='n'>" + x.linhas.length + "</td><td class='n'>" + fmt(Math.round(t * 100)) + " €</td><td class='l'>" + esc(x.fonte) + "</td><td class='l'>" + dmy(x.criado) + "</td></tr>"; }).join("") + "</tbody></table></div>"
-        : "<p class='mut' style='margin:0'>Ainda não há relatórios guardados nesta loja.</p>") + "</div></div>";
+        : "<p class='mut' style='margin:0'>Ainda não há relatórios guardados nesta estação.</p>") + "</div></div>";
   } catch (e) { box.innerHTML = "<div class='card msgErr' style='padding:12px'>✖ " + esc(falhou(e)) + "</div>"; }
 }
 /* a mensagem fica num sítio próprio (#vaMsg), para a lista não a apagar quando se atualiza */

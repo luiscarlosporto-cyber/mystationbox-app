@@ -20,10 +20,10 @@ async function lerPdfPrecos(f) {
   var bytes = new Uint8Array(await f.arrayBuffer()), pags = await MOTOR.pdfPaginas(bytes, inflar);
   var L = []; pags.forEach(function (p) { p.forEach(function (l) { L.push(l); }); });
   var r = MOTOR.lerPrecosRepsol(L), est = ESTS.find(function (x) { return x.id === EST; }) || {};
-  if (!est.posto_repsol) throw new Error("A loja aberta não tem o posto Repsol configurado: não posso confirmar que o PDF é dela.");
+  if (!est.posto_repsol) throw new Error("A estação aberta não tem o posto Repsol configurado: não posso confirmar que o PDF é dela.");
   if (r.posto && r.posto !== est.posto_repsol) {
     var outra = ESTS.find(function (x) { return x.posto_repsol === r.posto; });
-    throw new Error("Este PDF é do posto " + r.posto + (outra ? " (" + outra.name + ")" : "") + ". Mude a loja no cabeçalho e carregue de novo.");
+    throw new Error("Este PDF é do posto " + r.posto + (outra ? " (" + outra.name + ")" : "") + ". Mude a estação no cabeçalho e carregue de novo.");
   }
   return {r: r, bytes: bytes};
 }
