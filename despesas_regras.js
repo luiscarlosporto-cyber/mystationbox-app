@@ -38,11 +38,15 @@ var DESPESAS = (function () {
   /* Guia da Segurança Social lida por reconhecimento de texto (vem desenhada, sem texto). Os dois valores da guia («Valor a pagar» e o do quadro MB)
      têm de ser iguais; senão não se lê nada (falhar com clareza). */
   function lerGuiaSS(texto) {
-    var t = String(texto || "").replace(/[ \t]+/g, " ");
-    var vs = []; t.replace(/Valor(?: a pagar)?\s*:?\s*(\d{1,3}(?:[.\s]\d{3})*,\d{2})/gi, function (_, v) { vs.push(valorC(v.replace(/\s/g, "."))); });
+    var t = String(texto || "").replace(/[ \t]+/g, " "), vs = [], ent = null, ref = null;
+    var V = "(\\d{1,3}(?:[.\\s]\\d{3})*,\\d{2})", junta = function (v) { vs.push(valorC(v.replace(/\s/g, "."))); };
+    t.replace(new RegExp("(?:Valor a pagar|Valor:|Total a pagar)\\s*:?\\s*" + V, "gi"), function (_, v) { junta(v); });
+    var mb = new RegExp("\\b(\\d{5})\\s+(\\d{9})\\s+" + V).exec(t);   // quadro MB numa linha: entidade, referência, valor
+    if (mb) { ent = mb[1]; ref = mb[2]; junta(mb[3]); }
     if (!vs.length || vs.some(function (v) { return v !== vs[0]; })) return null;
-    var ent = /Entidade\s*:?\s*(\d{5})\b/i.exec(t), ref = /Refer[eê]ncia\s*:?\s*(\d{9})\b/i.exec(t), val = /validade\s*(\d{4}-\d{2}-\d{2})/i.exec(t) || /(\d{4}-\d{2}-\d{2})\s*$/m.exec(t.split(/Nome/)[0] || "");
-    return {valor_c: vs[0], entidade: ent ? ent[1] : null, referencia: ref ? ref[1] : null, validade: val ? val[1] : null, lidos: vs.length};
+    var e = /Entidade\s*:?\s*(\d{5})\b/i.exec(t), r = /Refer\S*ncia\s*:?\s*(\d{9})\b/i.exec(t), per = /\b(\d{4})(\d{2})\s*-\s*Contribui/i.exec(t);
+    var val = /V[aá]lido at[eé]\s*:?\s*(\d{4}-\d{2}-\d{2})/i.exec(t) || /validade[^\n]*\n[^\n]*?(\d{4}-\d{2}-\d{2})\s*$/im.exec(t);
+    return {valor_c: vs[0], entidade: ent || (e && e[1]), referencia: ref || (r && r[1]), validade: val ? val[1] : null, periodo: per ? per[1] + "-" + per[2] : null, lidos: vs.length};
   }
 
   /* Famílias da Conta do mês. Custo fixo «Taxa de exploração · …» é da Repsol. */
