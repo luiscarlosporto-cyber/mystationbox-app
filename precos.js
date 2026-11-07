@@ -101,9 +101,14 @@ function octanBotao(x) {
   if (x.ense_erro) return "<button class='btn p' data-apr='" + x.dia + "'>↻ Verifiquei: tentar outra vez</button>";
   return x.aprovado_em ? "" : "<button class='btn p' data-apr='" + x.dia + "'>🤖 Aprovar: OCTAN AI grava na ENSE</button>";
 }
+/* A regra de aprovar preços para a ENSE, num só sítio (usada aqui e nos Avisos): quem e quando, apaga a tentativa
+   anterior para o OCTAN AI voltar a tentar, e só se os preços ainda estiverem «lido». */
+function aprovarPrecosENSE(est, dia) {
+  return sb.from("msb_precos").update({aprovado_em: new Date().toISOString(), aprovado_por: (PERFIL && PERFIL.display_name) || "", ense_tentado_em: null, ense_erro: null}).eq("estacao", est).eq("dia", dia).eq("estado", "lido");
+}
 async function aprovarOctan(dia) {
   if (!await msbConfirma("Aprovas estes preços? O OCTAN AI vai gravá-los na ENSE com a data em vigor de " + dmy(dia) + ".", "Aprovar")) return;
-  var r = await sb.from("msb_precos").update({aprovado_em: new Date().toISOString(), aprovado_por: (PERFIL && PERFIL.display_name) || "", ense_tentado_em: null, ense_erro: null}).eq("estacao", EST).eq("dia", dia).eq("estado", "lido");
+  var r = await aprovarPrecosENSE(EST, dia);
   if (r.error) { status(false, falhou(r.error)); return; }
   status(true, "Aprovado ✓"); carregarPrecos();
 }

@@ -54,7 +54,7 @@ function aviHistorico() {
 }
 async function aviAprovar(est, dia) {
   if (!await msbConfirma("Aprovas estes preços de " + aviLoja(est) + "? O OCTAN AI vai gravá-los na ENSE.", "Aprovar")) return;
-  var r = await sb.from("msb_precos").update({aprovado_em: new Date().toISOString(), aprovado_por: (PERFIL && PERFIL.display_name) || "", ense_tentado_em: null, ense_erro: null}).eq("estacao", est).eq("dia", dia).eq("estado", "lido");
+  var r = await aprovarPrecosENSE(est, dia);
   if (r.error) return status(false, "⚠ " + falhou(r.error));
   carregarAvisos(); aviSelo();
 }
