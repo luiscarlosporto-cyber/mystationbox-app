@@ -309,6 +309,7 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
 </section>
 
 <script src="config.js"></script>
+<script src="formatos.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="motor.js"></script>
 <script>
@@ -322,7 +323,7 @@ function num1(v){var s=String(v==null?"":v).replace(/[\s ]/g,"").replace(/[^0-9
 /* aceita contas como "2647,24-54,14" (MB = compras − devoluções) */
 function num(v){var z=String(v==null?"":v).replace(/[\s ]/g,"");if(/^-?[0-9.,]+([-+][0-9.,]+)+$/.test(z)){var r=0;z.match(/[-+]?[0-9.,]+/g).forEach(function(q){r+=num1(q)});return Math.round(r*100)/100}return num1(v)}
 function cent(v){return String(v).trim()===""?null:Math.round(num(v)*100)}
-function fmt(c){return c==null?"":(c/100).toLocaleString("pt-PT",{minimumFractionDigits:2,maximumFractionDigits:2})}
+function fmt(c){return FORMATOS.euros(c)}
 function eur(c){return c==null?"—":fmt(c)+" €"}
 function sinal(d){return d==null?"—":(d>0?"+":d<0?"−":"")+fmt(Math.abs(d))}
 /* cor da diferença (regra do utilizador, 02/11/2026): verde quando sobra ou bate certo (≥ −0,50 €), laranja quando falta dinheiro */
@@ -499,10 +500,10 @@ entrar().catch(function(e){$("#vLogin").hidden=false;$("#lErro").textContent=fal
 <script src="faturas.js"></script>
 <script src="despesas_regras.js"></script>
 <script src="despesas.js"></script>
-<script src="beta/beta.js?v=0fbaeab8"></script>
+<script src="beta/beta.js?v=ac6b20fd"></script>
 <script src="beta/painel_regras.js?v=ee528bf0"></script>
-<script src="beta/painel.js?v=7b367839"></script>
-<script src="beta/paginas.js?v=cf170f45"></script>
+<script src="beta/painel.js?v=52d3871d"></script>
+<script src="beta/paginas.js?v=1cba4b38"></script>
 <script src="beta/horario_regras.js?v=bb093f77"></script>
 <script src="beta/horario_gerar.js?v=c4e08e4e"></script>
 <script src="beta/horario.js?v=188b3617"></script>

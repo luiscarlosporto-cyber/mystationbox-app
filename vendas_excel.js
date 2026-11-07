@@ -114,7 +114,7 @@ async function maqAuto() {
 
 /* Relatório só da máquina (06/11/2026, pedido do utilizador): o módulo de stock faz as contas; aqui mostra-se só a máquina,
    numa tabela compacta, e o PDF cabe numa folha A4. Vale também para um ficheiro escolhido à mão. */
-function maqNum(v, c) { return (Math.round(v * 100) / 100).toLocaleString("pt-PT", {minimumFractionDigits: c, maximumFractionDigits: c, useGrouping: "always"}); }
+function maqNum(v, c) { return FORMATOS.numero(Math.round(v * 100) / 100, c); }
 function maqDados(w) {
   var R = null; try { R = w.eval("typeof maqRep !== 'undefined' ? maqRep : null"); } catch (e) { /* ainda não leu */ }
   if (!R) return null;

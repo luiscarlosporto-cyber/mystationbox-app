@@ -22,7 +22,7 @@ async function cfgENSE() {
   var c = (r.data && r.data.ense) || {produtos: ["butano13", "propano11", "gas95", "gas95ad", "gas98ad", "gasoleo", "gasoleoad", "butano6", "butano12", "butano12_5"], gpl_kg_litros: 1.8};
   return (ENSE_CFG[EST] = c);
 }
-function q100(v) { return v == null ? "" : (v / 100).toLocaleString("pt-PT", {minimumFractionDigits: v % 100 ? 2 : 0, maximumFractionDigits: 2}); }
+function q100(v) { return v == null ? "" : FORMATOS.numero(v / 100, v % 100 ? 2 : 0, 2); }
 function unid(p) { return ENSE_PROD[p].u === "L" ? "litros" : "unidades"; }
 function mesHoje() { var d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); }
 function falhouComb(e) { var m = falhou(e); return /msb_comb|msb_ense|does not exist|schema cache/.test(m) ? "As tabelas dos combustíveis ainda não estão ativas no servidor." : m; }
@@ -62,7 +62,7 @@ async function carregarEntradasComb() {
     box.innerHTML = h;
     if (ADMIN) {
       $$("#combCorpo .ceQ").forEach(function (el) { el.oninput = function () { var p = el.dataset.p, x = $("#combCorpo .ceConv[data-p='" + p + "']"), v = num(el.value);
-        if (x) x.textContent = v > 0 ? "= " + (Math.round(v * c.gpl_kg_litros * 100) / 100).toLocaleString("pt-PT") + " litros" : ""; }; });
+        if (x) x.textContent = v > 0 ? "= " + FORMATOS.numero(Math.round(v * c.gpl_kg_litros * 100) / 100, 0, 2) + " litros" : ""; }; });
       $("#ceHist").onclick = function () { $("#fCeHist").click(); };
       $("#fCeHist").onchange = function () { var f = this.files[0]; this.value = ""; if (f) importarHistCarburante(f, c, L); };
       $("#ceGravar").onclick = async function () {

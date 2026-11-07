@@ -134,7 +134,7 @@ async function carregarFaturasDig(msg) {
     var L = q.data || [];
     c.innerHTML = (msg ? "<div class='msgOk' style='padding:8px 10px;border-radius:8px'>" + esc(msg) + "</div>" : "") + "<div class='card'><div class='cb' style='display:grid;gap:8px'><h3 style='margin:0'>Faturas enviadas</h3>" +
       (L.length ? "<div style='overflow-x:auto'><table><thead><tr><th>Data</th><th>Fornecedor</th><th>Número</th><th>Total</th><th>Estado</th><th>Visto</th><th></th></tr></thead><tbody>" + L.map(function (x, i) {
-        return "<tr><td>" + dmy(x.dia) + "</td><td>" + esc((FATURAS.FORN[x.fornecedor] || {}).nome || x.fornecedor) + "</td><td>" + esc(x.numero) + "</td><td>" + dinheiro(x.total_c) + " €</td><td>" + (x.estado === "no_pc" ? "✔ No PC" : "⏳ A caminho do PC") + "</td><td>" + esc(x.visto_por) + "</td><td><button class='btn' data-o='" + i + "'>📄</button></td></tr>"; }).join("") + "</tbody></table></div>" : "<p class='mut' style='margin:0'>Ainda não há faturas digitalizadas nesta loja.</p>") + "</div></div>";
+        return "<tr><td>" + dmy(x.dia) + "</td><td>" + esc((FATURAS.FORN[x.fornecedor] || {}).nome || x.fornecedor) + "</td><td>" + esc(x.numero) + "</td><td>" + FORMATOS.euros(x.total_c || 0) + " €</td><td>" + (x.estado === "no_pc" ? "✔ No PC" : "⏳ A caminho do PC") + "</td><td>" + esc(x.visto_por) + "</td><td><button class='btn' data-o='" + i + "'>📄</button></td></tr>"; }).join("") + "</tbody></table></div>" : "<p class='mut' style='margin:0'>Ainda não há faturas digitalizadas nesta loja.</p>") + "</div></div>";
     $$("#digCorpo [data-o]").forEach(function (b) { b.onclick = function () { abrirOriginal(L[+b.dataset.o].original); }; });
   } catch (e) { c.innerHTML = "<div class='bad'>✖ " + esc(falhou(e)) + "</div>"; }
 }

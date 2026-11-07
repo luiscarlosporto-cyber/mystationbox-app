@@ -16,7 +16,7 @@
     ["ont", "Ontem · vendas", 0, function (D) { var v = D.mes.concat(D.ant).filter(function (r) { return r.dia === hojeISO(-1); }); return v.length ? v.reduce(function (s, r) { return s + r.vendas_c; }, 0) : null; }, "eur"]
   ];
   var RITMO = {vend: 1, lit: 1, comb: 1, loja: 1};   // somam dia a dia: dá para comparar o valor por dia com o mês anterior
-  function num(n, c) { return n.toLocaleString("pt-PT", {minimumFractionDigits: c, maximumFractionDigits: c, useGrouping: "always"}); }
+  function num(n, c) { return FORMATOS.numero(n, c); }
   function eur(c) { return num(c / 100, 2) + " €"; }
   function eur0(c) { return num(Math.round(c / 100), 0) + " €"; }
   function formato(n, t) { return t === "eur" ? eur(n) : t === "lit" ? num(Math.round(n), 0) + " L" : sinal(Math.round(n)) + " €"; }

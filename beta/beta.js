@@ -28,7 +28,6 @@
   var SELO = 0;
   function seloH(x) { return x.id === "ini" && SELO ? "<i class='selo'>" + SELO + "</i>" : ""; }
   /* números sempre agrupados, também com 4 algarismos: 4 174,50 € */
-  window.fmt = function (c) { return c == null ? "" : (c / 100).toLocaleString("pt-PT", {minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always"}); };
   /* o Registo do dia só se lê quando se abre: no arranque abre-se o Painel */
   var irDiaReal = window.irDia, DIA_ADIADO = false;
   window.irDia = function (d) { if (window.PAGINA === "reg") { DIA_ADIADO = false; return irDiaReal(d); } DIA = d; DIA_ADIADO = true; return Promise.resolve(); };

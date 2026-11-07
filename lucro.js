@@ -165,8 +165,8 @@ function descontoTMS(t) {
   return out;   // centilitros por produto
 }
 function diasEntre(a, b) { return Math.round((new Date(b) - new Date(a)) / 864e5) + 1; }
-function eurL(v) { return v == null ? "—" : v.toLocaleString("pt-PT", {minimumFractionDigits: 3, maximumFractionDigits: 4}); }
-function litros2(cl) { return (cl / 100).toLocaleString("pt-PT", {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
+function eurL(v) { return v == null ? "—" : FORMATOS.numero(v, 3, 4); }
+function litros2(cl) { return FORMATOS.numero(cl / 100, 2); }
 
 async function carregarLucro() {
   var box = $("#lucCorpo"); box.innerHTML = "<div class='mut'>A carregar…</div>";
