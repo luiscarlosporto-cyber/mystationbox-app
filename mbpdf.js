@@ -29,7 +29,7 @@ async function fazerPdfMB(M, C, ent, inst) {
       txt("Multibanco registado na caixa × creditado pela Repsol", 14, 18.5, {t: 9, c: P.rgb(1, 0.78, 0.6)});
       txt(ent, W - 14, 11, {dir: 1, t: 9, c: P.rgb(1, 1, 1)}); txt(inst, W - 14, 18.5, {dir: 1, t: 9, c: P.rgb(1, 1, 1)});
       y = 34;
-      var T = C.T, cx = [["Registado na caixa", T.r], ["Creditado", T.c], ["Por creditar", T.nc]], bw = (W - 28 - 8) / 3;
+      var T = C.T, cx = [["Registado na caixa", T.r], [T.cs ? "Creditado (" + fmt(T.cs) + " € no mês seguinte)" : "Creditado, todo no próprio mês", T.c], ["Por creditar", T.nc]], bw = (W - 28 - 8) / 3;
       cx.forEach(function (k, i) { var x = 14 + i * (bw + 4); ret(x, y - 4, bw, 15, i === 2 && T.nc ? larF : i === 1 ? verdeF : claro);
         txt(k[0], x + 3, y + 0.5, {t: 7.5, c: cinz}); txt(fmt(k[1]) + " €", x + 3, y + 7.5, {b: 1, t: 12, c: i === 2 && T.nc ? lar2 : i === 1 ? verde : esc0}); });
       y += 17;
@@ -46,7 +46,7 @@ async function fazerPdfMB(M, C, ent, inst) {
     ret(14, y - 4, W - 28, 6, ok ? verdeF : larF); ret(14, y - 4, 0.9, 6, ok ? verde : lar);
     txt(dmy(r.dia).slice(0, 5), X.dia + 2, y); txt((r.turno === "t1" ? "T1" : "T2") + (r.func ? " " + r.func : ""), X.tur, y);
     txt(fmt(r.reg), X.reg, y, {dir: 1}); txt(r.cred == null ? "-" : fmt(r.cred), X.cred, y, {dir: 1});
-    txt(r.doc ? (r.transf ? "Transf. " + r.doc : "Liq. " + r.doc + " · fecho " + r.fecho) + " · " + dmy(r.dcred).slice(0, 5) : "-", X.doc, y, {t: 7.5});
+    txt(r.doc ? (r.transf ? "Transf. " + r.doc + " · " + dmy(r.dcred).slice(0, 5) : "Liq. " + r.doc + " de " + dmy(r.demis).slice(0, 5) + " · fecho " + r.fecho) + (r.demis && r.demis.slice(0, 7) > r.dia.slice(0, 7) ? " (mês seg.)" : "") : "-", X.doc, y, {t: 7.5});
     txt(r.cred == null ? "-" : sinalPdf(r.cred - r.reg), X.dif, y, {dir: 1});
     txt(r.est, X.est, y, {b: 1, t: 7.5, c: ok ? verde : lar2});
     y += 6;

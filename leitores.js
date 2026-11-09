@@ -360,22 +360,25 @@ function desenharRepsol(M, docs, ligados, turnos, checks, ligMB, ligSol) {
 var MBCONF = null;   // última conferência desenhada (para o PDF da contabilidade, mbpdf.js)
 function conferenciaMB(nm, tm, ligTurno, primeira, ultima) {
   if (!tm.length) { MBCONF = null; return ""; }
-  var R = [], T = {r: 0, c: 0, n: 0, nc: 0, d: 0}, linhas = tm.slice().sort(function (a, b) { return a.dia < b.dia ? -1 : a.dia > b.dia ? 1 : a.turno < b.turno ? -1 : 1; }).map(function (t) {
+  var R = [], T = {r: 0, c: 0, n: 0, nc: 0, d: 0, cm: 0, cs: 0}, linhas = tm.slice().sort(function (a, b) { return a.dia < b.dia ? -1 : a.dia > b.dia ? 1 : a.turno < b.turno ? -1 : 1; }).map(function (t) {
     var l = ligTurno[t.dia + t.turno], ok = l && l.est === "ok", cred = l && l.c ? l.c.valor_c : null, est;
+    /* data do documento que creditou (liquidação: emissão; transferência: dia): diz se o MB entrou no próprio mês ou depois (dono, 09/11/2026) */
+    var em = l && l.c ? l.c.emissao || l.c.data : null, depois = em && em.slice(0, 7) > t.dia.slice(0, 7);
+    if (cred != null) { if (depois) T.cs += cred; else T.cm += cred; }
     if (ok) est = "✔ creditado";
     else if (l && l.est === "dif") est = "⚠ creditado com diferença";
     else if (t.dia < primeira) est = "sem documento para verificar";
     else if (t.dia <= addDia(ultima, -1)) est = "✖ em falta nos documentos";
     else est = "⏳ ainda não liquidado";
-    R.push({dia: t.dia, turno: t.turno, func: t.func || "", reg: t.mb_c, cred: cred, transf: !!(l && l.c && l.c.transf), doc: l && l.c ? l.c.doc : "", fecho: l && l.c ? l.c.fecho : "", dcred: l && l.c ? l.c.data : "",
+    R.push({dia: t.dia, turno: t.turno, func: t.func || "", reg: t.mb_c, cred: cred, transf: !!(l && l.c && l.c.transf), demis: em || "", doc: l && l.c ? l.c.doc : "", fecho: l && l.c ? l.c.fecho : "", dcred: l && l.c ? l.c.data : "",
       est: ok ? "creditado" : l && l.est === "dif" ? "creditado com diferença" : t.dia < primeira ? "sem documento para verificar" : t.dia <= addDia(ultima, -1) ? "em falta nos documentos" : "ainda não liquidado"});
     T.r += t.mb_c; if (cred != null) { T.c += cred; T.d += cred - t.mb_c; } if (ok) T.n++; else T.nc += t.mb_c;
-    return "<tr class='" + (ok ? "lin-ok" : "lin-wn") + "' data-ir='" + t.dia + "' data-ok='" + (ok ? 1 : 0) + "'><td>" + dmy(t.dia).slice(0, 5) + "</td><td class='l'>" + (t.turno === "t1" ? "☀️ T1" : "🌙 T2") + " " + esc(t.func || "") + "</td><td class='n'>" + fmt(t.mb_c) + "</td><td class='n'>" + (cred == null ? "—" : fmt(cred)) + "</td><td class='l'>" + (l && l.c ? (l.c.transf ? "🏦 Transf. " + esc(l.c.doc) + " <small class='mut'>" + dmy(l.c.data).slice(0, 5) + "</small>" : "Liq. " + esc(l.c.doc) + " <small class='mut'>fecho #" + esc(l.c.fecho) + " · " + dmy(l.c.data).slice(0, 5) + "</small>") : "—") + "</td><td class='n'>" + (cred == null ? "—" : sinal(cred - t.mb_c)) + "</td><td class='l'><b>" + est + "</b></td></tr>";
+    return "<tr class='" + (ok ? "lin-ok" : "lin-wn") + "' data-ir='" + t.dia + "' data-ok='" + (ok ? 1 : 0) + "'><td>" + dmy(t.dia).slice(0, 5) + "</td><td class='l'>" + (t.turno === "t1" ? "☀️ T1" : "🌙 T2") + " " + esc(t.func || "") + "</td><td class='n'>" + fmt(t.mb_c) + "</td><td class='n'>" + (cred == null ? "—" : fmt(cred)) + "</td><td class='l'>" + (l && l.c ? (l.c.transf ? "🏦 Transf. " + esc(l.c.doc) + " <small class='mut'>" + dmy(l.c.data).slice(0, 5) + "</small>" : "Liq. " + esc(l.c.doc) + " <small class='mut'>fecho #" + esc(l.c.fecho) + " · " + dmy(l.c.data).slice(0, 5) + "</small>") : "—") + "</td><td>" + (em ? (depois ? "<b style='color:var(--wn,#B45309)'>" + dmy(em) + "</b><br><small>⏭️ mês seguinte</small>" : dmy(em)) : "—") + "</td><td class='n'>" + (cred == null ? "—" : sinal(cred - t.mb_c)) + "</td><td class='l'><b>" + est + "</b></td></tr>";
   });
   MBCONF = {nm: nm, linhas: R, T: T};
-  return "<div class='liq'><h3>💳 MB registado × creditado · " + esc(nm) + (ADMIN ? " <button class='btn' id='bMbPdf' style='font-size:13px;padding:4px 10px'>📄 PDF para a contabilidade</button>" : "") + "<span class='mut' style='font-weight:400;font-size:13px'>" + T.n + " de " + tm.length + " turnos creditados · por creditar " + fmt(T.nc) + " €</span></h3>" +
+  return "<div class='liq'><h3>💳 MB registado × creditado · " + esc(nm) + (ADMIN ? " <button class='btn' id='bMbPdf' style='font-size:13px;padding:4px 10px'>📄 PDF para a contabilidade</button>" : "") + "<span class='mut' style='font-weight:400;font-size:13px'>" + T.n + " de " + tm.length + " turnos creditados · no mês " + fmt(T.cm) + " € · no mês seguinte " + fmt(T.cs) + " € · por creditar " + fmt(T.nc) + " €</span></h3>" +
     "<label class='mut' style='font-size:13px;display:flex;gap:6px;align-items:center;margin:0 0 6px'><input type='checkbox' id='mbSoNao'> Mostrar só os não creditados</label>" +
-    "<div class='sc'><table id='mbConf'><thead><tr><th>Dia</th><th class='l'>Turno</th><th>MB registado</th><th>MB creditado</th><th class='l'>Documento</th><th>Diferença</th><th class='l'>Estado</th></tr></thead><tbody>" + linhas.join("") +
-    "</tbody><tfoot><tr><th colspan='2' class='l'>Total</th><th class='n'>" + fmt(T.r) + "</th><th class='n'>" + fmt(T.c) + "</th><th></th><th class='n'>" + sinal(T.d) + "</th><th class='l'>por creditar " + fmt(T.nc) + " €</th></tr></tfoot></table></div></div>";
+    "<div class='sc'><table id='mbConf'><thead><tr><th>Dia</th><th class='l'>Turno</th><th>MB registado</th><th>MB creditado</th><th class='l'>Documento</th><th>Liquidação de</th><th>Diferença</th><th class='l'>Estado</th></tr></thead><tbody>" + linhas.join("") +
+    "</tbody><tfoot><tr><th colspan='2' class='l'>Total</th><th class='n'>" + fmt(T.r) + "</th><th class='n'>" + fmt(T.c) + "</th><th></th><th class='l' style='font-weight:400;font-size:12.5px'>no mês " + fmt(T.cm) + " €<br>mês seguinte " + fmt(T.cs) + " €</th><th class='n'>" + sinal(T.d) + "</th><th class='l'>por creditar " + fmt(T.nc) + " €</th></tr></tfoot></table></div></div>";
 }
 function chipDoc(x) { var d = x.dados; return "<span class='chip'>" + (NOMES_DOC[x.tipo] || x.tipo) + " <b>" + esc(x.numero) + "</b> · " + dmy(x.emissao).slice(0, 5) + (d.total != null ? " · " + MOTOR.pt(d.total) + " €" : "") + (x.pdf ? " <a href='#' data-pdf='" + esc(x.pdf) + "'>PDF</a>" : "") + "</span>"; }
