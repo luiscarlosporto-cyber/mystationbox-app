@@ -337,8 +337,9 @@ table.hor .l small{display:block;font-weight:400;font-size:10.5px;color:var(--mu
 .pnEn.ok .ic{background:#2E9E52}.pnEn.at .ic{background:#F36C21}
 .pnEn .tx{flex:1;min-width:0}.pnEn small{display:block;font-size:12.5px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;opacity:.85}
 .pnEn strong{display:block;font-size:19px;line-height:1.25;margin:2px 0}.pnEn .ds{display:block;font-size:13.5px}
+.pnEn .pnEnB{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}div.pnEn{cursor:default}
 .pnEn .vai{flex:none;font-size:13.5px;font-weight:600;border:1px solid currentColor;border-radius:8px;padding:6px 10px}
 .pnEn:focus-visible{outline:3px solid var(--azul);outline-offset:2px}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pnEn.ok{background:#163423;color:#9FE0B5}:root:not([data-theme="light"]) .pnEn.at{background:#3A2416;color:#FFC7A3}}
 :root[data-theme="dark"] .pnEn.ok{background:#163423;color:#9FE0B5}:root[data-theme="dark"] .pnEn.at{background:#3A2416;color:#FFC7A3}
-@media (max-width:640px){.pnEn .vai{display:none}}
+@media (max-width:640px){.pnEn .vai{display:none}div.pnEn{flex-wrap:wrap}.pnEn .pnEnB{flex-basis:100%}}

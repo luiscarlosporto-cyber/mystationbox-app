@@ -341,11 +341,19 @@
     function guardar() { gravar("msb_ind", A); pinta(); }
     box.hidden = false; pinta();
   }
-  /* Preços ENSE no topo (aprovado a 07/11/2026): verde quando publicados, laranja quando não */
+  /* Preços ENSE no topo (aprovado a 07/11/2026): verde quando publicados, laranja quando não.
+   * 10/11/2026: o verde («Publicados») pode arquivar-se e sai do Painel até chegar a tabela da semana seguinte.
+   * Fica guardado neste aparelho (msb_ense_arq: «estação|dia em vigor»); o laranja nunca se arquiva. */
+  function enseArq() { return ler("msb_ense_arq") || []; }
+  function enseUlt(X, id) { return (X.pre || []).filter(function (x) { return x.estacao === id; }).map(function (x) { return x.dia; }).sort().pop() || ""; }
   function faixaEnse(X) {
     if (!X.pre) return "";
-    return "<div class='pnEnse'>" + lojasVer().map(function (e) { var u = PN.ense(X.pre, e.id);
-      return "<button class='pnEn " + u.tom + "' data-e='" + e.id + "' data-p='pre' aria-label='" + esc("Preços ENSE de " + nomeLoja(e) + ": " + u.t) + "'><span class='ic' aria-hidden='true'>" + (u.tom === "ok" ? "✓" : "!") + "</span><span class='tx'><small>Preços ENSE · " + esc(nomeLoja(e)) + "</small><strong>" + esc(u.t) + "</strong><span class='ds'>" + esc(u.s) + "</span></span><span class='vai'>Ver preços</span></button>"; }).join("") + "</div>";
+    var arq = enseArq(), F = lojasVer().map(function (e) { var u = PN.ense(X.pre, e.id), ch = e.id + "|" + enseUlt(X, e.id);
+      if (u.tom === "ok" && arq.indexOf(ch) >= 0) return "";
+      var tx = "<span class='ic' aria-hidden='true'>" + (u.tom === "ok" ? "✓" : "!") + "</span><span class='tx'><small>Preços ENSE · " + esc(nomeLoja(e)) + "</small><strong>" + esc(u.t) + "</strong><span class='ds'>" + esc(u.s) + "</span></span>";
+      if (u.tom === "ok") return "<div class='pnEn ok'>" + tx + "<span class='pnEnB'><button class='mini' data-e='" + e.id + "' data-p='pre'>Ver preços</button><button class='mini' data-arqe='" + esc(ch) + "' aria-label='" + esc("Arquivar o aviso dos preços ENSE de " + nomeLoja(e)) + "'>Arquivar</button></span></div>";
+      return "<button class='pnEn " + u.tom + "' data-e='" + e.id + "' data-p='pre' aria-label='" + esc("Preços ENSE de " + nomeLoja(e) + ": " + u.t) + "'>" + tx + "<span class='vai'>Ver preços</span></button>"; }).join("");
+    return F ? "<div class='pnEnse'>" + F + "</div>" : "";
   }
   function topo(X) {
     var atual = !MES_V || MES_V === X.mes;
@@ -363,6 +371,9 @@
     box.querySelectorAll("[data-p]").forEach(function (b) { b.onclick = function () { irLoja(b.dataset.e, b.dataset.p); }; });
     box.querySelectorAll("[data-arq]").forEach(function (b) { b.onclick = function () { b.disabled = true; arquivar(X, b.dataset.arq.split(",")); }; });
     box.querySelectorAll("[data-ver]").forEach(function (b) { b.onclick = function () { LOJA_V = b.dataset.ver; desenhar(X); }; });
+    box.querySelectorAll("[data-arqe]").forEach(function (b) { b.onclick = function () {
+      var ests = ESTS.map(function (e) { return e.id + "|" + enseUlt(X, e.id); });   // guarda só as tabelas atuais
+      gravar("msb_ense_arq", enseArq().filter(function (k) { return ests.indexOf(k) >= 0; }).concat([b.dataset.arqe])); desenhar(X); }; });
     box.querySelectorAll("[data-fam]").forEach(function (b) { b.onclick = function () { FAM_V = b.dataset.fam; ANTES.a = ANTES.b = null; desenhar(X); if (b.closest(".pnFam")) $("#pnGraf") && box.querySelector(".pnChips").scrollIntoView({block: "nearest", behavior: "smooth"}); }; });
     $("#pnPers").onclick = function () { editarInd(X); };
     $("#pnAnt").onclick = function () { verMes(X, addMes(MES_V || X.mes, -1)); };
