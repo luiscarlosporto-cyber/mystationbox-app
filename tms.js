@@ -37,16 +37,54 @@ async function importarTMS(f) {
   } catch (e) { box.innerHTML = "<div class='card bad' style='padding:12px'>⚠ " + esc(falhou(e)) + "</div>"; }
 }
 
+/* Fechos que chegaram por email (10/11/2026): o OCTAN AI entrega o .csv em msb_tms_email e aqui lê-se com o mesmo leitor e as
+ * mesmas verificações do carregamento à mão. Contas que não batem → «recusado» com o motivo; nunca grava números aproximados.
+ * Corre quando um administrador abre a app; uma falha de rede deixa o ficheiro por ler, para a abertura seguinte. */
+async function tmsEmail() {
+  if (!ADMIN) return;
+  try {
+    var q = await sb.from("msb_tms_email").select("id,estacao,original").eq("estado", "por_ler").order("id").limit(6);
+    if (q.error || !q.data || !q.data.length) return;
+    var cfg = await tmsComercios(), feitos = [], maus = 0;
+    for (var i = 0; i < q.data.length; i++) {
+      var x = q.data[i];
+      var fim = function (alt) { return sb.from("msb_tms_email").update(Object.assign({tratado_em: new Date().toISOString(), tratado_por: EU && EU.id}, alt)).eq("id", x.id).eq("estado", "por_ler"); };
+      try {
+        var d = await sb.storage.from("msb-originais").download(x.original); if (d.error) throw d.error;
+        var r; try { r = MOTOR.lerTMSBytes(new Uint8Array(await d.data.arrayBuffer())); } catch (e) { maus++; await fim({estado: "recusado", motivo: String(e.message || e).slice(0, 500)}); continue; }
+        if (cfg[r.comercio] !== x.estacao) { maus++; await fim({estado: "recusado", mes: r.mes, motivo: "O comércio " + r.comercio + " não é o desta estação."}); continue; }
+        var erros = r.verificacoes.filter(function (v) { return v.nivel === "erro"; });
+        if (erros.length) { maus++; await fim({estado: "recusado", mes: r.mes, motivo: erros.map(function (v) { return v.msg; }).join(" · ").slice(0, 500)}); continue; }
+        var chave = r.comercio + "|" + r.desde + "|" + r.ate;
+        var ex = await sb.from("msb_tms").select("chave").eq("estacao", x.estacao).eq("chave", chave).maybeSingle(); if (ex.error) throw ex.error;
+        if (ex.data) { await fim({estado: "repetido", mes: r.mes}); continue; }   // já carregado à mão: não se mexe
+        var g = await sb.from("msb_tms").insert({estacao: x.estacao, chave: chave, mes: r.mes, comercio: r.comercio, desde: r.desde, ate: r.ate, dados: r, original: x.original}); if (g.error) throw g.error;
+        await fim({estado: "carregado", mes: r.mes}); feitos.push(nomeEstacao(x.estacao) + " " + r.mes);
+      } catch (e) { /* fica por ler */ }
+    }
+    if (feitos.length) status(true, "Fecho TMS recebido por email e carregado: " + feitos.join(", ") + " ✓");
+    else if (maus) status(false, "Chegou por email um fecho TMS que não bate certo. Veja em Conferências → Fecho mensal TMS.");
+  } catch (e) { /* sem ligação: tenta na próxima abertura */ }
+}
+async function tmsRecusados() {   // fechos do email recusados nesta estação, à vista na página do TMS
+  try {
+    var q = await sb.from("msb_tms_email").select("recebido,nome,mes,motivo").eq("estacao", EST).eq("estado", "recusado").order("id", {ascending: false}).limit(3);
+    if (q.error || !q.data.length) return "";
+    return q.data.map(function (x) { return "<div class='card' style='padding:12px;border:2px solid var(--bad);margin-bottom:10px'><b>❌ Fecho TMS recebido por email" + (x.recebido ? " a " + dmy(x.recebido) : "") + (x.mes ? " (" + esc(x.mes) + ")" : "") + ": não foi gravado.</b><div style='font-size:14px'>" + esc(x.motivo || "") + "</div></div>"; }).join("");
+  } catch (e) { return ""; }
+}
+
 async function carregarTMS() {
   var box = $("#tmsBox"), m = $("#tMes").value || MES; $("#tMes").value = m; box.innerHTML = "";
   try {
     var q = await sb.from("msb_tms").select("chave,mes,comercio,desde,ate,dados,original,criado").eq("estacao", EST).eq("mes", m).order("ate", {ascending: false});
     if (q.error) throw q.error;
-    if (!q.data.length) { box.innerHTML = "<div class='mut' style='font-size:14px'>Sem fecho mensal do TMS importado para este mês." + (ADMIN ? " Use <b>🧾 Fecho mensal TMS</b> para o carregar (.csv que chega no fim do mês)." : "") + "</div>"; return; }
+    var rec = await tmsRecusados();
+    if (!q.data.length) { box.innerHTML = rec + "<div class='mut' style='font-size:14px'>Sem fecho mensal do TMS importado para este mês. Chega sozinho por email no dia a seguir ao fim do mês." + (ADMIN ? " Também pode carregá-lo em <b>🧾 Fecho mensal TMS</b>." : "") + "</div>"; return; }
     var t = q.data[0], r = t.dados;
     if (!r.turnos) r.turnos = {de: r.desde ? MOTOR.turnoSeguinte(MOTOR.turnoDoFecho(r.desde)) : {dia: m + "-01", turno: "t1"}, ate: MOTOR.turnoDoFecho(r.ate)};   // importados antes de 01/11
     var L = await turnosDoPeriodo(r.turnos);
-    box.innerHTML = desenharTMS(t, L, m);
+    box.innerHTML = rec + desenharTMS(t, L, m);
     var b = $("#tmsOrig"); if (b) b.onclick = function () { abrirOriginal(t.original); };
   } catch (e) { box.innerHTML = "<div class='bad'>" + esc(falhou(e)) + "</div>"; }
 }

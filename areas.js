@@ -42,7 +42,7 @@ function montarMenu() {
   if (!$("#equipa").parentElement.matches("#v-ges")) $("#v-ges").appendChild($("#equipa"));
   AREAS_TEL = ADMIN ? ["ini", "cx", "dcs", "cpr"] : ["stk", "eqp"];
   if (!ADMIN) AREAS.find(function (x) { return x.id === "eqp"; }).n = "👥 Horário";   // o funcionário só tem o Horário nesta área
-  if (window.MSB_NAV) { MSB_NAV.montar(); ir(inicio()); if (window.pdocLink) pdocLink(); return; }   // navegação da beta; #doc=… abre um documento
+  if (window.MSB_NAV) { MSB_NAV.montar(); ir(inicio()); if (ADMIN && window.tmsEmail) setTimeout(tmsEmail, 1500); if (window.pdocLink) pdocLink(); return; }   // navegação da beta; #doc=… abre um documento
   var vis = areasVisiveis(), mais = vis.some(function (a) { return AREAS_TEL.indexOf(a.id) < 0; });
   $("#areas").innerHTML = vis.map(function (a) { var i = a.n.indexOf(" "); return "<button data-a='" + a.id + "'" + (AREAS_TEL.indexOf(a.id) < 0 ? " class='extra'" : "") + "><i>" + a.n.slice(0, i) + "</i><span>" + (a.c ? "<em class='lg'>" + a.n.slice(i + 1) + "</em><em class='cu'>" + a.c + "</em>" : a.n.slice(i + 1)) + "</span></button>"; }).join("") +
     (mais ? "<button data-a='mais' class='so-tel'><i>☰</i><span>Mais</span></button>" : "");
