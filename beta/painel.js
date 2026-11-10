@@ -355,6 +355,21 @@
       return "<button class='pnEn " + u.tom + "' data-e='" + e.id + "' data-p='pre' aria-label='" + esc("Preços ENSE de " + nomeLoja(e) + ": " + u.t) + "'>" + tx + "<span class='vai'>Ver preços</span></button>"; }).join("");
     return F ? "<div class='pnEnse'>" + F + "</div>" : "";
   }
+  /* Entrada (dono, 10/11/2026): um cartão por estação, lado a lado, com a cor e a sigla dela; «Entrar» abre a Caixa dessa estação.
+     Valores do mês em curso, com IVA; sem valor mostra «—», nunca um número aproximado. */
+  function entrada(X) {
+    if (ESTS.length < 2 || !MSB_NAV.estInfo) return "";
+    var guarda = LOJA_V; LOJA_V = "todas"; var Ld = porDecidir(X); LOJA_V = guarda;
+    var vOnt = IND.find(function (x) { return x[0] === "ont"; })[3], vMes = IND.find(function (x) { return x[0] === "vend"; })[3];
+    return "<div class='pnEsts'>" + ESTS.map(function (e) {
+      var i = MSB_NAV.estInfo(e.id), D = dadosLoja(X, e, X.mes), o = vOnt(D), m = vMes(D), n = Ld.filter(function (x) { return x.e === e.id; }).length;
+      return "<section class='pnEst' style='--ec:" + i.c + "'><header><b>" + i.s + "</b>" + esc(i.n) + (e.posto_repsol ? "<small>posto " + esc(e.posto_repsol) + "</small>" : "") + "</header>" +
+        "<div class='l'><small>Vendas de ontem, com IVA</small><strong>" + (o == null ? "—" : eur0(o)) + "</strong></div>" +
+        "<div class='l'><small>" + (D.c && D.c.ate ? "Mês até " + dmy(D.c.ate).slice(0, 5) : Maius(nomeMes(X.mes))) + ", com IVA</small><strong>" + (m == null ? "—" : eur0(m)) + "</strong></div>" +
+        "<div class='l dc'>" + (n ? "⚠ Por decidir: " + n : "✔ Nada por decidir") + "</div>" +
+        "<button class='btn' data-e='" + e.id + "' data-p='reg'>Entrar em " + esc(i.n) + " ›</button></section>";
+    }).join("") + "</div>";
+  }
   function topo(X) {
     var atual = !MES_V || MES_V === X.mes;
     return "<div class='pnTopo'>" + (ESTS.length > 1 ? "<div class='pnSeg' role='group' aria-label='Escolher estação'>" + [{id: "todas", n: "Todas"}].concat(ESTS.map(function (e) { return {id: e.id, n: nomeLoja(e)}; })).map(function (l) { return "<button data-ver='" + l.id + "' aria-pressed='" + (LOJA_V === l.id) + "' class='" + (LOJA_V === l.id ? "on" : "") + "'>" + esc(l.n) + "</button>"; }).join("") + "</div>" : "") +
@@ -365,7 +380,7 @@
     var box = $("#iniCorpo");
     if (LOJA_V !== "todas" && !ESTS.some(function (e) { return e.id === LOJA_V; })) LOJA_V = "todas";
     var falta = ESTS.some(function (e) { var D = dadosLoja(X, e); return !D.c && !D.f; }), M = MES_V || X.mes;
-    box.innerHTML = (X.falhas.length ? "<div class='aviso'><p>Não consegui ler: " + esc(X.falhas.join(", ")) + ". O que está em baixo pode estar incompleto.</p></div>" : "") + topo(X) + faixaEnse(X) + cartoes(X) +
+    box.innerHTML = (X.falhas.length ? "<div class='aviso'><p>Não consegui ler: " + esc(X.falhas.join(", ")) + ". O que está em baixo pode estar incompleto.</p></div>" : "") + entrada(X) + topo(X) + faixaEnse(X) + cartoes(X) +
       "<div class='pnGrade'>" + grafico(X) + pintarDecidir(X) + barras(X) + recebido_(X) + porFechar(X) + tabelaFam(X) + "</div>" +
       "<p class='rod'>" + (falta ? "A ler no CBOS pelo OCTAN AI: os valores aparecem daqui a uns minutos, com o PC ligado." : M === X.mes ? "Vendas com IVA, lidas no CBOS pelo OCTAN AI, até ontem. O ritmo por dia e a estimativa do mês são contas simples, não são valores do CBOS." : "Vendas com IVA, do mês inteiro.") + "</p>";
     box.querySelectorAll("[data-p]").forEach(function (b) { b.onclick = function () { irLoja(b.dataset.e, b.dataset.p); }; });

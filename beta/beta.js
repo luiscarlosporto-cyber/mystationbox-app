@@ -54,7 +54,9 @@
     var main = app.querySelector("main"), chips = document.createElement("div"), barra = document.createElement("nav");
     chips.id = "bChips"; barra.id = "bBarra"; barra.setAttribute("aria-label", "Áreas");
     app.insertBefore(lat, app.firstChild); app.insertBefore(topo, main); app.insertBefore(chips, main); app.appendChild(barra);
-    topo.insertBefore($("#selEst"), $("#bNovo"));   // o mesmo seletor de loja, com a mesma função
+    topo.insertBefore($("#selEst"), $("#bNovo"));   // o mesmo seletor de loja, com a mesma função (escondido: troca-se pela marca da estação)
+    var marcaEst = document.createElement("button"); marcaEst.id = "bEstP"; topo.insertBefore(marcaEst, topo.firstChild);
+    marcaEst.onclick = function () { var o = ESTS.find(function (e) { return e.id !== EST; }); if (!o || ESTS.length < 2) return; var s = $("#selEst"); s.value = o.id; s.onchange(); };
     var sair = $("#bSair"); sair.textContent = "Sair"; topo.appendChild(sair);
     $("#bQuem").textContent = $("#hQuem").textContent;
 
@@ -85,7 +87,22 @@
   }
 
   var ABERTA = "";
+  /* estação bem visível (dono, 10/11/2026): cor, sigla, nome e posto na barra de cima e uma borda da mesma cor na página.
+     Não depende só da cor: a sigla e o nome estão sempre escritos. No Painel e em Comparar estações (as duas) não aparece. */
+  var EST_ID = {sto: {s: "ST", c: "#0E7C7B"}, pnf: {s: "PN", c: "#6B4FBB"}};
+  var DUAS = ["ini", "cmp"];
+  function estInfo(id) { var e = ESTS.find(function (x) { return x.id === id; }) || {}, k = EST_ID[id] || {s: String(id || "").slice(0, 2).toUpperCase(), c: "#566878"}; return {e: e, s: k.s, c: k.c, n: e.short_name || e.name || id}; }
+  function pintarEst(pg) {
+    var duas = DUAS.indexOf(pg) >= 0, i = estInfo(EST), b = $("#bEstP"), troca = ESTS.length > 1;
+    document.body.classList.toggle("b-duas", duas); document.body.style.setProperty("--est", i.c);
+    if (!b) return;
+    b.hidden = duas;
+    b.innerHTML = "<b>" + i.s + "</b><span class='n'>" + esc(i.n) + "</span>" + (i.e.posto_repsol ? "<span class='po'>· " + esc(i.e.posto_repsol) + "</span>" : "") + (troca ? "<span class='tr' aria-hidden='true'>⇄</span>" : "");
+    b.title = troca ? "Estação aberta: " + i.n + ". Carregar para trocar de estação." : "Estação: " + i.n;
+    b.setAttribute("aria-label", b.title); b.disabled = !troca;
+  }
   function marcar(pg, a) {
+    pintarEst(pg);
     if (pg === "reg" && DIA_ADIADO) { DIA_ADIADO = false; irDiaReal(DIA); }
     $("#bQuem").textContent = $("#hQuem").textContent;
     if (pg !== ABERTA) { ABERTA = pg; setTimeout(function () { if (PAGINA === pg) MSB_NAV.abrirPagina(pg); }); }
@@ -112,7 +129,7 @@
     var fora = AREAS_TEL.indexOf(a.id) < 0;
     $("#bBarra").innerHTML = noTel.map(function (x) { return "<button data-a='" + x.id + "'" + (x.id === a.id ? " class='on'" : "") + ">" + ic(IC_AREA[x.id]) + (x.c || nomeArea(x)) + seloH(x) + "</button>"; }).join("") +
       "<button data-a='mais'" + (fora ? " class='on'" : "") + ">" + ic("x") + "Mais</button>";
-    document.title = (atual ? atual[1] + " · " : "") + "mystationbox";
+    document.title = (DUAS.indexOf(pg) < 0 ? estInfo(EST).s + " · " : "") + (atual ? atual[1] + " · " : "") + "mystationbox";
   }
 
   function fecharTudo() { ["#bNovoM", "#bPesq", "#bMais"].forEach(function (s) { var e = $(s); if (e) e.remove(); }); }
@@ -186,6 +203,7 @@
       var d = document.createElement("dialog"); d.id = "bConf";
       d.innerHTML = "<p></p><div><button class='btn' value='n'>Cancelar</button><button class='btn p' value='s'></button></div>";
       d.querySelector("p").textContent = texto; d.querySelector(".p").textContent = acao || "Confirmar";
+      if (window.EST && DUAS.indexOf(window.PAGINA) < 0) { var ie = estInfo(EST), et = document.createElement("small"); et.className = "est"; et.textContent = ie.s + " · " + ie.n; d.insertBefore(et, d.firstChild); }
       var c = null; if (campo != null) { c = document.createElement("input"); c.value = campo; d.insertBefore(c, d.lastChild); c.onkeydown = function (e) { if (e.key === "Enter") { e.preventDefault(); acabar("s"); } }; }
       var feito = false;
       function acabar(v) { if (feito) return; feito = true; d.close(); d.remove(); fim(c ? (v === "s" ? c.value : false) : v === "s"); }
@@ -281,7 +299,7 @@
       function (c) { c.value = x.n; c.dispatchEvent(new Event("input", {bubbles: true})); });
   }
 
-  window.MSB_NAV = {
+  window.MSB_NAV = {estInfo: estInfo, 
     montar: montar, marcar: marcar, limpar: limpar, confirma: confirma,
     fechado: function (t, h) { return h ? "<details class='card' style='padding:12px 14px'><summary><b>" + t + "</b></summary><div style='display:grid;gap:10px;margin-top:10px'>" + h + "</div></details>" : ""; },
     selo: function (n) { if (n === SELO) return; SELO = n; marcar(PAGINA, areaDe(PAGINA) || AREAS[0]); },
