@@ -753,7 +753,7 @@ function cbosSemFamilia(txt, fam, partido) {
 function cbosENum(t) { return /^-?[\d.]*\d(,\d+)?\s*[€%]?$/.test(t.trim()); }
 function cbosData(t) { var m = /(\d{2})\/(\d{2})\/(\d{4})/.exec(t || ""); return m ? m[3] + "-" + m[2] + "-" + m[1] : null; }
 function lerVendasCBOS(linhas) {
-  var r = {posto: "", nome_posto: "", de: null, ate: null, comb: {}, loja: [], verificacoes: []}, sec = null, forma = null, fam = null, subC = {}, subF = {}, tot = {}, buf = [], pend = [];
+  var r = {posto: "", nome_posto: "", de: null, ate: null, comb: {}, loja: [], verificacoes: []}, sec = null, forma = null, fam = null, subC = {}, subF = {}, tot = {}, buf = [], pend = [], pendC = [], ultC = null;
   linhas.forEach(function (bruta) {
     var ln = bruta.trim(); if (!ln) return;
     var m = /Lojas:\s*(E\d{3,5})\s*-\s*(.+?)(?:\s{2,}|$)/.exec(ln);
@@ -765,8 +765,20 @@ function lerVendasCBOS(linhas) {
     var c = cbosCols(ln);
     if (!c.length || c[0] === "Forma de pagamento" || c[0] === "Família") return;
     if (sec === "comb") {
-      if (c[0].indexOf("Subtotal ") === 0) { if (c.length < 3) return; subC[c[0].slice(9).trim()] = [cbosNum(c[1]), cbosNum(c[2])]; return; }
+      if (c[0].indexOf("Subtotal ") === 0) { if (c.length < 3) return; subC[c[0].slice(9).trim()] = [cbosNum(c[1]), cbosNum(c[2])]; pendC = []; ultC = null; return; }
       if (c[0] === "Total") { if (c.length < 3) return; tot.comb = [cbosNum(c[1]), cbosNum(c[2])]; return; }
+      /* nome de produto partido em três linhas (Penafiel, 09/2026): «EFITEC 95» / os números / «PREM» (igual ao Python) */
+      if (c.length === 1 && !cbosENum(c[0])) {
+        if (ultC) { var P = r.comb[ultC[0]]; P[ultC[1] + " " + c[0].toUpperCase()] = P[ultC[1]]; delete P[ultC[1]]; ultC = null; } else pendC.push(c[0]);
+        return;
+      }
+      ultC = null;
+      if (c.length === 7 && forma && pendC.length && c.every(cbosENum)) {
+        var nome = pendC.join(" ").toUpperCase();
+        (r.comb[forma] = r.comb[forma] || {})[nome] = [cbosNum(c[0]), cbosNum(c[1]), cbosNum(c[4])];
+        ultC = [forma, nome]; pendC = []; return;
+      }
+      pendC = [];
       if (c.length === 9 && !cbosENum(c[0])) { forma = c[0].toLowerCase(); c = c.slice(1); }
       if (c.length === 8 && forma && !cbosENum(c[0])) (r.comb[forma] = r.comb[forma] || {})[c[0].toUpperCase()] = [cbosNum(c[1]), cbosNum(c[2]), cbosNum(c[5])];
       return;
