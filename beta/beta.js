@@ -90,7 +90,7 @@
   /* estação bem visível (dono, 10/11/2026): cor, sigla, nome e posto na barra de cima e uma borda da mesma cor na página.
      Não depende só da cor: a sigla e o nome estão sempre escritos. No Painel e em Comparar estações (as duas) não aparece. */
   var EST_ID = {sto: {s: "ST", c: "#0E7C7B"}, pnf: {s: "PN", c: "#6B4FBB"}};
-  var DUAS = ["ini", "cmp"];
+  var DUAS = ["ini", "cmp", "car", "doc", "forn"];
   function estInfo(id) { var e = ESTS.find(function (x) { return x.id === id; }) || {}, k = EST_ID[id] || {s: String(id || "").slice(0, 2).toUpperCase(), c: "#566878"}; return {e: e, s: k.s, c: k.c, n: e.short_name || e.name || id}; }
   function pintarEst(pg) {
     var duas = DUAS.indexOf(pg) >= 0, i = estInfo(EST), b = $("#bEstP"), troca = ESTS.length > 1;
@@ -232,7 +232,7 @@
   function acoesNovo() {
     var L = ADMIN ? [["Registar turno", "Caixa do dia", function () { ir("reg"); }]] : [];
     if (ADMIN) L.push(
-      ["Carregar ficheiro", "Turno, Repsol, TMS, vendas ou encomenda", function () { $("#bCarregar").click(); }],
+      ["Carregar documentos", "Qualquer ficheiro: turno, Repsol, TMS, vendas, banco", function () { ir("car"); }],
       ["Fotografar fatura", "M.Cunha e Vendeiro", function () { ir("dig"); $("#bDigFoto").click(); }],
       ["Pedir vendas", "O OCTAN AI lê no CBOS", function () { ir("avi"); esperar(function () { return $("#pvPasta"); }, function (e) { e.scrollIntoView({block: "center"}); e.focus(); }); }]
     ); else L.push(["Contar stock", "Contagem de domingo", function () { ir("contar"); }]);

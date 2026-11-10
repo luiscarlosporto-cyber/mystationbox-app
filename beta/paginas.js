@@ -166,18 +166,77 @@
     } catch (e) { box.innerHTML = b.h + "<div class='aviso'><p>" + esc(falhou(e)) + "</p></div>"; b.ligar(); }
   }
 
-  var ABRIR = {cmp: function () { comparar(); }, doc: function () { documentos(); }, forn: function () { fornecedores(); }, hor: function () { MSB_NAV.horario(); }};
+  /* ---- Documentos → Carregar documentos (10/11/2026, pedido do dono: «está tudo muito disperso»).
+     Um só sítio para entregar qualquer ficheiro: usa o mesmo reconhecimento pelo conteúdo do botão Carregar (carregarFicheiros,
+     areas.js), com os mesmos leitores e verificações. Por baixo, o que já está carregado em cada estação no mês escolhido.
+     Só lê; quem grava são os leitores de sempre, cada um na sua página. ---- */
+  var CAR_M = null;
+  async function carregarDocs(M) {
+    var box = $("#v-car"); M = M || CAR_M || hojeISO(0).slice(0, 7); CAR_M = M;
+    var b = barraMes("car", M, carregarDocs), ini = M + "-01", fim = addMes(M, 1) + "-01", passado = M < hojeISO(0).slice(0, 7);
+    var zona = "<div id='carZona' class='carZona' tabindex='0' role='button' aria-label='Escolher ficheiros para carregar'><strong>Largue aqui os ficheiros, ou toque para escolher</strong>" +
+      "<span>Pode ser mais de um. A app reconhece cada ficheiro pelo conteúdo e a estação pelo próprio documento.</span>" +
+      "<small>Folha de turno (.xls) · fotografia de talão ou fatura · PDF da Repsol · fecho mensal TMS (.csv) · Turno por formas de cobrança e Folha de fecho (PDF do CBOS) · vendas de tabaco (.xlsx) · créditos por transferência e extrato do banco (Excel)</small></div>";
+    var liga = function () {
+      b.ligar();
+      var z = $("#carZona"); if (!z) return;
+      z.onclick = function () { $("#fCarregar").click(); };
+      z.onkeydown = function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); z.onclick(); } };
+      z.ondragover = function (e) { e.preventDefault(); z.classList.add("on"); };
+      z.ondragleave = function () { z.classList.remove("on"); };
+      z.ondrop = function (e) { e.preventDefault(); z.classList.remove("on"); var fs = Array.from(e.dataTransfer.files || []); if (fs.length) carregarFicheiros(fs); };
+      box.querySelectorAll("[data-ce]").forEach(function (x) { x.onclick = function () {
+        var e = x.dataset.ce, pg = x.dataset.cp; if (e !== EST) { var sl = $("#selEst"); sl.value = e; PAGINA = pg; sl.onchange(); } else ir(pg); }; });
+    };
+    box.innerHTML = zona + "<h2>O que já está carregado</h2>" + b.h + "<div class='bl ske' style='height:240px'></div>"; liga();
+    try {
+      var q = function (p) { return p.then(function (r) { if (r.error) throw r.error; return r.data || []; }); };
+      var R = await Promise.all([
+        q(sb.from("msb_turnos").select("estacao,dia").gte("dia", ini).lt("dia", fim)),
+        q(sb.from("msb_tms").select("estacao,mes").eq("mes", M)),
+        q(sb.from("msb_vendas_mes").select("estacao,mes,ate").eq("mes", M)),
+        q(sb.from("msb_folha_fecho").select("estacao,mes,ate").eq("mes", M)),
+        q(sb.from("msb_extratos").select("estacao,dia").gte("dia", ini).lt("dia", fim).order("dia", {ascending: false}).limit(5000)),
+        q(sb.from("msb_vendas_artigos").select("estacao,de,ate").lt("de", fim).gte("ate", ini)),
+        q(sb.from("msb_transferencias").select("estacao,dia").gte("dia", ini).lt("dia", fim).limit(5000)),
+        q(sb.from("msb_docs").select("estacao,emissao").gte("emissao", ini).lt("emissao", fim).limit(5000))
+      ]);
+      var de = function (i, e) { return R[i].filter(function (x) { return x.estacao === e; }); };
+      var ult = function (L, k) { return L.map(function (x) { return x[k]; }).sort().pop(); };
+      var um = function (i, pg) { return function (e) { var L = de(i, e); return L.length ? ["Carregado" + (L[0].ate ? " até " + dmy(L[0].ate).slice(0, 5) : ""), pg] : null; }; };
+      var varios = function (i, k, nome, pg) { return function (e) { var L = de(i, e); return L.length ? [L.length + " " + nome + (L.length === 1 ? "" : "s") + ", até " + dmy(ult(L, k)).slice(0, 5), pg] : null; }; };
+      var LIN = [
+        ["Turnos registados", "reg", function (e) { var d = {}; de(0, e).forEach(function (x) { d[x.dia] = 1; }); var n = Object.keys(d).length; return n ? [n + (n === 1 ? " dia" : " dias") + ", até " + dmy(Object.keys(d).sort().pop()).slice(0, 5), "reg"] : null; }],
+        ["Documentos Repsol (PDF)", "rep", varios(7, "emissao", "documento", "rep")],
+        ["Créditos por transferência", "rep", varios(6, "dia", "crédito", "rep")],
+        ["Extrato do banco", "ban", varios(4, "dia", "movimento", "ban")],
+        ["Fecho mensal TMS", "tms", um(1, "tms")],
+        ["Turno por formas de cobrança", "luc", um(2, "luc")],
+        ["Folha de fecho", "cmp", um(3, "cmp")],
+        ["Vendas por artigo", "va", function (e) { var L = de(5, e); return L.length ? ["Carregado até " + dmy(ult(L, "ate")).slice(0, 5), "va"] : null; }]
+      ];   // as tabelas de preços não entram aqui: chegam sozinhas (OCTAN AI) e têm o destaque próprio no Painel (dono, 10/11/2026)
+      var h = "<div class='sc'><table class='carT'><thead><tr><th class='l'>Documento</th>" + ESTS.map(function (e) { return "<th class='l'>" + esc(nomeLoja(e)) + "</th>"; }).join("") + "</tr></thead><tbody>" + LIN.map(function (l) {
+        return "<tr><td class='l'>" + l[0] + "</td>" + ESTS.map(function (e) { var r = l[2](e.id);
+          return "<td class='l'><button class='mini' data-ce='" + e.id + "' data-cp='" + (r ? r[1] : l[1]) + "'>" + (r ? "✔ " + esc(r[0]) : (passado ? "⚠ Em falta" : "Ainda não carregado")) + "</button></td>"; }).join("") + "</tr>";
+      }).join("") + "</tbody></table></div>";
+      box.innerHTML = zona + "<h2>O que já está carregado</h2>" + b.h + "<p class='rod'>" + nomeMes(M) + " · carregar numa linha abre a página desse documento, já na estação certa. Um documento que não bate certo é recusado e não fica gravado.</p>" + h;
+      liga();
+    } catch (e) { box.innerHTML = zona + b.h + "<div class='aviso'><p>" + esc(falhou(e)) + "</p></div>"; liga(); }
+  }
+
+  var ABRIR = {cmp: function () { comparar(); }, doc: function () { documentos(); }, forn: function () { fornecedores(); }, car: function () { carregarDocs(); }, hor: function () { MSB_NAV.horario(); }};
   MSB_NAV.seccoes = seccoes;
   MSB_NAV.paginas = function () {
     var area = function (id) { return AREAS.find(function (a) { return a.id === id; }); };
     var R = area("res"), i = R.p.findIndex(function (p) { return p[0] === "fun"; });
     R.p.splice(i, 0, ["cmp", "Comparar estações", {g: "Análise"}]);
     area("dcs").p.unshift(["doc", "Documentos e procura"]);
+    area("dcs").p.unshift(["car", "Carregar documentos"]);
     area("eqp").p.unshift(["hor", "Horário"]);
     area("frn").p.unshift(["forn", "Por fornecedor"]);
-    VISTA_DA.cmp = "cmp"; VISTA_DA.doc = "doc"; VISTA_DA.hor = "hor"; VISTA_DA.forn = "forn";
+    VISTA_DA.cmp = "cmp"; VISTA_DA.doc = "doc"; VISTA_DA.hor = "hor"; VISTA_DA.forn = "forn"; VISTA_DA.car = "car";
     var w = $("main .wrap");
-    ["cmp", "doc", "hor", "forn"].forEach(function (k) { var v = document.createElement("div"); v.id = "v-" + k; v.className = "v"; v.hidden = true; w.appendChild(v); });
+    ["cmp", "doc", "hor", "forn", "car"].forEach(function (k) { var v = document.createElement("div"); v.id = "v-" + k; v.className = "v"; v.hidden = true; w.appendChild(v); });
     new MutationObserver(agendar).observe($("main"), {childList: true, subtree: true});
   };
   MSB_NAV.abrirPagina = function (pg) { if (ABRIR[pg]) ABRIR[pg](); };
