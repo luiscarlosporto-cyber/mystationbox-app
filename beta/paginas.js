@@ -133,16 +133,51 @@
   var espera = null;
   function agendar() { clearTimeout(espera); espera = setTimeout(rever, 120); }
 
-  var ABRIR = {cmp: function () { comparar(); }, doc: function () { documentos(); }, hor: function () { MSB_NAV.horario(); }};
+  /* ---- Fornecedores → Por fornecedor (10/11/2026): documentos do mês agrupados por fornecedor, com IVA.
+     Usa a mesma lista da pesquisa de documentos (pesquisa_docs.js). Ainda não é conta corrente: faltam os pagamentos,
+     por isso não mostra saldo. Documento com «valor por ler» conta-se à parte, nunca com valor aproximado. ---- */
+  var FORN_M = null;
+  async function fornecedores(M) {
+    var box = $("#v-forn"); M = M || FORN_M || hojeISO(0).slice(0, 7); FORN_M = M;
+    var b = barraMes("forn", M, fornecedores);
+    box.innerHTML = b.h + "<div class='bl ske' style='height:240px'></div>"; b.ligar();
+    try {
+      if (!PDOC.lista) await pdocCarregar();
+      var COL = [["fat", "Faturas"], ["nc", "Notas de crédito"], ["auto", "Autofaturas Solred"], ["liq", "Liquidações"]];
+      var col = function (k) { return k === "desp" || k === "forn" ? "fat" : k; };
+      var D = PDOC.lista.filter(function (x) { return x.k !== "transf" && String(x.d || "").slice(0, 7) === M; });
+      var h = ESTS.map(function (e) {
+        var G = {};
+        D.filter(function (x) { return x.e === e.id; }).forEach(function (x) {
+          var n = String(x.ent || "Sem fornecedor").trim().toUpperCase(), g = G[n] || (G[n] = {n: 0, ler: 0});
+          var c = col(x.k), t = g[c] || (g[c] = {q: 0, v: 0}); g.n++;
+          if (x.v == null) g.ler++; else { t.q++; t.v += Math.abs(x.v); }
+        });
+        var nomes = Object.keys(G).sort(function (p, q) { return G[q].n - G[p].n; });
+        if (!nomes.length) return "<h2>" + esc(nomeLoja(e)) + "</h2><div class='vazio'>Sem documentos de fornecedores neste mês.</div>";
+        return "<h2>" + esc(nomeLoja(e)) + "</h2><div class='sc'><table><thead><tr><th class='l'>Fornecedor</th>" + COL.map(function (c) { return "<th>" + c[1] + "</th>"; }).join("") + "<th>Valor por ler</th></tr></thead><tbody>" + nomes.map(function (n) {
+          var g = G[n];
+          return "<tr><td class='l'>" + esc(n) + "</td>" + COL.map(function (c) { var t = g[c[0]]; return "<td class='n'>" + (t && t.q ? eur(t.v) + " <span class='mut'>(" + t.q + ")</span>" : "<span class='mut'>—</span>") + "</td>"; }).join("") +
+            "<td class='n'>" + (g.ler ? "⚠ " + g.ler : "<span class='mut'>—</span>") + "</td></tr>";
+        }).join("") + "</tbody></table></div>";
+      }).join("");
+      box.innerHTML = b.h + "<p class='rod'>" + nomeMes(M) + " · valores com IVA, lidos dos documentos (entre parênteses, quantos). Ainda sem pagamentos: não é o saldo devido. Cada documento está em Documentos → Documentos e procura.</p>" + h;
+      b.ligar();
+    } catch (e) { box.innerHTML = b.h + "<div class='aviso'><p>" + esc(falhou(e)) + "</p></div>"; b.ligar(); }
+  }
+
+  var ABRIR = {cmp: function () { comparar(); }, doc: function () { documentos(); }, forn: function () { fornecedores(); }, hor: function () { MSB_NAV.horario(); }};
   MSB_NAV.seccoes = seccoes;
   MSB_NAV.paginas = function () {
-    var D = AREAS.find(function (a) { return a.id === "des"; }), C = AREAS.find(function (a) { return a.id === "con"; });
-    var i = D.p.findIndex(function (p) { return p[0] === "fun"; });
-    D.p.splice(i, 0, ["cmp", "Comparar estações", {g: "Análise"}]); C.p.push(["doc", "Documentos", {g: "Contabilidade"}]);
-    AREAS[0].p.splice(1, 0, ["hor", "Horário"]);
-    VISTA_DA.cmp = "cmp"; VISTA_DA.doc = "doc"; VISTA_DA.hor = "hor";
+    var area = function (id) { return AREAS.find(function (a) { return a.id === id; }); };
+    var R = area("res"), i = R.p.findIndex(function (p) { return p[0] === "fun"; });
+    R.p.splice(i, 0, ["cmp", "Comparar estações", {g: "Análise"}]);
+    area("dcs").p.unshift(["doc", "Documentos e procura"]);
+    area("eqp").p.unshift(["hor", "Horário"]);
+    area("frn").p.unshift(["forn", "Por fornecedor"]);
+    VISTA_DA.cmp = "cmp"; VISTA_DA.doc = "doc"; VISTA_DA.hor = "hor"; VISTA_DA.forn = "forn";
     var w = $("main .wrap");
-    ["cmp", "doc", "hor"].forEach(function (k) { var v = document.createElement("div"); v.id = "v-" + k; v.className = "v"; v.hidden = true; w.appendChild(v); });
+    ["cmp", "doc", "hor", "forn"].forEach(function (k) { var v = document.createElement("div"); v.id = "v-" + k; v.className = "v"; v.hidden = true; w.appendChild(v); });
     new MutationObserver(agendar).observe($("main"), {childList: true, subtree: true});
   };
   MSB_NAV.abrirPagina = function (pg) { if (ABRIR[pg]) ABRIR[pg](); };

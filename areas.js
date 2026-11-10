@@ -3,15 +3,18 @@
  * que continua a ser o mesmo código (stock-tabaco-central), embutido sem cabeçalho nem menu próprios: aqui
  * escolhe-se o separador e mostram-se só os cartões dessa página. Nada foi apagado: tudo mudou de sítio. */
 "use strict";
-var AREAS = [   // ordem aprovada a 05/11/2026: decisão, operação e controlo, obrigações e regras. Terceiro campo: g = subgrupo, adm = só administrador.
-  {id: "ini", n: "🏠 Painel", p: [["ini", "Painel de Gestão"], ["avi", "OCTAN AI", {adm: 1}]]},
-  {id: "ens", n: "⛽ ENSE", adm: 1, p: [["pre", "Preços ENSE", {g: "ENSE"}], ["ense", "Reporte mensal", {g: "ENSE"}]]},   // área própria, fora da Conformidade (dono, 07/11/2026)
-  {id: "res", n: "💰 Resultados", adm: 1, p: [["cdm", "Conta do mês"], ["luc", "Lucro (margens)"], ["mes", "Resultado mensal"]]},   // área própria (dono, 07/11/2026)
-  {id: "des", n: "📊 Desempenho", adm: 1, p: [["liv", "Livro de movimentos", {g: "Movimentos"}], ["ven", "Vendas e margens", {g: "Vendas"}], ["va", "Relatório de vendas", {g: "Vendas"}], ["maq", "Máquina de tabaco", {g: "Vendas"}], ["fun", "Por funcionário", {g: "Análise"}]]},
-  {id: "tes", n: "💶 Tesouraria", p: [["reg", "Registo diário", {g: "Caixa"}], ["sai", "Saídas de caixa", {g: "Caixa"}], ["his", "Histórico", {g: "Caixa"}], ["rep", "Repsol e Multibanco", {g: "Conferências", adm: 1}], ["tms", "Fecho mensal TMS", {g: "Conferências", adm: 1}], ["dsp", "Despesas", {g: "Despesas", adm: 1}], ["ban", "Banco", {g: "Banco", adm: 1}]]},
-  {id: "cst", n: "🛒 Compras e Stocks", c: "Compras", p: [["enc", "Por aprovar", {g: "Compras", adm: 1}], ["nova", "Nova encomenda", {g: "Compras", adm: 1}], ["comh", "Encomendas feitas", {g: "Compras", adm: 1}], ["ent", "Entrada de mercadoria", {g: "Receções", adm: 1}], ["dig", "Digitalizar fatura", {g: "Receções", adm: 1}], ["comb", "Entrada de combustível", {g: "Receções", adm: 1}], ["contar", "Contar", {g: "Stock"}], ["ler", "Ler código", {g: "Stock"}], ["stock", "Stock atual", {g: "Stock"}], ["inv", "Inventário", {g: "Stock"}], ["mov", "Movimentos", {g: "Stock"}]]},
-  {id: "con", n: "📋 Conformidade", adm: 1, p: [["kms", "Mapa de kms do gerente", {g: "Contabilidade"}]]},
-  {id: "adm", n: "⚙️ Administração", adm: 1, p: [["eq", "Equipa e acessos", {g: "Pessoas"}], ["mrg", "Margens e custos", {g: "Regras"}], ["prod", "Produtos e códigos", {g: "Regras"}], ["cfg", "Configuração do stock", {g: "Regras"}]]}
+var AREAS = [   // reorganização de 10/11/2026 (dono, «avança com tudo»): campo b = bloco do menu (Dia a dia · Controlo · Gestão). Terceiro campo de cada página: g = subgrupo, adm = só administrador.
+  {id: "ini", n: "🏠 Painel", b: "Dia a dia", adm: 1, p: [["ini", "Painel de Gestão"], ["avi", "OCTAN AI"]]},
+  {id: "cx", n: "💶 Caixa", adm: 1, p: [["reg", "Registo diário"], ["sai", "Saídas de caixa"], ["his", "Histórico"]]},
+  {id: "cmb", n: "⛽ Combustível", adm: 1, p: [["comb", "Entradas de combustível"], ["pre", "Preços ENSE", {g: "ENSE"}], ["ense", "Reporte mensal ENSE", {g: "ENSE"}]]},
+  {id: "stk", n: "📦 Stock", p: [["contar", "Contar"], ["ler", "Ler código"], ["stock", "Stock atual"], ["inv", "Inventário"], ["mov", "Movimentos"]]},
+  {id: "cpr", n: "🛒 Compras", adm: 1, p: [["enc", "Por aprovar"], ["nova", "Nova encomenda"], ["comh", "Encomendas feitas"], ["ent", "Entrada de mercadoria", {g: "Receções"}], ["dig", "Digitalizar fatura", {g: "Receções"}]]},
+  {id: "cnf", n: "🏦 Conferências", b: "Controlo", adm: 1, p: [["rep", "Repsol e Multibanco"], ["tms", "Fecho mensal TMS"], ["ban", "Banco"], ["liv", "Livro de movimentos"]]},
+  {id: "frn", n: "🧾 Fornecedores", adm: 1, p: [["dsp", "Despesas"]]},   // «Por fornecedor» acrescentado em beta/paginas.js
+  {id: "res", n: "💰 Resultados", adm: 1, p: [["cdm", "Conta do mês", {g: "O mês"}], ["luc", "Lucro (margens)", {g: "O mês"}], ["mes", "Resultado mensal", {g: "O mês"}], ["ven", "Vendas e margens", {g: "Vendas"}], ["va", "Relatório de vendas", {g: "Vendas"}], ["maq", "Máquina de tabaco", {g: "Vendas"}], ["fun", "Por funcionário", {g: "Análise"}]]},
+  {id: "dcs", n: "📋 Documentos", adm: 1, p: [["kms", "Mapa de kms do gerente"]]},   // «Documentos» acrescentado em beta/paginas.js
+  {id: "eqp", n: "👥 Equipa", b: "Gestão", p: [["eq", "Equipa e acessos", {adm: 1}]]},   // «Horário» (também do funcionário) acrescentado em beta/paginas.js
+  {id: "def", n: "⚙️ Definições", adm: 1, p: [["mrg", "Margens e custos"], ["prod", "Produtos e códigos"], ["cfg", "Configuração do stock"]]}
 ];
 /* páginas do módulo de stock: separador e cartões (pelo título, ou "#id" do cartão) a mostrar ou esconder.
    O cartão da encomenda muda de título ("Encomenda LOGISTA · Penafiel · por validar"), por isso vai pelo id. */
@@ -31,16 +34,20 @@ var PAGINA = "ini";
 function msbConfirma(t, acao) { return window.MSB_NAV ? MSB_NAV.confirma(t, acao) : Promise.resolve(confirm(t)); }
 function areasVisiveis() { return AREAS.filter(function (a) { return ADMIN || !a.adm; }); }
 function paginasDe(a) { return a.p.filter(function (x) { return ADMIN || !(x[2] && x[2].adm); }); }
+/* primeira página de quem entra: o funcionário só vê Stock e Horário (dono, 10/11/2026) */
+function inicio() { return ADMIN ? "ini" : "contar"; }
 function areaDe(pg) { return AREAS.find(function (a) { return a.p.some(function (x) { return x[0] === pg; }); }); }
 
 function montarMenu() {
   if (!$("#equipa").parentElement.matches("#v-ges")) $("#v-ges").appendChild($("#equipa"));
-  if (window.MSB_NAV) { MSB_NAV.montar(); ir("ini"); if (window.pdocLink) pdocLink(); return; }   // navegação da beta; #doc=… abre um documento
+  AREAS_TEL = ADMIN ? ["ini", "cx", "dcs", "cpr"] : ["stk", "eqp"];
+  if (!ADMIN) AREAS.find(function (x) { return x.id === "eqp"; }).n = "👥 Horário";   // o funcionário só tem o Horário nesta área
+  if (window.MSB_NAV) { MSB_NAV.montar(); ir(inicio()); if (window.pdocLink) pdocLink(); return; }   // navegação da beta; #doc=… abre um documento
   var vis = areasVisiveis(), mais = vis.some(function (a) { return AREAS_TEL.indexOf(a.id) < 0; });
   $("#areas").innerHTML = vis.map(function (a) { var i = a.n.indexOf(" "); return "<button data-a='" + a.id + "'" + (AREAS_TEL.indexOf(a.id) < 0 ? " class='extra'" : "") + "><i>" + a.n.slice(0, i) + "</i><span>" + (a.c ? "<em class='lg'>" + a.n.slice(i + 1) + "</em><em class='cu'>" + a.c + "</em>" : a.n.slice(i + 1)) + "</span></button>"; }).join("") +
     (mais ? "<button data-a='mais' class='so-tel'><i>☰</i><span>Mais</span></button>" : "");
   $$("#areas button").forEach(function (b) { b.onclick = function () { if (b.dataset.a === "mais") return abrirMais(); $("#maisMenu").hidden = true; var a = AREAS.find(function (x) { return x.id === b.dataset.a; }); ir(paginasDe(a)[0][0]); }; });
-  ir("ini");
+  ir(inicio());
 }
 function marcar(pg) {
   PAGINA = pg; var a = areaDe(pg) || AREAS[0];
@@ -52,7 +59,7 @@ function marcar(pg) {
 }
 /* ir para uma página (também chamado pelo módulo de stock, ex.: depois de criar uma encomenda) */
 function ir(pg) {
-  var a = areaDe(pg), ent = a && a.p.find(function (x) { return x[0] === pg; }); if (!a || (a.adm && !ADMIN) || (ent[2] && ent[2].adm && !ADMIN)) pg = "ini";
+  var a = areaDe(pg), ent = a && a.p.find(function (x) { return x[0] === pg; }); if (!a || (a.adm && !ADMIN) || (ent[2] && ent[2].adm && !ADMIN)) { pg = inicio(); a = areaDe(pg); }
   if (NEXP[pg]) { vistaBase("nex"); marcar(pg); nexMostrar(pg); }
   else {
     var v = VISTA_DA[pg] || pg;
@@ -274,7 +281,7 @@ $("#bCarregar").onclick = function () { $("#fCarregar").click(); };
 $("#fCarregar").onchange = function () { var fs = Array.from(this.files || []); this.value = ""; if (fs.length) carregarFicheiros(fs); };
 
 /* ---------------- telemóvel: barra de áreas em baixo, "Mais" para as restantes ---------------- */
-var AREAS_TEL = ["ini", "des", "tes", "cst"];
+var AREAS_TEL = ["ini", "cx", "dcs", "cpr"];   // barra do telemóvel; a do funcionário acerta-se em montarMenu
 function abrirMais() {
   var el = $("#maisMenu"); el.hidden = !el.hidden; if (el.hidden) return;
   el.innerHTML = "<div class='mm'>" + areasVisiveis().filter(function (a) { return AREAS_TEL.indexOf(a.id) < 0; }).map(function (a) { return "<button data-a='" + a.id + "'>" + a.n + "</button>"; }).join("") + "</div>";

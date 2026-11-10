@@ -13,12 +13,20 @@
     m: '<path d="M12 5v14M5 12h14"/>',
     x: '<path d="M4 7h16M4 12h16M4 17h16"/>',
     r: '<path d="M15 6l-6 6 6 6"/>',
-    s: '<path d="M10 4H5v16h5M15 8l4 4-4 4M19 12H9"/>'
+    s: '<path d="M10 4H5v16h5M15 8l4 4-4 4M19 12H9"/>',
+    g: '<path d="M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h12M4 10h10M14 8l3 2v8a1.5 1.5 0 0 0 3 0V9l-3-3"/>',
+    h: '<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M3 4h2l2.5 11h11L21 7H6.5"/>',
+    k: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/>',
+    o: '<path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>',
+    u: '<circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14c2.8 0 5 2.2 5 5"/>'
   };
   /* páginas que no menu são uma só, com separadores em cima */
-  var GRUPOS = [{n: "Receções", p: ["ent", "dig", "comb"]}, {n: "Vendas", p: ["ven", "va", "maq"]}];
+  var GRUPOS = [{n: "Receções", p: ["ent", "dig"]}, {n: "Vendas", p: ["ven", "va", "maq"]}];
   function grupoDe(pg) { return GRUPOS.find(function (g) { return g.p.indexOf(pg) >= 0; }); }
-  var IC_AREA = {ini: "p", des: "d", tes: "t", cst: "c", con: "f", adm: "a"};
+  var IC_AREA = {ini: "p", cx: "t", cmb: "g", stk: "c", cpr: "h", cnf: "f", frn: "k", res: "d", dcs: "o", eqp: "u", def: "a"};
+  /* título de cada bloco do menu (Dia a dia · Controlo · Gestão), quando a área seguinte muda de bloco; o funcionário, com 2 áreas, não os vê */
+  function blocoDe(x) { var b = ""; for (var i = 0; i < AREAS.length; i++) { if (AREAS[i].b) b = AREAS[i].b; if (AREAS[i] === x) return b; } return b; }
+  function blocos(L) { var ant = ""; return function (x) { var b = blocoDe(x); if (!ADMIN || b === ant) return ""; ant = b; return "<b class='bBloco'>" + b + "</b>"; }; }
   function ic(n) { return '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">' + ICONES[n] + "</svg>"; }
   function nomeArea(a) { return a.n.slice(a.n.indexOf(" ") + 1); }
   function sem(t) { return String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); }
@@ -85,8 +93,9 @@
     var vistos = {}, itens = ps.filter(function (p) { var g = grupoDe(p[0]); if (!g) return true; if (vistos[g.n]) return false; return vistos[g.n] = 1; });
     function emFoco(p) { var g = grupoDe(p[0]); return p[0] === pg || (g && g === grp); }
     function rotulo(p) { var g = grupoDe(p[0]); return g ? g.n : p[1]; }
+    var bl = blocos();
     $("#bAreas").innerHTML = areasVisiveis().map(function (x) {
-      var on = x.id === a.id, h = "<button data-a='" + x.id + "' title='" + nomeArea(x) + "'" + (on ? " class='on' aria-current='true'" : "") + ">" + ic(IC_AREA[x.id]) + "<span class='tx'>" + nomeArea(x) + "</span>" + seloH(x) + "</button>";
+      var on = x.id === a.id, h = bl(x) + "<button data-a='" + x.id + "' title='" + nomeArea(x) + "'" + (on ? " class='on' aria-current='true'" : "") + ">" + ic(IC_AREA[x.id]) + "<span class='tx'>" + nomeArea(x) + "</span>" + seloH(x) + "</button>";
       if (on && ps.length > 1) h += "<div class='sub'>" + itens.map(function (p) {
         var g = (p[2] && p[2].g) || "", t = g && g !== gr && !grupoDe(p[0]) ? "<b>" + g + "</b>" : ""; if (!grupoDe(p[0])) gr = g || gr;
         return t + "<button data-p='" + p[0] + "'" + (emFoco(p) ? " class='on' aria-current='page'" : "") + ">" + rotulo(p) + "</button>";
@@ -190,8 +199,8 @@
   function abrirMais() {
     if ($("#bMais")) return fecharTudo();
     fecharTudo();
-    var el = document.createElement("div"); el.id = "bMais";
-    el.innerHTML = "<div>" + areasVisiveis().filter(function (a) { return AREAS_TEL.indexOf(a.id) < 0; }).map(function (a) { return "<button data-a='" + a.id + "'>" + ic(IC_AREA[a.id]) + nomeArea(a) + "</button>"; }).join("") +
+    var el = document.createElement("div"), blM = blocos(); el.id = "bMais";
+    el.innerHTML = "<div>" + areasVisiveis().filter(function (a) { return AREAS_TEL.indexOf(a.id) < 0; }).map(function (a) { return blM(a) + "<button data-a='" + a.id + "'>" + ic(IC_AREA[a.id]) + nomeArea(a) + "</button>"; }).join("") +
       "<button data-x='sair'>" + ic("s") + "Sair</button></div>";
     el.onclick = function (e) {
       var b = e.target.closest("button"); fecharTudo(); if (!b) return;
@@ -203,7 +212,7 @@
 
   /* ---- botão Novo ---- */
   function acoesNovo() {
-    var L = [["Registar turno", "Caixa do dia", function () { ir("reg"); }]];
+    var L = ADMIN ? [["Registar turno", "Caixa do dia", function () { ir("reg"); }]] : [];
     if (ADMIN) L.push(
       ["Carregar ficheiro", "Turno, Repsol, TMS, vendas ou encomenda", function () { $("#bCarregar").click(); }],
       ["Fotografar fatura", "M.Cunha e Vendeiro", function () { ir("dig"); $("#bDigFoto").click(); }],
