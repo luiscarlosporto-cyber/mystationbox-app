@@ -990,8 +990,59 @@ function lerServicoRepsol(linhas) {
   r.verificacoes = erros.length ? erros.map(function (e) { return {nivel: "erro", texto: e}; }) : [{nivel: "ok", texto: r.linhas.length + " linhas; contas certas"}];
   return r;
 }
+/* ---------------- valor total dos documentos da Saphety (tradução de caixa_app/total_documento.py) ---------------- */
+function lerTotalDocumento(linhas) {
+  var NUM = "-?\\d{1,3}(?:\\.\\d{3})*,\\d{2}-?|-?\\d+,\\d{2}-?";
+  var c = function (txt) { var t = txt.trim(), neg = /-$/.test(t) || /^-/.test(t); t = t.replace(/^-+|-+$/g, ""); if (t.indexOf(",") >= 0) t = t.replace(/\./g, "").replace(",", "."); var v = Math.round(parseFloat(t) * 100); return neg ? -v : v; };
+  var L = linhas.map(function (l) { return l.replace(/\s+/g, " ").trim(); }).filter(function (l) { return l; });
+  var procura = function (re) { for (var i = 0; i < L.length; i++) { var m = re.exec(L[i]); if (m) return m; } return null; };
+  var todas = function (re) { return L.map(function (l) { return re.exec(l); }).filter(function (m) { return m; }); };
+  var r = {valor_c: null, regra: null, motivo: null}, m, v;
+  m = procura(new RegExp("Importância a liquidar:\\s*(" + NUM + ")"));
+  if (m) {
+    v = c(m[1]);
+    var q = todas(new RegExp("^23%\\s+(" + NUM + ")\\s+(" + NUM + ")$"));
+    if (q.length) { var soma = q.reduce(function (s, x) { return s + c(x[1]) + c(x[2]); }, 0);
+      if (Math.abs(soma - v) > 2) { r.motivo = "base + IVA (" + soma + ") não bate com a importância a liquidar (" + v + ")"; return r; } }
+    r.valor_c = v; r.regra = "Importância a liquidar"; return r;
+  }
+  m = procura(new RegExp("^Valor Total:\\s*(" + NUM + ")$"));
+  if (m) { r.valor_c = c(m[1]); r.regra = "Valor Total"; return r; }
+  m = procura(new RegExp("VALOR A PAGAR \\.*:\\s*(" + NUM + ")"));
+  if (m) { r.valor_c = c(m[1]); r.regra = "Valor a pagar"; return r; }
+  m = procura(new RegExp("^Total factura\\s+(" + NUM + ")$"));
+  if (m) { r.valor_c = c(m[1]); r.regra = "Total factura"; return r; }
+  m = procura(new RegExp("^Saldo :\\s*(" + NUM + ")$"));
+  var d = procura(new RegExp("^Total Debitos :\\s*(" + NUM + ")$")), cr = procura(new RegExp("^Total Creditos :\\s*(" + NUM + ")$"));
+  if (m && d && cr) {
+    var deb = c(d[1]), cred = c(cr[1]), saldo = c(m[1]);
+    if (Math.abs(deb - cred) !== Math.abs(saldo)) { r.motivo = "débitos − créditos (" + (deb - cred) + ") não bate com o saldo (" + saldo + ")"; return r; }
+    r.valor_c = deb - cred; r.regra = "Saldo da liquidação (débitos − créditos)"; return r;
+  }
+  for (var i = 0; i < L.length; i++) {
+    if (L[i] !== "Valor Total") continue;
+    var s2 = 0;
+    for (var j = i + 1; j < Math.min(i + 12, L.length); j++) {
+      var b = new RegExp("^IVA à taxa de [\\d,]+%.*?\\s(" + NUM + ")(?:\\s+(" + NUM + "))?$").exec(L[j]);
+      if (b) { s2 += c(b[1]) + (b[2] ? c(b[2]) : 0); continue; }
+      var t = /^(\d+\.\d{2})$/.exec(L[j]);
+      if (t) { v = c(t[1]);
+        if (s2 && Math.abs(s2 - v) > 2) { r.motivo = "bases + IVA (" + s2 + ") não batem com o valor total (" + v + ")"; return r; }
+        r.valor_c = v; r.regra = "Valor Total (autofatura)"; return r; }
+    }
+    break;
+  }
+  m = procura(new RegExp("^TOTAL\\s+(" + NUM + ")$"));
+  if (m) {
+    v = c(m[1]);
+    var st = procura(new RegExp("Subtotal :\\s*(" + NUM + ")$")), iva = procura(new RegExp("^TOTAL IVA\\s+(" + NUM + ")$"));
+    if (st && iva && Math.abs(c(st[1]) + c(iva[1]) - v) > 2) { r.motivo = "subtotal + IVA não bate com o total"; return r; }
+    r.valor_c = v; r.regra = "TOTAL"; return r;
+  }
+  r.motivo = "não encontrei a linha do total"; return r;
+}
 var MOTOR = {num: num, num1: num1, pt: pt, lerTurno: lerTurno, pdfPaginas: pdfPaginas, lerDocumento: lerDocumento, classificarDoc: classificarDoc, verificar: verificar,
   lerFecho: lerFecho, pontuarFecho: pontuarFecho, lerMB: lerMB, lerSolred: lerSolred, verificarMB: verificarMB, verificarSolred: verificarSolred, turnoSugerido: turnoSugerido, classificarFecho: classificarFecho, valores: valores, ratio: ratio,
-  lerServicoRepsol: lerServicoRepsol, lerTMS: lerTMS, lerTMSBytes: lerTMSBytes, inteiro100: inteiro100, turnoDoFecho: turnoDoFecho, turnoSeguinte: turnoSeguinte, lerVendasCBOS: lerVendasCBOS, lerFolhaFecho: lerFolhaFecho, lerTaxasRepsol: lerTaxasRepsol, lerPrecosRepsol: lerPrecosRepsol, PRECOS_ENSE: PRECOS_ENSE};
+  lerServicoRepsol: lerServicoRepsol, lerTMS: lerTMS, lerTMSBytes: lerTMSBytes, inteiro100: inteiro100, turnoDoFecho: turnoDoFecho, turnoSeguinte: turnoSeguinte, lerVendasCBOS: lerVendasCBOS, lerFolhaFecho: lerFolhaFecho, lerTaxasRepsol: lerTaxasRepsol, lerPrecosRepsol: lerPrecosRepsol, lerTotalDocumento: lerTotalDocumento, PRECOS_ENSE: PRECOS_ENSE};
 if (typeof module !== "undefined" && module.exports) module.exports = MOTOR; else raiz.MOTOR = MOTOR;
 })(typeof window !== "undefined" ? window : globalThis);

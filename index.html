@@ -213,6 +213,9 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
     <div id="preCorpo" style="display:grid;gap:12px"></div>
   </div>
 
+  <!-- CONFORMIDADE: PESQUISAR DOCUMENTOS -->
+  <div id="v-pdoc" class="v" hidden></div>
+
   <!-- COMPRAS: DIGITALIZAR FATURAS DE FORNECEDORES -->
   <div id="v-dig" class="v" hidden>
     <div class="bar"><button class="btn p" id="bDigFoto">📷 Fotografar fatura</button><button class="btn" id="bDig">📄 Escolher PDF ou imagem</button><input type="file" id="fDigFoto" accept="image/*" capture="environment" hidden><input type="file" id="fDig" accept="application/pdf,.pdf,image/*" hidden></div>
@@ -518,6 +521,7 @@ entrar().catch(function(e){$("#vLogin").hidden=false;$("#lErro").textContent=fal
 <script src="kms.js"></script>
 <script src="relpdf.js"></script>
 <script src="precos.js"></script>
+<script src="pesquisa_docs.js"></script>
 <script src="avisos.js"></script>
 <script src="faturas_ler.js"></script>
 <script src="faturas.js"></script>
