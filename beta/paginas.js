@@ -57,7 +57,10 @@
   /* ---- Documentos para a contabilidade ---- */
   var DOC_M = null;
   async function documentos(M) {
-    var box = $("#v-doc"); M = M || DOC_M || addMes(hojeISO(0).slice(0, 7), -1); DOC_M = M;
+    /* no topo, a pesquisa em todos os meses (pesquisa_docs.js); por baixo, a lista do mês, que se esconde enquanto se procura */
+    if (!$("#docMes")) $("#v-doc").innerHTML = "<div id='docPesq'></div><div id='docMes'></div>";
+    if (window.pdocMontar) pdocMontar($("#docPesq"));
+    var box = $("#docMes"); M = M || DOC_M || addMes(hojeISO(0).slice(0, 7), -1); DOC_M = M;
     var b = barraMes("doc", M, documentos), ini = M + "-01", fim = addMes(M, 1) + "-01";
     box.innerHTML = b.h + "<div class='bl ske' style='height:240px'></div>"; b.ligar();
     try {
@@ -116,7 +119,7 @@
   function rever() {
     $$("main table").forEach(function (tb) {
       if (tb.__f) return ajustarTabela(tb);
-      var n = tb.tBodies[0] ? tb.tBodies[0].rows.length : 0; if (n <= 40) return;
+      var n = tb.tBodies[0] ? tb.tBodies[0].rows.length : 0; if (n <= 40 || tb.closest("#v-doc")) return;   // Documentos tem a sua pesquisa (todos os meses)
       var alvo = tb.closest(".sc") || tb, topo = document.createElement("div"), fim = document.createElement("div");
       topo.className = "tbTopo"; topo.innerHTML = "<input type='search' placeholder='Procurar nesta lista' aria-label='Procurar nesta lista'><span class='mut'></span>";
       fim.className = "tbFim"; fim.innerHTML = "<button class='btn' type='button'></button>";

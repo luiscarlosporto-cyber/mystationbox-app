@@ -1,5 +1,8 @@
 /* mystationbox · pesquisa de documentos (10/11/2026, pedido do dono).
- * Conformidade → Pesquisar documentos: procura por número, entre datas e entre valores, nas duas estações, em
+ * Fica no topo de Conformidade → Documentos (beta/paginas.js chama pdocMontar): com a caixa vazia a página mostra
+ * a lista do mês; ao escrever (ou com «mais filtros») mostra só os documentos encontrados, de todos os meses.
+ * Link direto (ex.: nos avisos «Documento da Saphety não lido»): …/mystationbox-app/#doc=0008441890&est=sto.
+ * Procura por número, entre datas e entre valores, nas duas estações, em
  *   - documentos da Saphety recolhidos pelo OCTAN AI (liquidações, faturas, notas de crédito, autofaturas…);
  *   - despesas (faturas de fornecedores, recibos, guias), faturas digitalizadas e créditos por transferência.
  * O valor dos documentos da Saphety lê-se do próprio PDF com MOTOR.lerTotalDocumento (= caixa_app/total_documento.py)
@@ -7,7 +10,8 @@
  * com um número aproximado: aparece na pesquisa por número e por data, não na pesquisa por valor.
  * Só lê; a única escrita é guardar o valor lido dos documentos da Saphety (administrador). */
 "use strict";
-var PDOC = {lista: null, aLer: false};
+var PDOC = {lista: null, aLer: false, link: null};
+var PDOC_GMAIL = {sto: "portojoaonuneslda@gmail.com", pnf: "portonuneslda@gmail.com"};   // contas que recebem os emails da Saphety
 var PDOC_TIPOS = [["", "Todos os tipos"], ["liq", "Liquidação"], ["fat", "Fatura"], ["nc", "Nota de crédito"], ["auto", "Autofatura Solred"], ["desp", "Despesa"], ["forn", "Fatura de fornecedor (digitalizada)"], ["transf", "Crédito por transferência"]];
 function pdocNorm(t) { return String(t || "").toLowerCase().replace(/[\s\/\-.]/g, "").replace(/^0+/, ""); }
 /* tipo e nome legível de um documento da Saphety, pela série do número */
@@ -48,7 +52,7 @@ async function pdocLerValores() {
   PDOC.aLer = true;
   for (var i = 0; i < falta.length; i++) {
     var x = falta[i];
-    $("#pdocProg").textContent = "⏳ A ler o valor dos documentos da Saphety: " + (i + 1) + " de " + falta.length + "…";
+    if ($("#pdocProg")) $("#pdocProg").textContent = "⏳ A ler o valor dos documentos da Saphety: " + (i + 1) + " de " + falta.length + "…";
     try {
       var f = await sb.storage.from("msb-originais").download(x.o); if (f.error) throw f.error;
       var pags = await MOTOR.pdfPaginas(new Uint8Array(await f.data.arrayBuffer()), inflar), L = [];
@@ -60,11 +64,16 @@ async function pdocLerValores() {
     } catch (e) { continue; }   // sem rede ou original em falta: tenta na próxima vez que abrir a página
     if (i % 10 === 9) pdocMostrar();
   }
-  PDOC.aLer = false; $("#pdocProg").textContent = ""; pdocMostrar();
+  PDOC.aLer = false; if ($("#pdocProg")) $("#pdocProg").textContent = ""; pdocMostrar();
 }
 function pdocValor(t) { var s = String(t || "").trim(); if (!s) return null; var v = MOTOR.num(s); return isNaN(v) ? null : Math.round(Math.abs(v) * 100); }
 function pdocMostrar() {
-  var box = $("#pdocRes"); if (!box || !PDOC.lista) return;
+  var box = $("#pdocRes"); if (!box) return;
+  var ativo = ["pdocNum", "pdocDe", "pdocAte", "pdocVmin", "pdocVmax", "pdocTipo", "pdocEst"].some(function (id) { return $("#" + id).value.trim(); });
+  box.hidden = !ativo; $("#pdocLimpar").hidden = !ativo;
+  if ($("#docMes")) $("#docMes").hidden = ativo;
+  if (!ativo) return;
+  if (!PDOC.lista) { box.innerHTML = "<div class='mut'>A carregar todos os documentos…</div>"; return; }
   var est = $("#pdocEst").value, tipo = $("#pdocTipo").value, nn = pdocNorm($("#pdocNum").value), de = $("#pdocDe").value, ate = $("#pdocAte").value,
     vmin = pdocValor($("#pdocVmin").value), vmax = pdocValor($("#pdocVmax").value), porValor = vmin != null || vmax != null;
   var R = PDOC.lista.filter(function (x) {
@@ -91,28 +100,68 @@ function pdocMostrar() {
             (refs.length ? "<span style='font-size:12px;flex:1;min-width:0'>" + refs.slice(0, 6).map(function (r) { return "<a href='#' data-n='" + esc(r) + "'>↳ " + esc(r) + "</a>"; }).join(" ") + (refs.length > 6 ? " <span class='mut'>+" + (refs.length - 6) + "</span>" : "") + "</span>" : "<span style='flex:1'></span>") +
             (x.o ? "<button class='mini' data-o='" + esc(x.o) + "' data-b='" + x.b + "'>📄 Abrir PDF</button>" : "<span class='mut' style='font-size:12px'>sem PDF</span>") +
           "</div></div>";
-      }).join("") + "</div>" : "<div class='vazio'>Nenhum documento com estes critérios.</div>");
+      }).join("") + "</div>" : pdocNaoEncontrado(est, $("#pdocNum").value.trim()));
   box.querySelectorAll("[data-o]").forEach(function (b) { b.onclick = function () { if (b.dataset.b === "desp") verDocumentoDespesa(b.dataset.o); else abrirOriginal(b.dataset.o); }; });
+  var rep = $("#pdocRepetir"); if (rep) rep.onclick = pdocRepetir;
   box.querySelectorAll("[data-n]").forEach(function (a) { a.onclick = function (ev) { ev.preventDefault(); $("#pdocNum").value = a.dataset.n; $("#pdocTipo").value = ""; pdocMostrar(); }; });
 }
-async function carregarPesquisaDocs() {
-  var box = $("#v-pdoc");
-  if (!$("#pdocRes")) {
-    box.innerHTML = "<div class='card' style='padding:14px'><h2 style='margin:0 0 4px'>🔎 Pesquisar documentos</h2>" +
-      "<p class='mut' style='margin:0 0 10px;font-size:14px'>Liquidações, faturas, notas de crédito e autofaturas da Saphety, despesas e créditos por transferência. Escreva só parte do número, por exemplo «8442523» ou «4211798654». Os valores procuram-se sem sinal (uma nota de crédito de 147,23 € aparece entre 100 e 200).</p>" +
-      "<div class='ff'><label>Estação<select id='pdocEst'><option value=''>Todas</option>" + ESTS.map(function (e) { return "<option value='" + e.id + "'>" + esc(e.short_name || e.name) + "</option>"; }).join("") + "</select></label>" +
-      "<label>Tipo<select id='pdocTipo'>" + PDOC_TIPOS.map(function (t) { return "<option value='" + t[0] + "'>" + t[1] + "</option>"; }).join("") + "</select></label>" +
-      "<label>N.º do documento<input id='pdocNum' placeholder='ex.: 8442523' autocomplete='off'></label>" +
-      "<label>Data de<input id='pdocDe' type='date'></label><label>Data até<input id='pdocAte' type='date'></label>" +
-      "<label>Valor de (€)<input id='pdocVmin' class='n' inputmode='decimal' placeholder='0,00'></label><label>Valor até (€)<input id='pdocVmax' class='n' inputmode='decimal' placeholder='0,00'></label></div>" +
-      "<div class='bar' style='margin-top:8px'><button class='btn' id='pdocLimpar'>Limpar</button><button class='btn' id='pdocRecarregar'>↻ Atualizar</button><span id='pdocProg' class='mut' style='font-size:13px'></span></div></div>" +
-      "<div id='pdocRes'><div class='mut'>A carregar…</div></div>";
-    ["pdocEst", "pdocTipo", "pdocNum", "pdocDe", "pdocAte", "pdocVmin", "pdocVmax"].forEach(function (id) { $("#" + id).oninput = pdocMostrar; $("#" + id).onchange = pdocMostrar; });
-    $("#pdocLimpar").onclick = function () { ["pdocNum", "pdocDe", "pdocAte", "pdocVmin", "pdocVmax"].forEach(function (id) { $("#" + id).value = ""; }); $("#pdocTipo").value = ""; $("#pdocEst").value = ""; pdocMostrar(); };
-    $("#pdocRecarregar").onclick = function () { PDOC.lista = null; carregarPesquisaDocs(); };
-  }
+/* nada encontrado: com número, pode ser um documento da Saphety que o OCTAN AI ainda não conseguiu descarregar */
+function pdocNaoEncontrado(est, num) {
+  if (!num) return "<div class='vazio'>Nenhum documento com estes critérios.</div>";
+  var ests = est ? [est] : ESTS.map(function (e) { return e.id; });
+  return "<div class='aviso' style='display:grid;gap:8px'><b>Não encontrei o documento «" + esc(num) + "» na app.</b>" +
+    "<span style='font-size:14px'>Se veio num aviso «Documento da Saphety não lido», o OCTAN AI ainda não o conseguiu descarregar. Pode pedir uma nova recolha ou abrir o email original da Saphety.</span>" +
+    "<div class='bar'>" + (ADMIN ? "<button class='btn p' id='pdocRepetir'>🔁 Tentar de novo</button>" : "") +
+    ests.filter(function (e) { return PDOC_GMAIL[e]; }).map(function (e) { var nm = (ESTS.find(function (x) { return x.id === e; }) || {}).short_name || e;
+      return "<a class='btn' target='_blank' rel='noopener' href='https://mail.google.com/mail/?authuser=" + encodeURIComponent(PDOC_GMAIL[e]) + "#search/" + encodeURIComponent("from:saphety " + num.replace(/^0+/, "")) + "'>✉️ Email original" + (ests.length > 1 ? " · " + esc(nm) : "") + "</a>"; }).join("") +
+    "</div><span id='pdocRepMsg' class='mut' style='font-size:13px'></span></div>";
+}
+/* pede ao OCTAN AI nova recolha da Saphety (últimos 120 dias) da estação escolhida, ou das duas */
+async function pdocRepetir() {
+  var b = this, est = $("#pdocEst").value, ests = est ? [est] : ESTS.map(function (e) { return e.id; }), msg = $("#pdocRepMsg");
+  var hoje = new Date(), de = new Date(hoje.getTime() - 120 * 864e5), iso = function (d) { return d.toISOString().slice(0, 10); };
+  b.disabled = true;
   try {
-    if (!PDOC.lista) { $("#pdocRes").innerHTML = "<div class='mut'>A carregar…</div>"; await pdocCarregar(); }
+    var r = await sb.from("msb_pedidos").insert(ests.map(function (e) { return {estacao: e, de: iso(de), ate: iso(hoje), pasta: "SAPHETY", pedido_por: (PERFIL && PERFIL.display_name) || "app"}; }));
+    if (r.error) throw r.error;
+    msg.textContent = "✔ Pedido enviado ao OCTAN AI. O PC vê os pedidos de 2 em 2 minutos; a recolha leva 5 a 10 minutos. Depois carregue em ↻ e volte a procurar.";
+  } catch (e) { b.disabled = false; msg.textContent = "⚠ " + falhou(e); }
+}
+/* monta a pesquisa no topo da página Documentos; a lista do mês fica em #docMes */
+function pdocMontar(caixa) {
+  if ($("#pdocNum")) { pdocAplicarLink(); pdocMostrar(); return; }   // já montada: só o link direto, se houver
+  caixa.innerHTML = "<div class='card' style='padding:12px;display:grid;gap:8px'>" +
+    "<div style='display:flex;gap:8px'><input id='pdocNum' type='text' inputmode='search' placeholder='🔎 Procurar em todos os meses: n.º do documento (ex.: 8439313)' autocomplete='off' style='flex:1;min-width:0;padding:11px 12px;border:1px solid var(--bd);border-radius:10px;font-size:16px'>" +
+    "<button class='btn' id='pdocLimpar' hidden title='Limpar a pesquisa'>✕</button></div><span id='pdocProg' class='mut' style='font-size:13px'></span>" +
+    "<details id='pdocMais'><summary class='mut' style='cursor:pointer;font-size:14px'>Mais filtros: tipo, estação, datas e valores</summary>" +
+    "<div class='ff' style='margin-top:8px'><label>Tipo<select id='pdocTipo'>" + PDOC_TIPOS.map(function (t) { return "<option value='" + t[0] + "'>" + t[1] + "</option>"; }).join("") + "</select></label>" +
+    "<label>Estação<select id='pdocEst'><option value=''>Todas</option>" + ESTS.map(function (e) { return "<option value='" + e.id + "'>" + esc(e.short_name || e.name) + "</option>"; }).join("") + "</select></label>" +
+    "<label>Data de<input id='pdocDe' type='date'></label><label>Data até<input id='pdocAte' type='date'></label>" +
+    "<label>Valor de (€)<input id='pdocVmin' class='n' inputmode='decimal' placeholder='0,00'></label><label>Valor até (€)<input id='pdocVmax' class='n' inputmode='decimal' placeholder='0,00'></label></div>" +
+    "<p class='mut' style='margin:6px 0 0;font-size:13px'>Os valores procuram-se sem sinal: uma nota de crédito de 147,23 € aparece entre 100 e 200. <a href='#' id='pdocRecarregar'>↻ Atualizar documentos</a></p></details></div>" +
+    "<div id='pdocRes' hidden style='margin-top:10px'></div>";
+  ["pdocEst", "pdocTipo", "pdocNum", "pdocDe", "pdocAte", "pdocVmin", "pdocVmax"].forEach(function (id) { $("#" + id).oninput = pdocMostrar; $("#" + id).onchange = pdocMostrar; });
+  $("#pdocLimpar").onclick = function () { ["pdocNum", "pdocDe", "pdocAte", "pdocVmin", "pdocVmax", "pdocTipo", "pdocEst"].forEach(function (id) { $("#" + id).value = ""; }); pdocMostrar(); };
+  $("#pdocRecarregar").onclick = function (ev) { ev.preventDefault(); PDOC.lista = null; pdocPreparar(); };
+  pdocAplicarLink(); pdocMostrar(); pdocPreparar();
+}
+function pdocAplicarLink() {
+  if (!PDOC.link) return;
+  $("#pdocNum").value = PDOC.link.n;
+  if (PDOC.link.est && ESTS.some(function (e) { return e.id === PDOC.link.est; })) { $("#pdocEst").value = PDOC.link.est; $("#pdocMais").open = true; }
+  PDOC.link = null;
+}
+async function pdocPreparar() {
+  try {
+    if (!PDOC.lista) { await pdocCarregar(); }
     pdocMostrar(); pdocLerValores();
-  } catch (e) { $("#pdocRes").innerHTML = "<div class='aviso'>⚠ " + esc(falhou(e)) + "</div>"; }
+  } catch (e) { var r = $("#pdocRes"); if (r) { r.hidden = false; r.innerHTML = "<div class='aviso'>⚠ " + esc(falhou(e)) + "</div>"; } }
+}
+/* link direto: #doc=NÚMERO&est=sto abre Documentos com o número já procurado (só administradores veem a página) */
+function pdocLink() {
+  var h = location.hash || "", m = /[#&]doc=([^&]+)/.exec(h); if (!m || !ADMIN) return false;
+  var e = /[#&]est=([a-z]+)/.exec(h);
+  PDOC.link = {n: decodeURIComponent(m[1]), est: e ? e[1] : ""};
+  try { history.replaceState(null, "", location.pathname + location.search); } catch (x) { /* fica o # na barra, sem mal */ }
+  ir("doc"); return true;
 }

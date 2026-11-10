@@ -10,7 +10,7 @@ var AREAS = [   // ordem aprovada a 05/11/2026: decisão, operação e controlo,
   {id: "des", n: "📊 Desempenho", adm: 1, p: [["liv", "Livro de movimentos", {g: "Movimentos"}], ["ven", "Vendas e margens", {g: "Vendas"}], ["va", "Relatório de vendas", {g: "Vendas"}], ["maq", "Máquina de tabaco", {g: "Vendas"}], ["fun", "Por funcionário", {g: "Análise"}]]},
   {id: "tes", n: "💶 Tesouraria", p: [["reg", "Registo diário", {g: "Caixa"}], ["sai", "Saídas de caixa", {g: "Caixa"}], ["his", "Histórico", {g: "Caixa"}], ["rep", "Repsol e Multibanco", {g: "Conferências", adm: 1}], ["tms", "Fecho mensal TMS", {g: "Conferências", adm: 1}], ["dsp", "Despesas", {g: "Despesas", adm: 1}], ["ban", "Banco", {g: "Banco", adm: 1}]]},
   {id: "cst", n: "🛒 Compras e Stocks", c: "Compras", p: [["enc", "Por aprovar", {g: "Compras", adm: 1}], ["nova", "Nova encomenda", {g: "Compras", adm: 1}], ["comh", "Encomendas feitas", {g: "Compras", adm: 1}], ["ent", "Entrada de mercadoria", {g: "Receções", adm: 1}], ["dig", "Digitalizar fatura", {g: "Receções", adm: 1}], ["comb", "Entrada de combustível", {g: "Receções", adm: 1}], ["contar", "Contar", {g: "Stock"}], ["ler", "Ler código", {g: "Stock"}], ["stock", "Stock atual", {g: "Stock"}], ["inv", "Inventário", {g: "Stock"}], ["mov", "Movimentos", {g: "Stock"}]]},
-  {id: "con", n: "📋 Conformidade", adm: 1, p: [["pdoc", "Pesquisar documentos", {g: "Contabilidade"}], ["kms", "Mapa de kms do gerente", {g: "Contabilidade"}]]},
+  {id: "con", n: "📋 Conformidade", adm: 1, p: [["kms", "Mapa de kms do gerente", {g: "Contabilidade"}]]},
   {id: "adm", n: "⚙️ Administração", adm: 1, p: [["eq", "Equipa e acessos", {g: "Pessoas"}], ["mrg", "Margens e custos", {g: "Regras"}], ["prod", "Produtos e códigos", {g: "Regras"}], ["cfg", "Configuração do stock", {g: "Regras"}]]}
 ];
 /* páginas do módulo de stock: separador e cartões (pelo título, ou "#id" do cartão) a mostrar ou esconder.
@@ -25,7 +25,7 @@ var NEXP = {
   prod: {tab: "settings", only: ["Gestão de produtos"]},
   cfg: {tab: "settings", only: ["Configuração da base de dados central", "Importante"]}
 };
-var VISTA_DA = {avi: "avi", ini: "ini", reg: "reg", sai: "sai", his: "his", ven: "tab", comh: "tab", mov: "tab", rep: "rep", tms: "tms", mes: "mes", fun: "fun", eq: "ges", luc: "luc", cdm: "cdm", mrg: "mrg", comb: "comb", ense: "ense", va: "va", kms: "kms", pre: "pre", dig: "dig", dsp: "dsp", ban: "ban", liv: "liv", pdoc: "pdoc"};
+var VISTA_DA = {avi: "avi", ini: "ini", reg: "reg", sai: "sai", his: "his", ven: "tab", comh: "tab", mov: "tab", rep: "rep", tms: "tms", mes: "mes", fun: "fun", eq: "ges", luc: "luc", cdm: "cdm", mrg: "mrg", comb: "comb", ense: "ense", va: "va", kms: "kms", pre: "pre", dig: "dig", dsp: "dsp", ban: "ban", liv: "liv"};
 var PAGINA = "ini";
 /* confirmação: na beta é uma janela da app; na versão atual continua a do navegador */
 function msbConfirma(t, acao) { return window.MSB_NAV ? MSB_NAV.confirma(t, acao) : Promise.resolve(confirm(t)); }
@@ -35,7 +35,7 @@ function areaDe(pg) { return AREAS.find(function (a) { return a.p.some(function 
 
 function montarMenu() {
   if (!$("#equipa").parentElement.matches("#v-ges")) $("#v-ges").appendChild($("#equipa"));
-  if (window.MSB_NAV) { MSB_NAV.montar(); return ir("ini"); }   // navegação da beta
+  if (window.MSB_NAV) { MSB_NAV.montar(); ir("ini"); if (window.pdocLink) pdocLink(); return; }   // navegação da beta; #doc=… abre um documento
   var vis = areasVisiveis(), mais = vis.some(function (a) { return AREAS_TEL.indexOf(a.id) < 0; });
   $("#areas").innerHTML = vis.map(function (a) { var i = a.n.indexOf(" "); return "<button data-a='" + a.id + "'" + (AREAS_TEL.indexOf(a.id) < 0 ? " class='extra'" : "") + "><i>" + a.n.slice(0, i) + "</i><span>" + (a.c ? "<em class='lg'>" + a.n.slice(i + 1) + "</em><em class='cu'>" + a.c + "</em>" : a.n.slice(i + 1)) + "</span></button>"; }).join("") +
     (mais ? "<button data-a='mais' class='so-tel'><i>☰</i><span>Mais</span></button>" : "");
@@ -82,7 +82,6 @@ window.depoisVista = function (v) {
   if (v === "cdm") carregarConta();
   if (v === "ban") carregarBanco();
   if (v === "liv") carregarNucleo();
-  if (v === "pdoc") carregarPesquisaDocs();
 };
 
 /* ---------------- módulo de stock embutido ---------------- */
