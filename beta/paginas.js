@@ -176,7 +176,7 @@
     var b = barraMes("car", M, carregarDocs), ini = M + "-01", fim = addMes(M, 1) + "-01", passado = M < hojeISO(0).slice(0, 7);
     var zona = "<div id='carZona' class='carZona' tabindex='0' role='button' aria-label='Escolher ficheiros para carregar'><strong>Largue aqui os ficheiros, ou toque para escolher</strong>" +
       "<span>Pode ser mais de um. A app reconhece cada ficheiro pelo conteúdo e a estação pelo próprio documento.</span>" +
-      "<small>Folha de turno (.xls) · fotografia de talão ou fatura · PDF da Repsol · fecho mensal TMS (.csv) · Turno por formas de cobrança e Folha de fecho (PDF do CBOS) · vendas de tabaco (.xlsx) · créditos por transferência e extrato do banco (Excel)</small></div>";
+      "<small>Folha de turno (.xls) · fotografia de talão ou fatura · PDF da Repsol · fecho mensal TMS (.csv) · Turno por formas de cobrança e Folha de fecho (PDF do CBOS) · vendas de tabaco (.xlsx) · créditos por transferência, extrato do banco e histórico de movimentos de carburante (Excel)</small></div>";
     var liga = function () {
       b.ligar();
       var z = $("#carZona"); if (!z) return;
@@ -199,7 +199,8 @@
         q(sb.from("msb_extratos").select("estacao,dia").gte("dia", ini).lt("dia", fim).order("dia", {ascending: false}).limit(5000)),
         q(sb.from("msb_vendas_artigos").select("estacao,de,ate").lt("de", fim).gte("ate", ini)),
         q(sb.from("msb_transferencias").select("estacao,dia").gte("dia", ini).lt("dia", fim).limit(5000)),
-        q(sb.from("msb_docs").select("estacao,emissao").gte("emissao", ini).lt("emissao", fim).limit(5000))
+        q(sb.from("msb_docs").select("estacao,emissao").gte("emissao", ini).lt("emissao", fim).limit(5000)),
+        q(sb.from("msb_comb_entradas").select("estacao,dia").gte("dia", ini).lt("dia", fim).limit(5000))
       ]);
       var de = function (i, e) { return R[i].filter(function (x) { return x.estacao === e; }); };
       var ult = function (L, k) { return L.map(function (x) { return x[k]; }).sort().pop(); };
@@ -210,6 +211,7 @@
         ["Documentos Repsol (PDF)", "rep", varios(7, "emissao", "documento", "rep")],
         ["Créditos por transferência", "rep", varios(6, "dia", "crédito", "rep")],
         ["Extrato do banco", "ban", varios(4, "dia", "movimento", "ban")],
+        ["Entradas de combustível", "comb", varios(8, "dia", "linha", "comb")],
         ["Fecho mensal TMS", "tms", um(1, "tms")],
         ["Turno por formas de cobrança", "luc", um(2, "luc")],
         ["Folha de fecho", "cmp", um(3, "cmp")],

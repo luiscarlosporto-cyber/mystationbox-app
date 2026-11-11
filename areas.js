@@ -259,9 +259,11 @@ async function carregarFicheiros(fs) {
   /* Excel de créditos MB/Solred por transferência: reconhece-se pelo cabeçalho (N.º doc. · Mont. em MI) */
   /* extrato do banco (Crédito Agrícola): reconhece-se pela primeira linha «Operação: Consulta de Movimentos de Contas» */
   var ext = []; if (ADMIN) for (var x = g.vendas.length - 1; x >= 0; x--) if (await ehExtrato(g.vendas[x])) ext.push(g.vendas.splice(x, 1)[0]);
+  /* histórico de movimentos de carburante (receções de combustível): reconhece-se pelo cabeçalho (Nº Documento · Tanque · Produto) */
+  var hcb = []; if (ADMIN) for (var y = g.vendas.length - 1; y >= 0; y--) if (await ehHistCarburante(g.vendas[y])) hcb.push(g.vendas.splice(y, 1)[0]);
   var trf = []; for (var k = g.vendas.length - 1; k >= 0; k--) if (await ehTransferencias(g.vendas[k])) trf.push(g.vendas.splice(k, 1)[0]);
   if (g[""].length || g.csv.length) ir("reg");      // a mensagem aparece na barra do Registo
-  if (g[""].length) status(false, "⚠ Não reconheço: " + g[""].map(function (f) { return f.name; }).join(", ") + ". Ficheiros aceites: folha de turno (.xls), fotografia do talão, PDF da Repsol, fecho mensal TMS (.csv), relatório de vendas de tabaco (Excel .xlsx), extrato do banco (Excel), relatório «Turno por formas de cobrança» (PDF feito com «Guardar como PDF»).");
+  if (g[""].length) status(false, "⚠ Não reconheço: " + g[""].map(function (f) { return f.name; }).join(", ") + ". Ficheiros aceites: folha de turno (.xls), fotografia do talão, PDF da Repsol, fecho mensal TMS (.csv), relatório de vendas de tabaco (Excel .xlsx), extrato do banco (Excel), histórico de movimentos de carburante (Excel), relatório «Turno por formas de cobrança» (PDF feito com «Guardar como PDF»).");
   if (g.csv.length) status(false, "⚠ " + g.csv.map(function (f) { return f.name; }).join(", ") + ": o relatório de vendas tem de ser em Excel (.xlsx), porque o CSV não diz de que estação é.");
   if (g.tms.length) { ir("tms"); for (var j = 0; j < g.tms.length; j++) await importarTMS(g.tms[j]); }
   if (g.pdf.length) { ir("rep"); carregarPdfs(g.pdf); }
@@ -273,6 +275,7 @@ async function carregarFicheiros(fs) {
   if (g.foto.length) escolherFoto(g.foto[0]);
   if (trf.length) await importarTransferencias(trf[0]);
   if (ext.length) await importarExtrato(ext[0]);
+  if (hcb.length) { COMB_PEND = hcb[0]; ir("comb"); }
   if (g.vendas.length) escolherVendas(g.vendas[0]);
   var varios = g.xls.length + g.foto.length + g.vendas.length > (g.xls.length ? 1 : 0) + (g.foto.length ? 1 : 0) + (g.vendas.length ? 1 : 0);
   if (varios) status(false, "⚠ Só se lê uma folha de turno, um talão e um relatório de vendas de cada vez: carregue os restantes depois.");

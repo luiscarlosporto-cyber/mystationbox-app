@@ -65,6 +65,7 @@ async function carregarEntradasComb() {
         if (x) x.textContent = v > 0 ? "= " + FORMATOS.numero(Math.round(v * c.gpl_kg_litros * 100) / 100, 0, 2) + " litros" : ""; }; });
       $("#ceHist").onclick = function () { $("#fCeHist").click(); };
       $("#fCeHist").onchange = function () { var f = this.files[0]; this.value = ""; if (f) importarHistCarburante(f, c, L); };
+      if (COMB_PEND) { var pf = COMB_PEND; COMB_PEND = null; importarHistCarburante(pf, c, L, true); }
       $("#ceGravar").onclick = async function () {
         var b = this, dia = $("#ceDia").value, guia = $("#ceGuia").value.trim(), nota = $("#ceNota").value.trim(), msg = $("#ceMsg"), linhas = [], mau = null;
         if (!dia) { msg.innerHTML = "<span class='bad'>Escolha a data.</span>"; return; }
@@ -106,7 +107,13 @@ async function carregarEntradasComb() {
 /* Histórico de movimentos de carburante (Excel do sistema Repsol): colunas Data, Turno, Loja, Tipo, Nº Documento, Fornecedor,
    Tanque, Produto, Volume, Volume a 15 graus, Temperatura, Montante Total. Só as linhas "Recepciones"; Volume em litros
    (o GLP também vem em litros: os kg calculam-se pelo fator). Antes de gravar mostra-se o que entra; não se repete o que já existe. */
-async function importarHistCarburante(f, c, existentes) {
+var COMB_PEND = null;   // ficheiro à espera de a página abrir na estação certa (vindo de «Carregar documentos» ou de outra estação)
+async function ehHistCarburante(f) {
+  try { await carregarXlsxMSB(); var wb = XLSX.read(new Uint8Array(await f.arrayBuffer()), {type: "array", sheetRows: 15}), L = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header: 1, defval: ""});
+    return L.some(function (r) { var t = r.map(function (x) { return String(x).trim(); }); return t.indexOf("Nº Documento") >= 0 && t.indexOf("Produto") >= 0 && t.indexOf("Tanque") >= 0; }); }
+  catch (e) { return false; }
+}
+async function importarHistCarburante(f, c, existentes, mudou) {
   var box = $("#ceHistMsg"), m = function (cls, t) { box.className = cls; box.style.padding = "10px"; box.style.borderRadius = "10px"; box.innerHTML = t; };
   m("mut", "⏳ A ler " + esc(f.name) + "…");
   try {
@@ -128,6 +135,8 @@ async function importarHistCarburante(f, c, existentes) {
     });
     var ps = Object.keys(postos), est = ESTS.find(function (x) { return (x.posto_repsol || "").toUpperCase() === ps[0]; });
     if (ps.length !== 1) throw new Error(ps.length ? "O ficheiro tem várias estações (" + ps.join(", ") + "). Exporte só uma." : "O ficheiro não diz de que estação é (coluna Loja).");
+    /* ficheiro de outra estação do dono: abre-se essa estação e continua-se lá (nada é gravado sem o «Gravar») */
+    if (est && est.id !== EST && !mudou) { COMB_PEND = f; var sl = $("#selEst"); sl.value = est.id; PAGINA = "comb"; sl.onchange(); return; }
     if (!est || est.id !== EST) throw new Error("Este ficheiro é do posto " + ps[0] + (est ? " (" + (est.short_name || est.name) + ")" : "") + ", mas está a trabalhar em " + $("#hEst").textContent + ". Mude de estação no topo e carregue de novo.");
     if (!novos.length) throw new Error("Não há receções de combustível no ficheiro.");
     /* não repetir: o que já existe com o mesmo dia, guia, produto e quantidade */
@@ -137,7 +146,7 @@ async function importarHistCarburante(f, c, existentes) {
     var gravar = novos.filter(function (x) { var k = x.dia + "|" + x.guia + "|" + x.produto + "|" + x.qtd; if (ja[k]) { ja[k]--; return false; } return true; });
     var guias = {}; gravar.forEach(function (x) { var k = x.dia + "|" + x.guia; (guias[k] = guias[k] || []).push(x); });
     var tot = gravar.reduce(function (a, x) { return a + x.qtd; }, 0);
-    m("card", "<b>" + esc(f.name) + "</b>: " + novos.length + " receções, " + (novos.length - gravar.length) + " já registadas" + (fora.length ? ", " + fora.length + " de produtos sem linha na ENSE (" + esc(fora.join(", ")) + ")" : "") + ".<br>" +
+    m("card", (mudou ? "ℹ️ Este ficheiro é de <b>" + esc(est.short_name || est.name) + "</b>: abri essa estação.<br>" : "") + "<b>" + esc(f.name) + "</b>: " + novos.length + " receções, " + (novos.length - gravar.length) + " já registadas" + (fora.length ? ", " + fora.length + " de produtos sem linha na ENSE (" + esc(fora.join(", ")) + ")" : "") + ".<br>" +
       (gravar.length ? "Vão entrar <b>" + Object.keys(guias).length + " guias</b> (" + gravar.length + " linhas, " + q100(tot) + " L):<div class='sc' style='margin-top:6px'><table><thead><tr><th>Data</th><th class='l'>Guia</th><th class='l'>Produtos</th></tr></thead><tbody>" +
         Object.keys(guias).sort().map(function (k) { var g = guias[k]; return "<tr><td>" + dmy(g[0].dia) + "</td><td class='l'><b>" + esc(g[0].guia) + "</b></td><td class='l'>" + g.map(function (x) { return esc(ENSE_PROD[x.produto].n) + ": " + q100(x.qtd) + " L" + (x.kg != null ? " (" + q100(x.kg) + " kg)" : ""); }).join("<br>") + "</td></tr>"; }).join("") +
         "</tbody></table></div><div class='bar' style='margin-top:8px'><button class='btn p' id='ceHistOk'>✔ Gravar " + Object.keys(guias).length + " guias</button><button class='btn' id='ceHistNao'>Cancelar</button></div>"
