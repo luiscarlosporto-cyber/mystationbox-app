@@ -383,7 +383,9 @@ function verificar(docs, app) {
       if (!d) add(g, "info", "Documento " + i.numdoc + " (" + i.tipo + ", " + eur(i.valor) + ") ainda não carregado");
       else { var ok = Math.abs(d.total - i.valor) <= TOL; add(g, ok ? "ok" : "erro", i.tipo + " " + i.numdoc + ": total do documento " + eur(d.total) + " " + (ok ? "=" : "≠") + " valor na liquidação " + eur(i.valor)); }
     });
-    var outros = L.itens.filter(function (i) { return i.tipo.indexOf("Visa") === 0 && lstrip0(i.pos) !== pos; });
+    var popt = lstrip0(String(app.pos_opt || "")), opt = L.itens.filter(function (i) { return popt && i.tipo.indexOf("Visa") === 0 && lstrip0(i.pos) === popt; });
+    if (opt.length) add(g, "info", opt.length + " crédito(s) MB do terminal automático (POS " + popt + "): " + eur(Math.round(opt.reduce(function (s, i) { return s + i.valor; }, 0) * 100) / 100) + ", contados à parte");
+    var outros = L.itens.filter(function (i) { return i.tipo.indexOf("Visa") === 0 && lstrip0(i.pos) !== pos && !(popt && lstrip0(i.pos) === popt); });
     if (outros.length) add(g, "info", outros.length + " crédito(s) Visas/Multibanco de outro POS ignorado(s): " + outros.map(function (i) { return "POS " + i.pos + " " + eur(i.valor); }).join(", "));
   });
   por.CCS.forEach(function (d) {

@@ -4,7 +4,16 @@
 "use strict";
 var CAMPO_COL = {func: "func", vendas: "vendas_c", mb: "mb_c", solred: "solred_c", pres: "pres_c", num: "num_c", forn: "forn_c", chq: "chq_c", lit: "lit_cl"};
 var NOME_CAMPO = {func: "Funcionário", vendas: "Vendas", mb: "MB", solred: "Solred €", pres: "Solred presente", num: "Numerário", forn: "Fornecedores", chq: "Cheques", lit: "Solred litros"};
-function posEst() { return (POSES[EST] || "").replace(/^0+/, ""); }
+/* terminal automático de combustível (OPT, só MB e Solred): o seu MB conta à parte do MB da loja (dono, 12/11/2026) */
+function posOpt(est) { return (POSES_OPT[est || EST] || "").replace(/^0+/, ""); }
+/* créditos MB do terminal automático, tirados das liquidações guardadas (uma fonte só: msb_docs) */
+function creditosOpt(docs) {
+  var p = posOpt(), R = []; if (!p) return R;
+  docs.forEach(function (d) { if (d.tipo !== "LIQ") return; (d.dados.itens || []).forEach(function (it) {
+    if (it.tipo.indexOf("Visa") === 0 && String(it.pos).replace(/^0+/, "") === p) R.push({doc: d.numero, emissao: d.emissao, data: it.data, fecho: it.fecho, numdoc: it.numdoc, valor_c: Math.round(it.valor * 100)}); }); });
+  return R.sort(function (a, b) { return a.data < b.data ? -1 : a.data > b.data ? 1 : 0; });
+}
+function posEst(est) { return (POSES[est || EST] || "").replace(/^0+/, ""); }
 function raw2(v) { return num(v).toFixed(2).replace(".", ","); }
 async function sha(bytes) { var h = await crypto.subtle.digest("SHA-256", bytes); return Array.from(new Uint8Array(h)).map(function (b) { return b.toString(16).padStart(2, "0"); }).join("").slice(0, 12); }
 async function linhaTurno(d, t) { if (d === DIA && LINHAS[t]) return LINHAS[t]; var r = await sb.from("msb_turnos").select("*").eq("estacao", EST).eq("dia", d).eq("turno", t).maybeSingle(); return r.data || null; }
@@ -212,14 +221,16 @@ $("#bPdf").onclick = function () { $("#fPdf").click(); };
 $("#fPdf").onchange = function () { var fs = Array.from(this.files || []); this.value = ""; if (fs.length) carregarPdfs(fs); };
 $("#v-rep").addEventListener("dragover", function (e) { if (ADMIN) e.preventDefault(); });
 $("#v-rep").addEventListener("drop", function (e) { if (!ADMIN) return; e.preventDefault(); var fs = Array.from(e.dataTransfer.files || []).filter(function (f) { return /pdf$/i.test(f.name) || f.type === "application/pdf"; }); if (fs.length) carregarPdfs(fs); });
-/* Grava um documento Repsol já lido e, sendo liquidação, os créditos MB deste posto. Serve o PDF carregado à mão e o que vem da Saphety. */
-async function guardarDocRepsol(rec, caminho) {
+/* Grava um documento Repsol já lido e, sendo liquidação, os créditos MB deste posto. Serve o PDF carregado à mão e o que vem da Saphety.
+   A estação vem de quem chama e fica fixa até ao fim: mudar de estação a meio de uma leitura gravava documentos de Penafiel em Santo Tirso (corrigido 12/11/2026). */
+async function guardarDocRepsol(rec, caminho, est) {
+  var EST = est;
   var chave = rec.tipo + "|" + rec.numero, ex = await sb.from("msb_docs").select("chave").eq("estacao", EST).eq("chave", chave).maybeSingle();
   var r = await sb.from("msb_docs").upsert({estacao: EST, chave: chave, tipo: rec.tipo, numero: rec.numero, emissao: rec.emissao || null, dados: rec, pdf: caminho}, {onConflict: "estacao,chave"});
   if (r.error) throw r.error;
   var mb = 0;
   if (rec.tipo === "LIQ") {
-    var cr = rec.itens.filter(function (it) { return it.tipo.indexOf("Visa") === 0 && it.pos.replace(/^0+/, "") === posEst(); }).map(function (it) {
+    var cr = rec.itens.filter(function (it) { return it.tipo.indexOf("Visa") === 0 && it.pos.replace(/^0+/, "") === posEst(EST); }).map(function (it) {
       return {estacao: EST, chave: it.pos + "|" + it.fecho + "|" + it.numdoc, doc: rec.liq, emissao: rec.emissao || null, data: it.data, valor_c: Math.round(it.valor * 100), pos: it.pos, fecho: it.fecho, numdoc: it.numdoc}; });
     if (cr.length) { var r2 = await sb.from("msb_creditos_mb").upsert(cr, {onConflict: "estacao,chave"}); if (r2.error) throw r2.error; }
     mb = cr.length;
@@ -230,6 +241,7 @@ async function guardarDocRepsol(rec, caminho) {
    O original fica onde a Saphety o guardou. O que não for liquidação reconhecida fica marcado «outro» e não grava nada. */
 async function importarLiqSaphety() {
   if (!ADMIN) return 0;
+  var EST = window.EST;   // fica fixa durante toda a leitura, mesmo que o utilizador mude de estação
   var r = await sb.from("msb_saphety_docs").select("numero,original").eq("estacao", EST).eq("estado", "recolhido").or("tipo.eq.Extrato de Conta,numero.like.Z3AF*"); if (r.error) throw r.error;
   var n = 0;
   for (var i = 0; i < (r.data || []).length; i++) {
@@ -237,14 +249,14 @@ async function importarLiqSaphety() {
     try {
       var f = await sb.storage.from("msb-originais").download(d.original); if (f.error) throw f.error;
       var rec = MOTOR.lerDocumento(await MOTOR.pdfPaginas(new Uint8Array(await f.data.arrayBuffer()), inflar));
-      if ((rec.tipo === "LIQ" || rec.tipo === "VF") && rec.ok) { await guardarDocRepsol(rec, d.original); estado = rec.tipo === "LIQ" ? "liquidacao" : "autofatura"; n++; }
+      if ((rec.tipo === "LIQ" || rec.tipo === "VF") && rec.ok) { await guardarDocRepsol(rec, d.original, EST); estado = rec.tipo === "LIQ" ? "liquidacao" : "autofatura"; n++; }
     } catch (e) { continue; }   // sem rede ou original em falta: tenta na próxima vez
     var u = await sb.from("msb_saphety_docs").update({estado: estado}).eq("estacao", EST).eq("numero", d.numero).eq("estado", "recolhido"); if (u.error) throw u.error;
   }
   return n;
 }
 async function carregarPdfs(files) {
-  var box = $("#repProg"), linhas = [], ultimo = null; box.hidden = false;
+  var box = $("#repProg"), linhas = [], ultimo = null, est = EST; box.hidden = false;   // estação fixa durante o carregamento
   function mostra() { box.innerHTML = "<b>📄 Documentos</b>" + linhas.map(function (l) { return "<div style='font-size:14px'>" + l + "</div>"; }).join(""); }
   for (var i = 0; i < files.length; i++) {
     var f = files[i]; linhas.push("⏳ " + esc(f.name)); mostra();
@@ -253,8 +265,8 @@ async function carregarPdfs(files) {
       if (!pags.length) throw new Error("Não consegui ler este PDF");
       var rec = MOTOR.lerDocumento(pags);
       if (!rec.tipo || !rec.ok) throw new Error("Não reconheci este documento (use os PDF originais da Repsol)");
-      var caminho = await guardarOriginal(EST + "/repsol/" + rec.tipo + "_" + String(rec.numero).replace(/\W/g, "") + "_" + await sha(bytes) + ".pdf", f, "application/pdf");
-      var g = await guardarDocRepsol(rec, caminho), mb = g.mb, ex = {data: g.existia};
+      var caminho = await guardarOriginal(est + "/repsol/" + rec.tipo + "_" + String(rec.numero).replace(/\W/g, "") + "_" + await sha(bytes) + ".pdf", f, "application/pdf");
+      var g = await guardarDocRepsol(rec, caminho, est), mb = g.mb, ex = {data: g.existia};
       var nomes = {LIQ: "Liquidação", CCS: "Fatura consignação", NDC: "Nota de crédito", VF: "Autofatura Solred"};
       linhas[linhas.length - 1] = "✅ " + nomes[rec.tipo] + " " + esc(rec.numero) + (rec.emissao ? " · " + dmy(rec.emissao) : "") + (mb ? " · " + mb + " crédito(s) MB" : "") + (ex.data ? " · já existia (atualizado)" : "");
       if (rec.emissao) ultimo = rec.emissao.slice(0, 7);
@@ -303,7 +315,7 @@ async function carregarRepsol() {
     var ligMB = ligarTransf(trs.filter(function (t) { return t.ttipo === "MB"; }), turnos, "mb_c", usados);
     var ligSol = ligarTransf(trs.filter(function (t) { return t.ttipo === "SOLRED"; }), turnos, "solred_c", {});
     ligados = ligados.concat(ligMB);
-    desenharRepsol(M, docs, ligados, turnos, MOTOR.verificar(docs.map(function (d) { return d.dados; }), {pos: posEst() || "36613", dias: dias}), ligMB, ligSol);
+    desenharRepsol(M, docs, ligados, turnos, MOTOR.verificar(docs.map(function (d) { return d.dados; }), {pos: posEst() || "36613", pos_opt: posOpt(), dias: dias}), ligMB, ligSol);
   } catch (e) { docsBox.innerHTML = "<div class='bad'>" + esc(falhou(e)) + "</div>"; }
 }
 function desenharRepsol(M, docs, ligados, turnos, checks, ligMB, ligSol) {
@@ -322,7 +334,7 @@ function desenharRepsol(M, docs, ligados, turnos, checks, ligMB, ligSol) {
   var nm = new Date(M + "-15").toLocaleDateString("pt-PT", {month: "long", year: "numeric"});
   $("#mbTotem").innerHTML = "<div class='t'>Multibanco · " + esc(nm) + "</div>" + [["Registado", reg], ["Creditado ✔", creditado], ["Em falta", falta.reduce(function (s, x) { return s + x.t.mb_c; }, 0)], ["Ainda não liquidado", pend.reduce(function (s, t) { return s + t.mb_c; }, 0)], ["Sem verificação", semv.reduce(function (s, t) { return s + t.mb_c; }, 0)]]
     .map(function (x) { return "<div><div class='k'>" + x[0] + "</div><div class='v'>" + fmt(x[1]) + "<small>€</small></div></div>"; }).join("");
-  var h = conferenciaMB(nm, tm, ligTurno, primeira, ultima) + seccaoTransf(M, nm, ligMB || [], ligSol || []);
+  var h = conferenciaMB(nm, tm, ligTurno, primeira, ultima) + seccaoOpt(M, nm, docs) + seccaoTransf(M, nm, ligMB || [], ligSol || []);
   if (falta.length) h += "<div class='liq'><h3>⚠️ MB por creditar (" + falta.length + ")<span class='mut' style='font-weight:400;font-size:13px'>turnos com MB sem crédito igual nos documentos carregados</span></h3><div class='sc'><table><thead><tr><th>Dia</th><th class='l'>Turno</th><th>MB registado</th><th class='l'>Crédito mais próximo</th></tr></thead><tbody>" +
     falta.map(function (x) { return "<tr><td>" + dmy(x.t.dia) + "</td><td class='l'>" + (x.t.turno === "t1" ? "☀️ T1" : "🌙 T2") + " " + esc(x.t.func || "") + "</td><td class='n'>" + fmt(x.t.mb_c) + "</td><td class='l'>" + (x.l ? "fecho " + esc(x.l.c.fecho) + " · " + fmt(x.l.c.valor_c) + " <span class='b wn'>dif. " + fmt(x.l.c.valor_c - x.t.mb_c) + "</span>" : "<span class='mut'>nenhum</span>") + "</td></tr>"; }).join("") + "</tbody></table></div></div>";
   if (!liqs.length && !outros.length && !h) h += "<div class='vazio'>Sem documentos da Repsol emitidos em " + esc(nm) + "." + (ADMIN ? " Carregue os PDF com o botão laranja (pode escolher vários)." : "") + "</div>";
@@ -380,5 +392,18 @@ function conferenciaMB(nm, tm, ligTurno, primeira, ultima) {
     "<label class='mut' style='font-size:13px;display:flex;gap:6px;align-items:center;margin:0 0 6px'><input type='checkbox' id='mbSoNao'> Mostrar só os não creditados</label>" +
     "<div class='sc'><table id='mbConf'><thead><tr><th>Dia</th><th class='l'>Turno</th><th>MB registado</th><th>MB creditado</th><th class='l'>Documento</th><th>Liquidação de</th><th>Diferença</th><th class='l'>Estado</th></tr></thead><tbody>" + linhas.join("") +
     "</tbody><tfoot><tr><th colspan='2' class='l'>Total</th><th class='n'>" + fmt(T.r) + "</th><th class='n'>" + fmt(T.c) + "</th><th></th><th class='l' style='font-weight:400;font-size:12.5px'>no mês " + fmt(T.cm) + " €<br>mês seguinte " + fmt(T.cs) + " €</th><th class='n'>" + sinal(T.d) + "</th><th class='l'>por creditar " + fmt(T.nc) + " €</th></tr></tfoot></table></div></div>";
+}
+/* MB do terminal automático no mês (pela data da operação): não tem turno na caixa, por isso não entra na conferência MB × turnos */
+var MBOPT = null;   // para o PDF da contabilidade (mbpdf.js)
+function seccaoOpt(M, nm, docs) {
+  var L = creditosOpt(docs).filter(function (c) { return (c.data || "").slice(0, 7) === M; });
+  MBOPT = posOpt() ? {pos: posOpt(), linhas: L, total: L.reduce(function (s, c) { return s + c.valor_c; }, 0)} : null;
+  if (!MBOPT) return "";
+  var cm = 0, cs = 0; L.forEach(function (c) { if ((c.emissao || "").slice(0, 7) > M) cs += c.valor_c; else cm += c.valor_c; });
+  return "<div class='liq'><h3>⛽ MB do terminal automático · " + esc(nm) + "<span class='mut' style='font-weight:400;font-size:13px'>POS " + esc(MBOPT.pos) + " · pagamento na bomba (só MB e Solred) · " + L.length + " créditos · " + fmt(MBOPT.total) + " € · liquidado no mês " + fmt(cm) + " € · no mês seguinte " + fmt(cs) + " €</span></h3>" +
+    (L.length ? "<div class='sc'><table><thead><tr><th>Dia da operação</th><th>Creditado</th><th class='l'>Documento</th><th>Liquidação de</th></tr></thead><tbody>" + L.map(function (c) {
+      return "<tr><td>" + dmy(c.data) + "</td><td class='n'>" + fmt(c.valor_c) + "</td><td class='l'>Liq. " + esc(c.doc) + " · fecho " + esc(c.fecho) + "</td><td>" + (c.emissao ? dmy(c.emissao) : "—") + ((c.emissao || "").slice(0, 7) > M ? " <span class='b wn'>mês seguinte</span>" : "") + "</td></tr>"; }).join("") +
+      "</tbody><tfoot><tr><th class='l'>Total</th><th class='n'>" + fmt(MBOPT.total) + "</th><th colspan='2'></th></tr></tfoot></table></div>"
+      : "<p class='mut' style='margin:0;font-size:13px'>Sem créditos do terminal automático com operações em " + esc(nm) + " nos documentos carregados.</p>") + "</div>";
 }
 function chipDoc(x) { var d = x.dados; return "<span class='chip'>" + (NOMES_DOC[x.tipo] || x.tipo) + " <b>" + esc(x.numero) + "</b> · " + dmy(x.emissao).slice(0, 5) + (d.total != null ? " · " + MOTOR.pt(d.total) + " €" : "") + (x.pdf ? " <a href='#' data-pdf='" + esc(x.pdf) + "'>PDF</a>" : "") + "</span>"; }

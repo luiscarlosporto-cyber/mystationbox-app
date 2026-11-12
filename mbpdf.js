@@ -55,6 +55,26 @@ async function fazerPdfMB(M, C, ent, inst) {
   pg.drawLine({start: {x: mm(14), y: mm(H - y + 3.5)}, end: {x: mm(W - 14), y: mm(H - y + 3.5)}, thickness: 0.6, color: cinz});
   y += 1.5; txt("Total", X.dia + 2, y, {b: 1}); txt(fmt(C.T.r), X.reg, y, {b: 1, dir: 1}); txt(fmt(C.T.c), X.cred, y, {b: 1, dir: 1}); txt(sinalPdf(C.T.d), X.dif, y, {b: 1, dir: 1}); txt("por creditar " + fmt(C.T.nc), X.est, y, {b: 1, t: 7.5, c: C.T.nc ? lar2 : verde});
   y += 10;
+  /* MB do terminal automático (dono, 12/11/2026): sem turno na caixa, conta à parte; a contabilidade vê os dois e a soma */
+  var O = window.MBOPT;
+  if (O) {
+    if (y > H - 45) novaPagina(false, true);
+    txt("MB do terminal automático · POS " + O.pos + " · pagamento na bomba (só MB e Solred)", 14, y, {b: 1, t: 10, c: azul}); y += 6;
+    if (O.linhas.length) {
+      var cabOpt = function () { ret(14, y - 4.5, W - 28, 7, claro); txt("Dia da operação", 16, y, {b: 1, t: 7.5, c: cinz}); txt("Creditado", 76, y, {b: 1, t: 7.5, c: cinz, dir: 1});
+        txt("Documento", 82, y, {b: 1, t: 7.5, c: cinz}); txt("Liquidação de", 150, y, {b: 1, t: 7.5, c: cinz}); y += 6.5; };
+      cabOpt();
+      O.linhas.forEach(function (c) { if (y > H - 20) { novaPagina(false, true); cabOpt(); }
+        txt(dmy(c.data), 16, y); txt(fmt(c.valor_c), 76, y, {dir: 1}); txt("Liq. " + c.doc + " · fecho " + c.fecho, 82, y, {t: 7.5});
+        txt(c.emissao ? dmy(c.emissao) + (c.emissao.slice(0, 7) > M ? " (mês seg.)" : "") : "-", 150, y, {t: 7.5}); y += 5.2; });
+      pg.drawLine({start: {x: mm(14), y: mm(H - y + 3.5)}, end: {x: mm(W - 14), y: mm(H - y + 3.5)}, thickness: 0.6, color: cinz});
+      y += 1.5; txt("Total do terminal automático", 16, y, {b: 1}); txt(fmt(O.total), 76, y, {b: 1, dir: 1}); y += 7;
+    } else { txt("Sem créditos do terminal automático com operações neste mês nos documentos carregados.", 14, y, {t: 8, c: cinz}); y += 6; }
+    if (y > H - 20) novaPagina(false, true);
+    ret(14, y - 4.5, W - 28, 8, verdeF);
+    txt("Total MB creditado: loja " + fmt(C.T.c) + " € + terminal automático " + fmt(O.total) + " € = " + fmt(C.T.c + O.total) + " €", 16, y + 0.5, {b: 1, t: 9, c: verde});
+    y += 12;
+  }
   /* resumo por documento de crédito */
   var porDoc = {}, ord = [];
   C.linhas.forEach(function (r) { if (r.cred == null) return; var k = (r.transf ? "Transferência " : "Liquidação ") + r.doc; if (!porDoc[k]) { porDoc[k] = {n: 0, v: 0}; ord.push(k); } porDoc[k].n++; porDoc[k].v += r.cred; });

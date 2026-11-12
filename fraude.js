@@ -14,11 +14,13 @@ var FRA_NIV = {critico: "❌", aviso: "⚠️", ok: "✅", acima: "ℹ️", info
 var FRA_NIVT = {critico: "Crítico", aviso: "Atenção", ok: "Normal", acima: "Acima dos colegas", info: "Valor baixo, só informa", curta: "Amostra curta"};
 var FRA_PESO = {critico: 3, aviso: 2, ok: 1, acima: 1, info: 0, curta: 0};
 var FRA_CORES = ["#2F6FDE", "#D9570F", "#157F52", "#8E44AD", "#B8860B", "#C0392B"];
+var FRA_HOR_DESDE = "2026-07-01";   // horário selado usado nas contas a partir de julho (dono, 12/11/2026)
 var FRA_DEC = {explicado: "Explicado", observacao: "Em observação", acao: "Ação do dono"};
 
 function fraNome(c) { return FRA_NOMES[c] || c.charAt(0) + c.slice(1).toLowerCase(); }
 function fraEur(c) { return (c < 0 ? "−" : "") + String(Math.round(Math.abs(c) / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " €"; }
 function fraEurs(c) { var r = Math.round(c / 100); return (r > 0 ? "+" : r < 0 ? "−" : "") + fraEur(Math.abs(c)); }
+function fraU(x) { return x && x.por_turno ? "/turno" : "/dia"; }
 function fraChip(x) { return "<span class='fra-chip " + x.nivel + "' title='" + FRA_NIVT[x.nivel] + "'>" + FRA_NIV[x.nivel] + (x.indice !== null ? " " + x.indice : "") + "</span>"; }
 
 function fraCss() {
@@ -54,13 +56,24 @@ async function carregarFraude() {
     try {
       var r = await Promise.all([
         sb.from("msb_vendas_colaborador").select("periodo,colaborador,familia,qtd_c,valor_c").eq("estacao", EST).limit(20000),
-        sb.from("msb_vendas_colaborador_dias").select("periodo,colaborador,dias").eq("estacao", EST).limit(5000),
-        sb.from("msb_fraude_registos").select("*").eq("estacao", EST).order("em").limit(5000)]);
+        sb.from("msb_vendas_colaborador_dias").select("estacao,periodo,colaborador,dias").limit(10000),
+        sb.from("msb_fraude_registos").select("*").eq("estacao", EST).order("em").limit(5000),
+        sb.from("msb_horario_dias").select("estacao,dia,colaborador_id,codigo").gte("dia", FRA_HOR_DESDE).in("codigo", ["M", "T", "MT"]).limit(20000),
+        sb.from("msb_horario_meses").select("estacao,mes,estado").eq("estado", "real"),
+        sb.from("msb_colaboradores").select("id,nome,nome_cbos")]);
       r.forEach(function (x) { if (x.error) throw x.error; });
       var p = {};
       r[0].data.forEach(function (x) { (p[x.periodo] = p[x.periodo] || {dias: {}, l: []}).l.push([x.colaborador, x.familia, x.qtd_c, x.valor_c]); });
-      r[1].data.forEach(function (x) { (p[x.periodo] = p[x.periodo] || {dias: {}, l: []}).dias[x.colaborador] = x.dias; });
-      FRA.dados = {p: p, reg: r[2].data};
+      var vd = {};
+      r[1].data.forEach(function (x) {
+        var m = x.periodo.slice(0, 7), s = ((vd[x.estacao] = vd[x.estacao] || {})[x.colaborador] = vd[x.estacao][x.colaborador] || new Set());
+        x.dias.forEach(function (d) { s.add(m + "-" + String(d).padStart(2, "0")); });
+        if (x.estacao === EST) (p[x.periodo] = p[x.periodo] || {dias: {}, l: []}).dias[x.colaborador] = x.dias; });
+      var cb = {}, partilha = {};
+      r[5].data.forEach(function (c) { if (c.nome_cbos) { cb[c.id] = c.nome_cbos; (partilha[c.nome_cbos] = partilha[c.nome_cbos] || []).push(c.nome); } });
+      var hor = r[3].data.filter(function (h) { return cb[h.colaborador_id]; }).map(function (h) { return {col: cb[h.colaborador_id], est: h.estacao, dia: h.dia, codigo: h.codigo}; });
+      var reais = {}; r[4].data.forEach(function (m) { reais[m.estacao + "|" + m.mes] = 1; });
+      FRA.dados = {p: p, reg: r[2].data, vd: vd, hor: hor, reais: reais, partilha: partilha};
     } catch (e) {
       var m = falhou(e); box.innerHTML = "<div class='bad'>" + esc(/msb_vendas_colaborador|PGRST205|42P01/.test(m) ? "A Fraude ainda não está ativa na base de dados." : m) + "</div>"; return;
     }
@@ -88,14 +101,26 @@ function fraRotulo(id) {
   if (aberto(a[2])) return (a[2] === "1" ? "1" : "16") + " a " + fraUltimoDia(id) + " " + mes + " (em curso)";
   return (a[2] === "1" ? "1 a 15 " : "16 a fim de ") + mes;
 }
+/* dias (ISO) de um período e se o horário selado o cobre todo */
+function fraDiasDe(per) {
+  var R = []; per.partes.forEach(function (k) { var a = k.split("-"), fim = new Date(+a[0], +a[1], 0).getDate(), ini = a[2] === "1" ? 1 : 16, ate = a[2] === "1" ? 15 : fim;
+    for (var d = ini; d <= ate; d++) R.push(a[0] + "-" + a[1] + "-" + String(d).padStart(2, "0")); });
+  return R;
+}
+function fraHorario(per) {
+  var dias = fraDiasDe(per), D = FRA.dados;
+  if (dias[0] < FRA_HOR_DESDE || !per.partes.every(function (k) { return D.reais[EST + "|" + k.slice(0, 7)]; })) return null;
+  var hoje = new Date().toISOString().slice(0, 10);
+  return FRAUDE.turnosHorario(EST, dias.filter(function (d) { return d < hoje; }), D.hor, D.vd);
+}
 function fraCalcular(per) {
-  var linhas = [], dias = {};
+  var linhas = [], dias = {}, H = fraHorario(per);
   per.partes.forEach(function (k) {
     var D = FRA.dados.p[k];
     Object.keys(D.dias).forEach(function (c) { var s = dias[c] || (dias[c] = new Set()); D.dias[c].forEach(function (d) { s.add(k + "-" + d); }); });
     D.l.forEach(function (x) { linhas.push({colaborador: x[0], periodo: k, familia: x[1], qtd: x[2], valor_c: x[3]}); });
   });
-  return FRAUDE.comparar(linhas, dias);
+  var r = FRAUDE.comparar(linhas, dias, H ? H.turnos : null); r.horario = H; return r;
 }
 function fraSerie() {
   var ant = null;
@@ -125,27 +150,29 @@ function fraDesenhar() {
     cols.map(function (c) {
       var xs = CR.map(function (f) { return r.res[f] && r.res[f][c]; }).filter(Boolean), pior = xs.slice().sort(function (a, b) { return FRA_PESO[b.nivel] - FRA_PESO[a.nivel]; })[0], tot = 0, dias = 0;
       Object.keys(r.res).forEach(function (f) { if (f !== "LOJA_TOTAL" && r.res[f][c]) { tot += r.res[f][c].valor_c; dias = r.res[f][c].dias; } });
-      return "<div class='fra-col " + (pior ? pior.nivel : "") + "'><h3>" + esc(fraNome(c)) + "</h3><div class='m'>" + dias + " dias com vendas · " + fraEur(tot) + "</div>" +
-        CR.map(function (f) { var x = r.res[f] && r.res[f][c]; return x ? "<div class='lin'><span>" + FRA_FAM[f] + "</span><span>" + fraEur(x.dia_c) + "/dia " + fraChip(x) + "</span></div>" : ""; }).join("") + "</div>";
+      var ptur = Object.keys(r.res).some(function (f) { return r.res[f][c] && r.res[f][c].por_turno; });
+      return "<div class='fra-col " + (pior ? pior.nivel : "") + "'><h3>" + esc(fraNome(c)) + "</h3><div class='m'>" + dias + (ptur ? " turnos (horário)" : " dias com vendas") + " · " + fraEur(tot) + "</div>" +
+        CR.map(function (f) { var x = r.res[f] && r.res[f][c]; return x ? "<div class='lin'><span>" + FRA_FAM[f] + "</span><span>" + fraEur(x.dia_c) + fraU(x) + " " + fraChip(x) + "</span></div>" : ""; }).join("") + "</div>";
     }).join("") + "</div></section>";
-  h += "<section class='card'><h2 style='margin:0 0 4px'>Comparação por categoria</h2><p class='mut' style='margin:0 0 10px;font-size:13px'>Venda média por dia, índice (100 = igual à mediana dos colegas) e diferença em euros por dia. Loja (tudo o que não é combustível), Tabaco, Cafetaria e a família LOJA são críticas: ✅ 90–110, ⚠️ 80–90, ❌ abaixo de 80. Restantes: ✅ 80–120, ⚠️ 65–80, ❌ abaixo de 65. Duas quinzenas seguidas em ⚠️ passam a ❌.</p>" +
-    "<div class='sc fra-tab'><table><thead><tr><th>Categoria</th>" + cols.map(function (c) { return "<th>" + esc(fraNome(c)) + "</th>"; }).join("") + "<th>Diferença máx./dia</th></tr></thead><tbody>";
+  h += "<section class='card'><h2 style='margin:0 0 4px'>Comparação por categoria</h2><p class='mut' style='margin:0 0 10px;font-size:13px'>Venda média por turno do horário (antes de julho, por dia com vendas), índice (100 = igual à mediana dos colegas) e diferença em euros por turno. Loja (tudo o que não é combustível), Tabaco, Cafetaria e a família LOJA são críticas: ✅ 90–110, ⚠️ 80–90, ❌ abaixo de 80. Restantes: ✅ 80–120, ⚠️ 65–80, ❌ abaixo de 65. Duas quinzenas seguidas em ⚠️ passam a ❌.</p>" +
+    "<div class='sc fra-tab'><table><thead><tr><th>Categoria</th>" + cols.map(function (c) { return "<th>" + esc(fraNome(c)) + "</th>"; }).join("") + "<th>Diferença máx.</th></tr></thead><tbody>";
   r.familias.forEach(function (f) {
     var xs = cols.map(function (c) { return r.res[f][c]; }); if (!xs.some(function (x) { return x && x.valor_c; })) return;
     var vals = xs.filter(function (x) { return x && x.dias >= FRAUDE.MIN_DIAS; }).map(function (x) { return x.dia_c; }), ehc = CR.indexOf(f) >= 0;
     h += "<tr class='" + (ehc ? "crit" : "") + "'><td>" + esc(FRA_FAM[f] || f) + (ehc ? "<span class='fra-tag'>crítica</span>" : "") + "</td>" +
-      xs.map(function (x) { return !x ? "<td>—</td>" : "<td><div><b>" + fraEur(x.dia_c) + "</b></div><div>" + fraChip(x) + "</div>" + (x.dif_dia_c === null ? "" : "<div class='d" + (x.dif_dia_c < 0 ? " neg" : "") + "'>" + fraEurs(x.dif_dia_c) + "/dia</div>") + "</td>"; }).join("") +
+      xs.map(function (x) { return !x ? "<td>—</td>" : "<td><div><b>" + fraEur(x.dia_c) + "</b></div><div>" + fraChip(x) + "</div>" + (x.dif_dia_c === null ? "" : "<div class='d" + (x.dif_dia_c < 0 ? " neg" : "") + "'>" + fraEurs(x.dif_dia_c) + fraU(x) + "</div>") + "</td>"; }).join("") +
       "<td>" + (vals.length > 1 ? fraEur(Math.max.apply(null, vals) - Math.min.apply(null, vals)) : "—") + "</td></tr>";
   });
   h += "</tbody></table></div></section>";
   h += "<section class='fra-graf'><div class='card'><h2 style='margin:0 0 4px'>Evolução do índice</h2><p class='mut' style='margin:0 0 8px;font-size:13px'>Por período, na categoria escolhida. Faixa = zona normal; tracejado = limite do ❌.</p><div class='fra-cat' id='fraCatEv'></div><div id='fraEv'></div><div class='fra-leg' id='fraLeg'></div></div>" +
-    "<div class='card'><h2 style='margin:0 0 4px'>Diferença face aos colegas</h2><p class='mut' style='margin:0 0 8px;font-size:13px'>Euros por dia, no período escolhido. À esquerda vende menos do que os colegas.</p><div class='fra-cat' id='fraCatDif'></div><div id='fraDif'></div></div></section>";
+    "<div class='card'><h2 style='margin:0 0 4px'>Diferença face aos colegas</h2><p class='mut' style='margin:0 0 8px;font-size:13px'>Euros por turno (antes de julho, por dia), no período escolhido. À esquerda vende menos do que os colegas.</p><div class='fra-cat' id='fraCatDif'></div><div id='fraDif'></div></div></section>";
+  h += fraSeccaoHorario(r);
   h += "<section class='card'><h2 style='margin:0 0 4px'>Alertas por decidir</h2><p class='mut' style='margin:0 0 10px;font-size:13px'>Um alerta é um indício, não uma prova. A decisão fica registada com data e quem decidiu, e nunca se apaga.</p><div id='fraAlertas'></div><div id='fraNota'></div></section>";
-  h += "<p class='mut' style='font-size:12.5px'>Fonte: CBOS, Consulta de Vendas por Período com «Discriminar por colaborador», lida mês a mês e conferida com o «Total aplicado» de cada colaborador. Conta por dia com vendas, porque os colaboradores rodam de turno. Ficam fora da comparação o terminal automático (Empregado OPT) e o administrador.</p>";
+  h += "<p class='mut' style='font-size:12.5px'>Fonte: CBOS, Consulta de Vendas por Período com «Discriminar por colaborador», lida mês a mês e conferida com o «Total aplicado» de cada colaborador. A partir de julho de 2026 conta por turno do horário selado; antes, por dia com vendas. Ficam fora da comparação o terminal automático (Empregado OPT) e o administrador.</p>";
   $("#fraCorpo").innerHTML = h;
 
   fraBotoes("fraCatEv", "catEv"); fraBotoes("fraCatDif", "catDif");
-  fraEvolucao(S); fraDiferenca(r, cols); fraAlertas(p, crit.concat(av));
+  fraEvolucao(S); fraDiferenca(r, cols); fraAlertas(p, crit.concat(av), r.horario);
   $("#fraQ").onclick = function () { var id = fraPeriodos()[FRA.i].id; FRA.jan = "q"; var ps = fraPeriodos(); FRA.i = Math.max(0, ps.map(function (x) { return x.id.slice(0, 7); }).lastIndexOf(id.slice(0, 7))); fraDesenhar(); };
   $("#fraM").onclick = function () { var id = fraPeriodos()[FRA.i].id; FRA.jan = "m"; FRA.i = fraPeriodos().map(function (x) { return x.id; }).indexOf(id.slice(0, 7)); fraDesenhar(); };
   $("#fraAnt").onclick = function () { FRA.i--; fraDesenhar(); };
@@ -188,15 +215,35 @@ function fraDiferenca(r, cols) {
     var x = a[1], y = T + i * rowH + 8, w = S(x.dif_dia_c), cor = x.nivel === "critico" ? "var(--bad)" : x.nivel === "aviso" ? "var(--wn)" : x.dif_dia_c < 0 ? "var(--mut)" : "var(--ok)";
     g += "<text x='" + (L - 10) + "' y='" + (y + 16) + "' text-anchor='end' font-size='12.5' style='fill:var(--fg)'>" + esc(fraNome(a[0])) + "</text>";
     g += "<rect x='" + (w < 0 ? Z + w : Z) + "' y='" + y + "' width='" + Math.abs(w) + "' height='22' rx='3' fill='" + cor + "' opacity='.85'/>";
-    g += "<text x='" + (W - 4) + "' y='" + (y + 15) + "' text-anchor='end' font-size='12' font-weight='600' style='fill:var(--fg)'>" + fraEurs(x.dif_dia_c) + "/dia</text>";
+    g += "<text x='" + (W - 4) + "' y='" + (y + 15) + "' text-anchor='end' font-size='12' font-weight='600' style='fill:var(--fg)'>" + fraEurs(x.dif_dia_c) + fraU(x) + "</text>";
   });
   $("#fraDif").innerHTML = g + "<text x='" + Z + "' y='" + (H - 4) + "' text-anchor='middle' font-size='11'>0 = mediana dos colegas</text></svg>";
 }
-function fraAlertas(p, al) {
+/* Horário × vendas: o horário selado contra os dias em que cada um vendeu no CBOS */
+function fraDatas(L) { return L.map(function (d) { return d.slice(8, 10) + "/" + d.slice(5, 7); }).join(", "); }
+function fraSeccaoHorario(r) {
+  var H = r.horario, part = FRA.dados.partilha;
+  if (!H) return "<section class='card'><h2 style='margin:0 0 4px'>Horário × vendas</h2><p class='mut' style='margin:0;font-size:13px'>Sem horário selado para este período (as contas usam o horário a partir de julho de 2026).</p></section>";
+  var cols = Object.keys(H.det).filter(function (c) { return FRAUDE.SEM_COLABORADOR.indexOf(c) < 0; }).sort(function (a, b) { return fraNome(a).localeCompare(fraNome(b), "pt"); });
+  var notas = Object.keys(part).filter(function (k) { return part[k].length > 1; }).map(function (k) { return fraNome(k) + " inclui os turnos de " + part[k].filter(function (n) { return n !== fraNome(k); }).join(", ") + " (vende com o mesmo utilizador no CBOS)"; });
+  return "<section class='card'><h2 style='margin:0 0 4px'>Horário × vendas</h2><p class='mut' style='margin:0 0 10px;font-size:13px'>Turnos do horário selado contra os dias com vendas no CBOS. M ou T = 1 turno; MT = 2 em Santo Tirso e não conta em Penafiel. Dia escalado em que só vendeu na outra estação conta lá." + (notas.length ? " " + esc(notas.join(". ")) + "." : "") + "</p>" +
+    "<div class='sc fra-tab'><table><thead><tr><th>Colaborador</th><th>Turnos</th><th>Dias certos</th><th style='text-align:left'>Escalado sem vendas</th><th style='text-align:left'>Vendas fora da escala</th><th style='text-align:left'>Escalado aqui, vendeu na outra estação</th></tr></thead><tbody>" +
+    cols.map(function (c) { var x = H.det[c];
+      return "<tr><td>" + esc(fraNome(c)) + "</td><td>" + x.turnos + "</td><td>" + x.certos + "</td><td style='text-align:left'>" + (x.semVendas.length ? "<span class='fra-chip " + (x.semVendas.length >= 2 ? "critico" : "aviso") + "'>" + x.semVendas.length + "</span> " + fraDatas(x.semVendas) : "—") +
+        "</td><td style='text-align:left'>" + (x.foraEscala.length ? "<span class='fra-chip " + (x.foraEscala.length >= 3 ? "aviso" : "info") + "'>" + x.foraEscala.length + "</span> " + fraDatas(x.foraEscala) : "—") +
+        "</td><td style='text-align:left'>" + (x.naOutra.length ? "<span class='fra-chip info'>" + x.naOutra.length + "</span> " + fraDatas(x.naOutra) : "—") + "</td></tr>"; }).join("") +
+    "</tbody></table></div></section>";
+}
+function fraAlertas(p, al, H) {
   al.sort(function (a, b) { return FRA_PESO[b[2].nivel] - FRA_PESO[a[2].nivel] || a[2].indice - b[2].indice; });
   var itens = al.map(function (a) { var x = a[2];
     return {per: p.id, c: a[1], f: a[0], nivel: x.nivel, chip: fraChip(x), t: fraNome(a[1]) + " · " + FRA_FAM[a[0]],
-      x: fraEur(x.dia_c) + " por dia contra " + fraEur(x.ref_dia_c) + " dos colegas (" + fraEurs(x.dif_dia_c) + "/dia, " + fraEurs(x.dif_dia_c * x.dias) + " em " + x.dias + " dias)" + (x.repetido ? (FRA.jan === "q" ? " · segunda quinzena seguida" : " · segundo mês seguido") : "")}; });
+      x: fraEur(x.dia_c) + (x.por_turno ? " por turno" : " por dia") + " contra " + fraEur(x.ref_dia_c) + " dos colegas (" + fraEurs(x.dif_dia_c) + fraU(x) + ", " + fraEurs(x.dif_dia_c * x.dias) + " em " + x.dias + (x.por_turno ? " turnos)" : " dias)") + (x.repetido ? (FRA.jan === "q" ? " · segunda quinzena seguida" : " · segundo mês seguido") : "")}; });
+  if (H) Object.keys(H.det).forEach(function (c) { var x = H.det[c]; if (FRAUDE.SEM_COLABORADOR.indexOf(c) >= 0) return;
+    if (x.semVendas.length >= 2) itens.push({per: p.id, c: c, f: "horario", nivel: "critico", chip: "<span class='fra-chip critico'>❌ " + x.semVendas.length + " dias</span>",
+      t: fraNome(c) + " · Escalado sem vendas", x: "Escalado no horário sem nenhuma venda com o seu utilizador no CBOS: " + fraDatas(x.semVendas)});
+    else if (x.foraEscala.length >= 3) itens.push({per: p.id, c: c, f: "horario", nivel: "aviso", chip: "<span class='fra-chip aviso'>⚠️ " + x.foraEscala.length + " dias</span>",
+      t: fraNome(c) + " · Vendas fora da escala", x: "Vendeu em dias em que não estava no horário: " + fraDatas(x.foraEscala)}); });
   FRA.dados.reg.filter(function (n) { return n.tipo !== "decisao" && (p.id.indexOf(n.periodo) === 0 || n.periodo.indexOf(p.id) === 0); }).forEach(function (n) {
     itens.push({per: n.periodo, c: n.colaborador, f: n.tipo, nivel: "critico", chip: "<span class='fra-chip critico'>❌ " + (n.tipo === "desconto" ? "Desconto" : "Acerto") + "</span>",
       t: fraNome(n.colaborador) + " · " + (n.tipo === "desconto" ? "Desconto ao talão" : "Devolução ou anulação"), x: n.texto + " · " + fraRotulo(n.periodo)});

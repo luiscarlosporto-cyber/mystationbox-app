@@ -370,7 +370,7 @@ function falhou(e){var m=(e&&(e.message||e.error_description))||String(e);
 var authChain=Promise.resolve();
 var tabLock=function(_n,_t,fn){var run=authChain.then(function(){return fn()});authChain=run.catch(function(){});return run};
 var sb=window.supabase.createClient(MSB_CONFIG.url,MSB_CONFIG.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,lock:tabLock}});
-var EU=null, PERFIL=null, EST=null, ESTS=[], ADMIN=false, NOMES={}, POSES={};
+var EU=null, PERFIL=null, EST=null, ESTS=[], ADMIN=false, NOMES={}, POSES={}, POSES_OPT={};
 var DIA=iso(new Date()), MES=DIA.slice(0,7), LINHAS={}, SAIDAS=[];
 
 async function entrar(){
@@ -388,7 +388,7 @@ async function entrar(){
   $("#hQuem").textContent=(PERFIL.display_name||EU.email)+(ADMIN?" · admin":"");
   $("#avRO").hidden=ADMIN;
   var sel=$("#selEst");sel.innerHTML=ESTS.map(function(x){return "<option value='"+x.id+"'>"+esc(x.short_name||x.name)+"</option>"}).join("");sel.value=EST;sel.hidden=ESTS.length<2;
-  var cf=await sb.from("msb_config").select("estacao,pos_mb");POSES={};(cf.data||[]).forEach(function(x){POSES[x.estacao]=x.pos_mb});
+  var cf=await sb.from("msb_config").select("estacao,pos_mb,pos_opt");POSES={};POSES_OPT={};(cf.data||[]).forEach(function(x){POSES[x.estacao]=x.pos_mb;POSES_OPT[x.estacao]=x.pos_opt||""});
   $$(".adm").forEach(function(b){b.hidden=!ADMIN});
   mostrarEst();irDia(DIA);window.APP_ARRANCOU=1;if(window.montarMenu)montarMenu();
 }

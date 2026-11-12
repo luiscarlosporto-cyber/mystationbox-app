@@ -15,7 +15,8 @@
   };
 
   // linhas: [{colaborador, periodo, familia, qtd, valor_c}] ; dias: {colaborador: Set(dias)}
-  function comparar(linhas, dias) {
+  // turnos (opcional): {colaborador: n.º de turnos do horário}; sem ele, conta-se por dia com vendas.
+  function comparar(linhas, dias, turnos) {
     const cols = Object.keys(dias).filter(c => !SEM_COLABORADOR.includes(c));
     const por = {};
     linhas = linhas.concat(linhas.filter(l => !COMBUSTIVEL.includes(l.familia)).map(l => ({ ...l, familia: 'LOJA_TOTAL' })));
@@ -30,12 +31,13 @@
     const res = {};
     for (const f of familias) {
       res[f] = {};
-      const porDia = c => ((por[c + '|' + f] || {}).valor_c || 0) / (dias[c].size || 1);
+      const expo = c => (turnos && turnos[c] > 0 ? turnos[c] : dias[c].size);
+      const porDia = c => ((por[c + '|' + f] || {}).valor_c || 0) / (expo(c) || 1);
       for (const c of cols) {
-        const colegas = cols.filter(o => o !== c && dias[o].size >= MIN_DIAS);
+        const colegas = cols.filter(o => o !== c && expo(o) >= MIN_DIAS);
         const v = porDia(c), x = por[c + '|' + f] || { qtd: 0, valor_c: 0 };
-        const r = { dias: dias[c].size, valor_c: x.valor_c, qtd: x.qtd, dia_c: Math.round(v), indice: null, dif_dia_c: null, nivel: 'curta' };
-        if (dias[c].size >= MIN_DIAS && colegas.length >= 1) {
+        const r = { dias: expo(c), por_turno: !!(turnos && turnos[c] > 0), valor_c: x.valor_c, qtd: x.qtd, dia_c: Math.round(v), indice: null, dif_dia_c: null, nivel: 'curta' };
+        if (expo(c) >= MIN_DIAS && colegas.length >= 1) {
           const ref = mediana(colegas.map(porDia));
           r.ref_dia_c = Math.round(ref);
           r.dif_dia_c = Math.round(v - ref);
@@ -65,6 +67,37 @@
     return atual;
   }
 
-  const api = { comparar, nivel, comPersistencia, mediana, CRITICAS, LIMITES, MIN_DIAS, MIN_VALOR_DIA_C, SEM_COLABORADOR };
+  /* Horário × vendas (dono, 12/11/2026): os turnos contam pelo horário selado.
+     M ou T = 1 turno; MT = 2 turnos, exceto em Penafiel, onde MT não conta (dono). Um dia escalado aqui em que a pessoa só vendeu
+     na outra estação conta lá; vender aqui sem estar escalado conta 1 turno (troca) e fica listado.
+     horario: [{col, est, dia, codigo}] das duas estações; vendas: {est: {col: Set(dias ISO)}}; dias: lista de dias ISO do período. */
+  function turnosHorario(est, dias, horario, vendas) {
+    const peso = h => h.codigo === 'MT' ? (h.est === 'pnf' ? 0 : 2) : (h.codigo === 'M' || h.codigo === 'T' ? 1 : 0);
+    const naLista = new Set(dias), esc = {}, outra = {};
+    for (const h of horario) {
+      if (!naLista.has(h.dia) || !h.col || peso(h) === 0) continue;
+      const m = h.est === est ? esc : outra;
+      (m[h.col] = m[h.col] || {})[h.dia] = Math.max(peso(h), (m[h.col] || {})[h.dia] || 0);
+    }
+    const aqui = vendas[est] || {}, la = Object.keys(vendas).filter(e => e !== est).map(e => vendas[e]);
+    const vendeuLa = (c, d) => la.some(v => v[c] && v[c].has(d));
+    const cols = new Set(Object.keys(esc).concat(Object.keys(aqui))), turnos = {}, det = {};
+    for (const c of cols) {
+      const x = { turnos: 0, escalados: 0, certos: 0, semVendas: [], foraEscala: [], naOutra: [] };
+      for (const d of dias) {
+        const e = (esc[c] || {})[d] || 0, v = !!(aqui[c] && aqui[c].has(d));
+        if (e) x.escalados += e;
+        if (e && v) { x.certos++; x.turnos += e; }
+        else if (e && !v && vendeuLa(c, d)) x.naOutra.push(d);
+        else if (e && !v) { x.semVendas.push(d); x.turnos += e; }
+        else if (!e && v && !((outra[c] || {})[d])) { x.foraEscala.push(d); x.turnos += 1; }
+        else if (!e && v) x.turnos += 1;
+      }
+      turnos[c] = x.turnos; det[c] = x;
+    }
+    return { turnos, det };
+  }
+
+  const api = { turnosHorario, comparar, nivel, comPersistencia, mediana, CRITICAS, LIMITES, MIN_DIAS, MIN_VALOR_DIA_C, SEM_COLABORADOR };
   if (typeof module !== 'undefined') module.exports = api; else raiz.FRAUDE = api;
 })(this);
