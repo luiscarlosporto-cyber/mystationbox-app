@@ -260,6 +260,8 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
   <div id="v-ban" class="v" hidden><div id="banCorpo" style="display:grid;gap:12px"></div></div>
   <!-- DESEMPENHO: LIVRO DE MOVIMENTOS (NÚCLEO FINANCEIRO) -->
   <div id="v-liv" class="v" hidden><div id="nucCorpo" style="display:grid;gap:12px"></div></div>
+  <!-- CONTROLO: FRAUDE (VENDAS POR COLABORADOR) -->
+  <div id="v-fra" class="v" hidden><div id="fraCorpo" style="display:grid;gap:14px"></div></div>
   <!-- RELATÓRIOS: ENSE MENSAL -->
   <div id="v-ense" class="v" hidden>
     <div class="bar"><button class="btn" id="eAnt">‹</button><input type="month" id="eMes"><button class="btn" id="eSeg">›</button><button class="btn p" id="bEnsePdf">📄 Gerar PDF para a ENSE</button></div>
@@ -528,7 +530,9 @@ entrar().catch(function(e){$("#vLogin").hidden=false;$("#lErro").textContent=fal
 <script src="extratos.js"></script>
 <script src="nucleo.js"></script>
 <script src="conta.js"></script>
-<script src="beta/beta.js?v=fcd669bf"></script>
+<script src="fraude_regras.js"></script>
+<script src="fraude.js"></script>
+<script src="beta/beta.js?v=c80e8cdf"></script>
 <script src="beta/painel_regras.js?v=ec7af70e"></script>
 <script src="beta/painel.js?v=5fe22660"></script>
 <script src="beta/paginas.js?v=a5c22158"></script>

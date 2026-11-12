@@ -23,7 +23,7 @@
   /* páginas que no menu são uma só, com separadores em cima */
   var GRUPOS = [{n: "Receções", p: ["ent", "dig"]}, {n: "Vendas", p: ["ven", "va", "maq"]}];
   function grupoDe(pg) { return GRUPOS.find(function (g) { return g.p.indexOf(pg) >= 0; }); }
-  var IC_AREA = {ini: "p", cx: "t", cmb: "g", stk: "c", cpr: "h", cnf: "f", frn: "k", res: "d", dcs: "o", eqp: "u", def: "a"};
+  var IC_AREA = {ini: "p", cx: "t", cmb: "g", stk: "c", cpr: "h", cnf: "f", frn: "k", res: "d", fra: "b", dcs: "o", eqp: "u", def: "a"};
   /* título de cada bloco do menu (Dia a dia · Controlo · Gestão), quando a área seguinte muda de bloco; o funcionário, com 2 áreas, não os vê */
   function blocoDe(x) { var b = ""; for (var i = 0; i < AREAS.length; i++) { if (AREAS[i].b) b = AREAS[i].b; if (AREAS[i] === x) return b; } return b; }
   function blocos(L) { var ant = ""; return function (x) { var b = blocoDe(x); if (!ADMIN || b === ant) return ""; ant = b; return "<b class='bBloco'>" + b + "</b>"; }; }
