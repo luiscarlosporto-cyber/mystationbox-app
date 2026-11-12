@@ -33,7 +33,8 @@ async function fazerPdfMB(M, C, ent, inst) {
       cx.forEach(function (k, i) { var x = 14 + i * (bw + 4); ret(x, y - 4, bw, 15, i === 2 && T.nc ? larF : i === 1 ? verdeF : claro);
         txt(k[0], x + 3, y + 0.5, {t: 7.5, c: cinz}); txt(fmt(k[1]) + " €", x + 3, y + 7.5, {b: 1, t: 12, c: i === 2 && T.nc ? lar2 : i === 1 ? verde : esc0}); });
       y += 17;
-      txt(T.n + " de " + C.linhas.length + " turnos creditados com o mesmo valor. Diferença total creditado - registado (só turnos com crédito): " + sinalPdf(T.d) + " €.", 14, y, {t: 8, c: cinz});
+      if (T.npr) { txt(T.npr + " créditos MB sem turno registado na caixa (" + fmt(T.pr) + " €): MB registado em falta até se registar o turno.", 14, y, {t: 8, b: 1, c: lar2}); y += 4.5; }
+      txt(T.n + " de " + (C.linhas.length - (T.npr || 0)) + " turnos creditados com o mesmo valor. Diferença total creditado - registado (só turnos com crédito): " + sinalPdf(T.d) + " €.", 14, y, {t: 8, c: cinz});
       y += 8;
     } else { y = 16; txt(titulo + " (continuação)", 14, y, {b: 1, t: 10, c: azul}); y += 8; }
     if (!semTabela) cabTabela();
@@ -44,10 +45,10 @@ async function fazerPdfMB(M, C, ent, inst) {
     if (y > H - 20) novaPagina(false);
     var ok = r.est === "creditado";
     ret(14, y - 4, W - 28, 6, ok ? verdeF : larF); ret(14, y - 4, 0.9, 6, ok ? verde : lar);
-    txt(dmy(r.dia).slice(0, 5), X.dia + 2, y); txt((r.turno === "t1" ? "T1" : "T2") + (r.func ? " " + r.func : ""), X.tur, y);
-    txt(fmt(r.reg), X.reg, y, {dir: 1}); txt(r.cred == null ? "-" : fmt(r.cred), X.cred, y, {dir: 1});
+    txt(dmy(r.dia).slice(0, 5), X.dia + 2, y); txt(r.turno ? (r.turno === "t1" ? "T1" : "T2") + (r.func ? " " + r.func : "") : "fecho " + r.fecho, X.tur, y);
+    txt(r.reg == null ? "por registar" : fmt(r.reg), X.reg, y, {dir: 1, b: r.reg == null, c: r.reg == null ? lar2 : esc0}); txt(r.cred == null ? "-" : fmt(r.cred), X.cred, y, {dir: 1});
     txt(r.doc ? (r.transf ? "Transf. " + r.doc + " · " + dmy(r.dcred).slice(0, 5) : "Liq. " + r.doc + " de " + dmy(r.demis).slice(0, 5) + " · fecho " + r.fecho) + (r.demis && r.demis.slice(0, 7) > r.dia.slice(0, 7) ? " (mês seg.)" : "") : "-", X.doc, y, {t: 7.5});
-    txt(r.cred == null ? "-" : sinalPdf(r.cred - r.reg), X.dif, y, {dir: 1});
+    txt(r.cred == null || r.reg == null ? "-" : sinalPdf(r.cred - r.reg), X.dif, y, {dir: 1});
     txt(r.est, X.est, y, {b: 1, t: 7.5, c: ok ? verde : lar2});
     y += 6;
   });
