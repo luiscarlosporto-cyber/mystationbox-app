@@ -98,6 +98,29 @@
     return { turnos, det };
   }
 
-  const api = { turnosHorario, comparar, nivel, comPersistencia, mediana, CRITICAS, LIMITES, MIN_DIAS, MIN_VALOR_DIA_C, SEM_COLABORADOR };
+  /* Base de 3 meses (dono, 12/11/2026): cada pessoa comparada também com a sua própria mediana por turno nos períodos anteriores
+     (6 quinzenas ou 3 meses, sem o atual). Só períodos com MIN_DIAS turnos; com menos de minPer períodos fica «histórico curto».
+     O alerta forte só aparece quando os dois sinais coincidem: abaixo dos colegas E abaixo do próprio histórico. */
+  const PESO_N = { critico: 2, aviso: 1 };
+  function aplicarBase(atual, anteriores, minPer) {
+    for (const f in atual.res) for (const c in atual.res[f]) {
+      const r = atual.res[f][c];
+      const hist = anteriores.map(a => a.res[f] && a.res[f][c]).filter(x => x && x.dias >= MIN_DIAS && !!x.por_turno === !!r.por_turno).map(x => x.dia_c);
+      if (hist.length < minPer || r.dias < MIN_DIAS) { r.base = null; continue; }
+      const b = mediana(hist);
+      r.base = { dia_c: Math.round(b), n: hist.length, dif_c: Math.round(r.dia_c - b) };
+      if (b < MIN_VALOR_DIA_C) { r.base.nivel = 'info'; r.base.indice = null; continue; }
+      r.base.indice = Math.round(100 * r.dia_c / b);
+      r.base.nivel = nivel(f, r.base.indice);
+      const pares = PESO_N[r.nivel] || 0, proprio = PESO_N[r.base.nivel] || 0;
+      if (r.nivel === 'curta' || r.nivel === 'info') continue;
+      if (pares && proprio) r.nivel = (pares + proprio >= 3) ? 'critico' : 'aviso';
+      else if (pares || proprio) r.nivel = 'aviso';
+      r.sinais = (pares ? 1 : 0) + (proprio ? 1 : 0);
+    }
+    return atual;
+  }
+
+  const api = { aplicarBase, turnosHorario, comparar, nivel, comPersistencia, mediana, CRITICAS, LIMITES, MIN_DIAS, MIN_VALOR_DIA_C, SEM_COLABORADOR };
   if (typeof module !== 'undefined') module.exports = api; else raiz.FRAUDE = api;
 })(this);
