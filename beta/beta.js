@@ -252,7 +252,7 @@
   var ARTIGOS = null, RES = [], SEL = 0;
   function carregarArtigos() {
     if (ARTIGOS) return Promise.resolve();
-    return sb.from("products").select("name,category,barcode,repsol_code").order("name").limit(2000).then(function (r) {
+    return lerTudo(function () { return sb.from("products").select("name,category,barcode,repsol_code").order("name"); }, ["id"]).then(function (r) {
       if (!r.error) ARTIGOS = (r.data || []).map(function (p) { return {n: p.name, c: p.category || "", k: sem(p.name + " " + (p.barcode || "") + " " + (p.repsol_code || ""))}; });
     });
   }

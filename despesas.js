@@ -17,7 +17,7 @@ function dspData(d) { return d ? d.split("-").reverse().join("/") : ""; }
 
 /* Água e outros bónus recolhidos da Saphety pelo OCTAN AI: entram por confirmar. As taxas ficam em Margens e custos; referência desconhecida fica por classificar. */
 async function dspImportarSaphety() {
-  var est = EST, r = await sb.from("msb_saphety_docs").select("numero,original,hash,estado").eq("estacao", est).in("estado", ["recolhido", "outro", "por_classificar"]).or("numero.like.Z3FS*,numero.like.Z3G3*,numero.like.Z720*"); if (r.error) throw r.error;
+  var est = EST, r = await lerTudo(function () { return sb.from("msb_saphety_docs").select("numero,original,hash,estado").eq("estacao", est).in("estado", ["recolhido", "outro", "por_classificar"]).or("numero.like.Z3FS*,numero.like.Z3G3*,numero.like.Z720*"); }, ["numero"]); if (r.error) throw r.error;
   if (!(r.data || []).length) return;
   var fx = await sb.from("msb_despesas_fontes").select("id").eq("estacao", est).eq("categoria", "Água").limit(1); if (fx.error) throw fx.error;
   var fonte = fx.data && fx.data[0] ? fx.data[0].id : null, posto = (ESTS.find(function (x) { return x.id === est; }) || {}).posto_repsol;

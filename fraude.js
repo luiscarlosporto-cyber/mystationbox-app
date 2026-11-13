@@ -63,10 +63,10 @@ async function carregarFraude() {
     box.innerHTML = "<div class='mut'>A carregar…</div>";
     try {
       var r = await Promise.all([
-        sb.from("msb_vendas_colaborador").select("periodo,colaborador,familia,qtd_c,valor_c").eq("estacao", EST).limit(20000),
-        sb.from("msb_vendas_colaborador_dias").select("estacao,periodo,colaborador,dias").limit(10000),
+        lerTudo(function () { return sb.from("msb_vendas_colaborador").select("periodo,colaborador,familia,qtd_c,valor_c").eq("estacao", EST); }, ["id"]),
+        lerTudo(function () { return sb.from("msb_vendas_colaborador_dias").select("estacao,periodo,colaborador,dias"); }, ["estacao", "periodo", "colaborador"]),
         sb.from("msb_fraude_registos").select("*").eq("estacao", EST).order("em").limit(5000),
-        sb.from("msb_horario_dias").select("estacao,dia,colaborador_id,codigo").gte("dia", FRA_HOR_DESDE).in("codigo", ["M", "T", "MT"]).limit(20000),
+        lerTudo(function () { return sb.from("msb_horario_dias").select("estacao,dia,colaborador_id,codigo").gte("dia", FRA_HOR_DESDE).in("codigo", ["M", "T", "MT"]); }, ["estacao", "dia", "colaborador_id"]),
         sb.from("msb_horario_meses").select("estacao,mes,estado").eq("estado", "real"),
         sb.from("msb_colaboradores").select("id,nome,nome_cbos")]);
       r.forEach(function (x) { if (x.error) throw x.error; });

@@ -97,7 +97,7 @@ async function lerTaxaMes() {   // preenche o valor My Repsol do mês escolhido
 async function pintarTaxasSaphety(C) {
   var box = $("#txSaphety"), est = EST; if (!box || !ADMIN) return;
   try {
-    var r = await sb.from("msb_saphety_docs").select("numero,data,original").eq("estacao", est).eq("estado", "recolhido").like("numero", "Z3FS%").order("data"); if (r.error) throw r.error;
+    var r = await lerTudo(function () { return sb.from("msb_saphety_docs").select("numero,data,original").eq("estacao", est).eq("estado", "recolhido").like("numero", "Z3FS%").order("data"); }, ["numero"]); if (r.error) throw r.error;
     var e = ESTS.find(function (x) { return x.id === est; }), L = [];
     for (var i = 0; i < (r.data || []).length; i++) {
       var d = r.data[i], f = await sb.storage.from("msb-originais").download(d.original); if (f.error) throw f.error;

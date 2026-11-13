@@ -242,7 +242,7 @@ async function guardarDocRepsol(rec, caminho, est) {
 async function importarLiqSaphety() {
   if (!ADMIN) return 0;
   var EST = window.EST;   // fica fixa durante toda a leitura, mesmo que o utilizador mude de estação
-  var r = await sb.from("msb_saphety_docs").select("numero,original").eq("estacao", EST).eq("estado", "recolhido").or("tipo.eq.Extrato de Conta,numero.like.Z3AF*"); if (r.error) throw r.error;
+  var r = await lerTudo(function () { return sb.from("msb_saphety_docs").select("numero,original").eq("estacao", EST).eq("estado", "recolhido").or("tipo.eq.Extrato de Conta,numero.like.Z3AF*"); }, ["numero"]); if (r.error) throw r.error;
   var n = 0;
   for (var i = 0; i < (r.data || []).length; i++) {
     var d = r.data[i], estado = "outro";
@@ -299,14 +299,14 @@ async function carregarRepsol() {
   var M = $("#rMes").value || MES, docsBox = $("#repDocs"); docsBox.innerHTML = "<div class='mut'>A carregar…</div>"; $("#repChecks").innerHTML = ""; $("#mbTotem").innerHTML = "";
   try {
     try { await importarLiqSaphety(); } catch (e) { msbAviso("Não consegui ler as liquidações da Saphety: " + falhou(e)); }
-    var rd = await sb.from("msb_docs").select("chave,tipo,numero,emissao,dados,pdf").eq("estacao", EST); if (rd.error) throw rd.error;
-    var rc = await sb.from("msb_creditos_mb").select("*").eq("estacao", EST); if (rc.error) throw rc.error;
-    var rx = await sb.from("msb_transferencias").select("*").eq("estacao", EST); if (rx.error) throw rx.error;
+    var rd = await lerTudo(function () { return sb.from("msb_docs").select("chave,tipo,numero,emissao,dados,pdf").eq("estacao", EST); }, ["chave"]); if (rd.error) throw rd.error;
+    var rc = await lerTudo(function () { return sb.from("msb_creditos_mb").select("*").eq("estacao", EST); }, ["chave"]); if (rc.error) throw rc.error;
+    var rx = await lerTudo(function () { return sb.from("msb_transferencias").select("*").eq("estacao", EST); }, ["chave"]); if (rx.error) throw rx.error;
     var docs = rd.data || [], cred = rc.data || [];
     var trs = (rx.data || []).map(function (t) { return {chave: "TR|" + t.chave, doc: t.chave, numdoc: t.chave, data: t.dia, valor_c: t.valor_c, pos: "", fecho: "", transf: true, ttipo: t.tipo}; });
     var datas = cred.map(function (c) { return c.data; }).concat(trs.map(function (t) { return addDia(t.data, -11); })).concat(docs.map(function (d) { return d.emissao; }).filter(Boolean)).concat([M + "-01", addMes(M, 1) + "-01"]).sort();
     var ini = addDia(datas[0], -2), fim = addDia(datas[datas.length - 1], 2);
-    var rt = await sb.from("msb_turnos").select("dia,turno,func,mb_c,solred_c,lit_cl").eq("estacao", EST).gte("dia", ini).lte("dia", fim); if (rt.error) throw rt.error;
+    var rt = await lerTudo(function () { return sb.from("msb_turnos").select("dia,turno,func,mb_c,solred_c,lit_cl").eq("estacao", EST).gte("dia", ini).lte("dia", fim); }, ["dia", "turno"]); if (rt.error) throw rt.error;
     var turnos = rt.data || [], dias = {};
     turnos.forEach(function (t) { var o = (dias[t.dia] = dias[t.dia] || {t1: {}, t2: {}})[t.turno]; if (t.lit_cl != null) o.lit = (t.lit_cl / 100).toFixed(2).replace(".", ","); if (t.solred_c != null) o.solred = (t.solred_c / 100).toFixed(2).replace(".", ","); });
     var ligados = ligarCreditos(cred, turnos), usados = {};

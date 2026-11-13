@@ -11,11 +11,11 @@ function carregarTabaco() { carregarTabacoResumo(); }
 async function carregarTabacoResumo() {
   var box = $("#tabCorpo"); box.innerHTML = "<div class='mut'>A carregar…</div>";
   try {
-    var r1 = await sb.from("product_company").select("product_id,stock,sales_month,sales_days").eq("company_id", EST); if (r1.error) throw r1.error;
-    var r2 = await sb.from("products").select("id,name,category,volume_size,repsol_code"); if (r2.error) throw r2.error;
+    var r1 = await lerTudo(function () { return sb.from("product_company").select("product_id,stock,sales_month,sales_days").eq("company_id", EST); }, ["product_id"]); if (r1.error) throw r1.error;
+    var r2 = await lerTudo(function () { return sb.from("products").select("id,name,category,volume_size,repsol_code"); }, ["id"]); if (r2.error) throw r2.error;
     var r3 = await sb.from("orders").select("id,created_at,created_by,operator,status,lines,count_lines,approved_by,sent_at,sent_to").eq("company_id", EST).order("created_at", {ascending: false}).limit(30); if (r3.error) throw r3.error;
     var r4 = await sb.from("stock_moves").select("created_at,product_name,move_type,quantity,stock_before,stock_after,operator,user_id").eq("company_id", EST).order("created_at", {ascending: false}).limit(50); if (r4.error) throw r4.error;
-    var r5 = ADMIN ? await sb.from("tabaco_precos").select("product_id,pvp_c,custo_c,unidade") : {data: []};   // só administradores
+    var r5 = ADMIN ? await lerTudo(function () { return sb.from("tabaco_precos").select("product_id,pvp_c,custo_c,unidade"); }, ["product_id"]) : {data: []};   // só administradores
     var preco = {}; (r5.data || []).forEach(function (x) { preco[x.product_id] = x; });
     var prod = {}; (r2.data || []).forEach(function (p) { prod[p.id] = p; });
     TAB.cat = (r1.data || []).map(function (pc) { var p = prod[pc.product_id] || {}; var pr = preco[pc.product_id], vol = p.volume_size || 10, mu = pr ? (pr.pvp_c - pr.custo_c) / (pr.unidade === "volume" ? vol : 1) : null;

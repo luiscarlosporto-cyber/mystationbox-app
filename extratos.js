@@ -29,9 +29,9 @@ async function carregarBanco() {
   if (!BAN.mes) BAN.mes = addMes(mesHoje(), -1);
   var box = $("#banCorpo"); if (!BAN.lido) box.innerHTML = "<div class='mut'>A carregar…</div>";
   try {
-    var r = await sb.from("msb_extratos").select("*").eq("estacao", EST).gte("dia", BAN_DESDE).order("dia").order("ordem").limit(5000); if (r.error) throw r.error;
+    var r = await lerTudo(function () { return sb.from("msb_extratos").select("*").eq("estacao", EST).gte("dia", BAN_DESDE).order("dia").order("ordem"); }, ["id"]); if (r.error) throw r.error;
     var g = await sb.from("msb_extratos_regras").select("*").eq("estacao", EST).order("padrao"); if (g.error) throw g.error;
-    var t = await sb.from("msb_turnos").select("dia,num_c").eq("estacao", EST).gte("dia", BAN_DESDE); if (t.error) throw t.error;
+    var t = await lerTudo(function () { return sb.from("msb_turnos").select("dia,num_c").eq("estacao", EST).gte("dia", BAN_DESDE); }, ["dia", "turno"]); if (t.error) throw t.error;
     BAN.movs = r.data || []; BAN.regras = g.data || []; BAN.turnos = t.data || [];
     desenharBanco();
   } catch (e) { box.innerHTML = "<div class='bad'>" + esc(falhouBanco(e)) + "</div>"; }

@@ -29,10 +29,10 @@ function pdocSaphety(d) {
 async function pdocCarregar() {
   var q = function (p) { return p.then(function (r) { if (r.error) throw r.error; return r.data || []; }); };
   var R = await Promise.all([
-    q(sb.from("msb_saphety_docs").select("estacao,numero,tipo,data,entidade,refs,original,estado,valor_c,valor_regra,valor_motivo,valor_lido_em").order("data", {ascending: false}).limit(5000)),
-    q(sb.from("msb_despesas").select("id,estacao,dia,categoria,fornecedor,documento,valor_c,original,estado").order("dia", {ascending: false}).limit(5000)).catch(function () { return []; }),
-    q(sb.from("msb_faturas_dig").select("estacao,fornecedor,numero,dia,total_c,original").order("dia", {ascending: false}).limit(5000)).catch(function () { return []; }),
-    q(sb.from("msb_transferencias").select("estacao,chave,tipo,dia,valor_c").order("dia", {ascending: false}).limit(5000)).catch(function () { return []; })
+    q(lerTudo(function () { return sb.from("msb_saphety_docs").select("estacao,numero,tipo,data,entidade,refs,original,estado,valor_c,valor_regra,valor_motivo,valor_lido_em").order("data", {ascending: false}); }, ["estacao", "numero"])),
+    q(lerTudo(function () { return sb.from("msb_despesas").select("id,estacao,dia,categoria,fornecedor,documento,valor_c,original,estado").order("dia", {ascending: false}); }, ["id"])).catch(function () { return []; }),
+    q(lerTudo(function () { return sb.from("msb_faturas_dig").select("estacao,fornecedor,numero,dia,total_c,original").order("dia", {ascending: false}); }, ["id"])).catch(function () { return []; }),
+    q(lerTudo(function () { return sb.from("msb_transferencias").select("estacao,chave,tipo,dia,valor_c").order("dia", {ascending: false}); }, ["estacao", "chave"])).catch(function () { return []; })
   ]);
   var L = [], ja = {};
   R[0].forEach(function (d) { var t = pdocSaphety(d); ja[d.estacao + "|" + pdocNorm(d.numero)] = 1;
