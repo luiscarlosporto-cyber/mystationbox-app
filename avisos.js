@@ -156,6 +156,7 @@ async function carregarAvisos() {
     if (L.length && !porLer.length) h += "<div class='mut'>Nada por ver. Os avisos já vistos estão no arquivo.</div>";
     var nArq = arq.length + pArq.length;
     var arquivo = nArq ? "<details class='card' style='padding:12px 14px'><summary><b>🗄️ Arquivo (" + nArq + ")</b></summary><div style='display:grid;gap:10px;margin-top:10px'>" + aviPedidos(pArq) + arq.map(cartaoAviso).join("") + "</div></details>" : "";
+    var er = await aviErros(); h += er.html;
     box.innerHTML = window.MSB_NAV ? h + aviPedidos(pAbertos) + aviForm() + MSB_NAV.fechado("Histórico de preços", aviHistorico()) + arquivo : aviForm() + aviPedidos(pAbertos) + h + aviHistorico() + arquivo;
     /* enquanto houver pedido em espera, a resposta aparece sozinha */
     clearTimeout(AVI_ESPERA);
@@ -165,8 +166,32 @@ async function carregarAvisos() {
     $$("#aviCorpo [data-avi]").forEach(function (b) { b.onclick = function () { aviVisto([Number(b.dataset.avi)]); }; });
     $$("#aviCorpo [data-us]").forEach(function (b) { b.onclick = function (ev) { ev.preventDefault(); var k = b.dataset.us.split("|"); aviUsar(Number(k[0]), k[1]); }; });
     $$("#aviCorpo [data-pv]").forEach(function (b) { b.onclick = async function (ev) { ev.preventDefault(); var r = await sb.from("msb_pedidos").update({visto_em: new Date().toISOString()}).eq("id", Number(b.dataset.pv)); if (r.error) return status(false, "⚠ " + falhou(r.error)); carregarAvisos(); }; });
+    $$("#aviCorpo [data-erv]").forEach(function (b) { b.onclick = function () { aviErroVisto(b.dataset.erv === "todos" ? er.ids : [Number(b.dataset.erv)]); }; });
     var t = $("#aviTudo"); if (t) t.onclick = function () { aviVisto(porLer.map(function (a) { return a.id; })); };
   } catch (e) { box.innerHTML = "<div class='bad'>" + esc(falhou(e)) + "</div>"; }
+}
+/* erros da app nos telemóveis e computadores (msb_erros, 13/11/2026): os por ver dos últimos 30 dias */
+async function errosPorVer(dias) {
+  var r = await sb.from("msb_erros").select("id,em,estacao,quem,versao,pagina,mensagem").is("visto_em", null).gte("em", new Date(Date.now() - (dias || 30) * 864e5).toISOString()).order("em", {ascending: false}).limit(200);
+  if (r.error) throw r.error;
+  return r.data || [];
+}
+async function aviErros() {
+  var L; try { L = await errosPorVer(30); } catch (e) { return {html: "", ids: []}; }   // tabela ainda não ativa: não mostra nada
+  if (!L.length) return {html: "", ids: []};
+  var cartoes = L.slice(0, 30).map(function (x) {
+    return "<div class='card' style='padding:10px 14px'><b>📱 " + esc(x.mensagem) + "</b><div class='mut'>" + aviDataHora(x.em) + " · " + esc(x.quem || "sem sessão") +
+      (x.estacao ? " · " + esc(aviLoja(x.estacao)) : "") + (x.pagina ? " · página " + esc(x.pagina) : "") + (x.versao ? " · " + esc(x.versao) : "") +
+      "</div><div style='margin-top:6px'><button class='btn' data-erv='" + x.id + "'>✔ Visto</button></div></div>";
+  }).join("");
+  return {ids: L.map(function (x) { return x.id; }), html: "<details class='card' style='padding:12px 14px'><summary><b>⚠️ Erros da app por ver (" + L.length + ")</b> <span class='mut'>· telemóveis e computadores, últimos 30 dias</span></summary>" +
+    "<div class='bar' style='margin-top:8px'><button class='btn' data-erv='todos'>✔ Marcar todos como vistos</button></div><div style='display:grid;gap:8px;margin-top:8px'>" + cartoes + "</div></details>"};
+}
+async function aviErroVisto(ids) {
+  var u = await sb.auth.getUser(), quem = (u.data && u.data.user && u.data.user.email) || "";
+  var r = await sb.from("msb_erros").update({visto_em: new Date().toISOString(), visto_por: quem}).in("id", ids);
+  if (r.error) return status(false, "⚠ " + falhou(r.error));
+  carregarAvisos();
 }
 async function aviVisto(ids) {
   var u = await sb.auth.getUser(), quem = (u.data && u.data.user && u.data.user.email) || "";

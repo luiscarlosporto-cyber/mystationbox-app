@@ -336,6 +336,7 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
 <script src="config.js"></script>
 <script src="formatos.js"></script>
 <script src="ler_tudo.js"></script>
+<script src="erros.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="motor.js"></script>
 <script>
@@ -362,7 +363,7 @@ function addDia(s,n){var d=new Date(s+"T12:00:00");d.setDate(d.getDate()+n);retu
 function addMes(m,n){var p=m.split("-"),d=new Date(+p[0],+p[1]-1+n,1);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")}
 function dmy(s){return s?s.slice(0,10).split("-").reverse().join("/"):""}
 function status(ok,m){var e=$("#st");e.className="st "+(ok?"ok":"bad");e.textContent=m}
-function falhou(e){var m=(e&&(e.message||e.error_description))||String(e);
+function falhou(e){if(window.msbErro)msbErro(e);var m=(e&&(e.message||e.error_description))||String(e);
   if(/Failed to fetch|NetworkError|Load failed/i.test(m))return "Sem ligação à cloud. Confirme a internet (no plano gratuito o projeto pode estar em pausa).";
   if(/row-level security|permission denied|42501/i.test(m))return "Sem permissão: só administradores podem alterar.";
   if(/JWT|token/i.test(m))return "A sessão expirou: saia e entre de novo.";return m}
@@ -535,7 +536,7 @@ entrar().catch(function(e){$("#vLogin").hidden=false;$("#lErro").textContent=fal
 <script src="fraude.js"></script>
 <script src="beta/beta.js?v=95b7f3de"></script>
 <script src="beta/painel_regras.js?v=ec7af70e"></script>
-<script src="beta/painel.js?v=5fe22660"></script>
+<script src="beta/painel.js?v=0c6e7fac"></script>
 <script src="beta/paginas.js?v=a5c22158"></script>
 <script src="beta/horario_regras.js?v=24be9c07"></script>
 <script src="beta/horario_gerar.js?v=c4e08e4e"></script>

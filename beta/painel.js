@@ -48,9 +48,10 @@
       guarda("documentos", sb.from("msb_docs").select("estacao,emissao").order("emissao", {ascending: false}).limit(40)),
       guarda("avisos", avisosRecentes(60).then(function (x) { return {data: x}; })),
       guarda("mês em curso", pedidosMes(mes)),
-      guarda("mês anterior", pedidosMes(ant))
+      guarda("mês anterior", pedidosMes(ant)),
+      guarda("erros da app", errosPorVer(7).then(function (x) { return {data: x}; }))
     ]);
-    return {cur: (R[11] || []).concat(R[12] || []), hoje: hoje, mes: mes, ant: ant, tur: R[0], fol: R[1], sai: R[2], enc: R[3], pre: R[4], tms: R[5], vm: R[6], va: R[7], ped: R[8], doc: R[9], avi: R[10], falhas: f};
+    return {cur: (R[11] || []).concat(R[12] || []), hoje: hoje, mes: mes, ant: ant, tur: R[0], fol: R[1], sai: R[2], enc: R[3], pre: R[4], tms: R[5], vm: R[6], va: R[7], ped: R[8], doc: R[9], avi: R[10], err: R[13], falhas: f};
   }
 
   function pedidosMes(m) { return sb.from("msb_pedidos").select("id,estacao,estado,de,ate,linhas,dias,familias").eq("pasta", "PAINEL").gte("de", m + "-01").lt("de", addMes(m, 1) + "-01").order("id", {ascending: false}).limit(6); }
@@ -101,6 +102,7 @@
       var ense = a.tipo === "ense" && /preç|ENSE/i.test(a.titulo || "");   // ENSE é o único crítico: só sai depois de tratado
       L.push({o: a.nivel === "erro" ? 0 : 2, t: a.titulo, s: loja(a.estacao) + " · OCTAN AI", e: a.estacao, p: "avi", b: "Ver", arq: ense ? "" : "a" + a.id});
     });
+    if (X.err && X.err.length) L.push({o: 2, t: X.err.length === 1 ? "1 erro da app por ver" : X.err.length + " erros da app por ver", s: "Telemóveis e computadores · últimos 7 dias", p: "avi", b: "Ver"});
     var par = X.avi && aviParado(X.avi); if (par) L.push({o: 0, t: "O OCTAN AI não corre desde " + aviDataHora(par.criado), s: "Confirma se o PC está ligado", p: "avi", b: "Ver"});
     (X.pre || []).filter(function (x) { return x.estado === "lido" && (!x.aprovado_em || x.ense_erro); }).forEach(function (x) {
       L.push({o: 1, t: x.ense_erro ? "Preços ENSE por gravar" : "Preços ENSE por aprovar", s: loja(x.estacao) + " · em vigor a " + dmy(x.dia), e: x.estacao, p: "pre", b: "Ver"});
