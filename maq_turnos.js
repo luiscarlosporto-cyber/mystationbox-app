@@ -39,7 +39,18 @@ var MAQT = (function () {
     });
     return {linhas: L, total: tot, valor_c: tot.t1.valor_c + tot.t2.valor_c, qtd: tot.t1.qtd + tot.t2.qtd};
   }
-  return {somar: somar, porDia: porDia, emFalta: emFalta, tabela: tabela, addDia: addDia};
+  /* Totais do mês por artigo da máquina (soma dos turnos M e T): substitui o relatório de vendas carregado à mão (dono, 14/11/2026) */
+  function artigos(mes, lidos, cods) {
+    var A = {};
+    Object.keys(lidos).filter(function (d) { return d.slice(0, 7) === mes; }).forEach(function (d) {
+      ["t1", "t2"].forEach(function (t) { ((lidos[d] || {})[t] || []).forEach(function (l) {
+        var c = String(l[0]); if (!cods[c]) return;
+        var x = A[c] = A[c] || {cod: c, name: l[1], qty: 0, valor_c: 0}; x.qty += +l[2] || 0; x.valor_c += Math.round((+l[3] || 0) * 100);
+      }); });
+    });
+    return Object.keys(A).map(function (k) { return A[k]; }).filter(function (x) { return x.qty > 0; }).sort(function (a, b) { return b.qty - a.qty || a.name.localeCompare(b.name, "pt"); });
+  }
+  return {somar: somar, porDia: porDia, emFalta: emFalta, tabela: tabela, artigos: artigos, addDia: addDia};
 })();
 if (typeof module !== "undefined") module.exports = MAQT;
 
@@ -78,8 +89,19 @@ async function maqTurnos(w) {
     var T = MAQT.tabela(mes, lidos, cods), n = function (v, c) { return FORMATOS.numero(v, c); }, eur = function (c) { return n(c / 100, 2); };
     var nm = new Date(mes + "-15").toLocaleDateString("pt-PT", {month: "long", year: "numeric"}), erro = P.filter(function (p) { return p.estado === "erro"; }).pop();
     var cel = function (x, f) { return "<td style='text-align:right;padding:5px 4px;white-space:nowrap'>" + (x.qtd ? "<b>" + eur(x.valor_c) + " €</b><br><small style='color:#6b7680'>" + n(x.qtd, 0) + " maços" + (f ? " · " + esc(f) : "") + "</small>" : "<span style='color:#9aa4ad'>—</span>" + (f ? "<br><small style='color:#6b7680'>" + esc(f) + "</small>" : "")) + "</td>"; };
-    box.innerHTML = "<div style='display:flex;align-items:center;gap:8px;flex-wrap:wrap'><b style='font-size:17px'>Máquina de tabaco por turno</b>" +
-      "<span style='margin-left:auto;display:flex;gap:6px;align-items:center'><button class='btn' id='mqtAnt'>‹</button><b style='text-transform:capitalize'>" + esc(nm) + "</b><button class='btn' id='mqtSeg'>›</button></span></div>" +
+    var AR = MAQT.artigos(mes, lidos, cods), pct = +cfg.data.maquina.margem_pct || null, dl = Object.keys(lidos).filter(function (d) { return d.slice(0, 7) === mes; }).sort();
+    var per = dl.length ? dmy(dl[0]) + " a " + dmy(dl[dl.length - 1]) : nm, mg = pct ? Math.round(T.valor_c * pct / 100) : null;
+    var est0 = ESTS.find(function (x) { return x.id === est; }) || {};
+    MAQT.pdf = {loja: est0.short_name || est0.name || "", per: per, qty: T.qtd, valor: T.valor_c / 100, margem: mg == null ? null : mg / 100, pct: pct, linhas: AR.map(function (x) { return {name: x.name, qty: x.qty, valor: x.valor_c / 100}; })};
+    var st0 = w.document.getElementById("maqStatus"), so = dl.length ? "none" : ""; L.style.display = so; if (st0) st0.style.display = so;   // com turnos lidos, o relatório carregado à mão deixa de ser preciso   // o relatório carregado à mão deixa de ser preciso
+    var topo = "<div style='display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px'><b style='font-size:17px'>Máquina de tabaco · <span style='text-transform:capitalize'>" + esc(nm) + "</span></b>" +
+      "<span style='margin-left:auto;display:flex;gap:6px;align-items:center'><button class='btn' id='mqtAnt'>‹</button><button class='btn' id='mqtSeg'>›</button></span></div>" +
+      "<div class='notice' style='font-size:15px;line-height:1.6'><b>" + esc(per) + "</b> (" + dl.length + " dia(s) lidos)<br>" + n(T.qtd, 0) + " maços · <b>" + eur(T.valor_c) + " €</b>" + (mg != null ? " · margem " + n(pct, 2) + " % = " + eur(mg) + " €" : "") + "</div>" +
+      (AR.length ? "<div style='overflow-x:auto'><table style='width:100%;border-collapse:collapse;font-size:14px;margin-top:8px'><thead><tr><th style='text-align:left;padding:6px 4px'>Artigo</th><th style='text-align:right;padding:6px 4px'>Maços</th><th style='text-align:right;padding:6px 4px'>€</th></tr></thead><tbody>" +
+        AR.map(function (x) { return "<tr style='border-top:1px solid #e3e8ec'><td style='padding:5px 4px'>" + esc(x.name) + "</td><td style='text-align:right;padding:5px 4px;font-weight:600'>" + n(x.qty, 0) + "</td><td style='text-align:right;padding:5px 4px;white-space:nowrap'>" + eur(x.valor_c) + "</td></tr>"; }).join("") +
+        "</tbody></table></div><div class='actions'><button class='btn' id='mqtPdf' style='flex:1'>📄 Descarregar PDF (uma folha)</button></div>" : "");
+    box.innerHTML = topo + "<div style='display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:18px'><b style='font-size:17px'>Por turno</b></div>" +
+      "" +
       "<p style='color:#6b7680;font-size:13px;margin:4px 0 8px'>Euros com IVA e maços de cada turno, lidos no CBOS pelo OCTAN AI (M = fecho 1, T = fecho 2; o OPT noturno fica de fora). Para conferir com a caixa de cada turno.</p>" +
       (pend.length ? "<div class='notice'>⏳ O OCTAN AI está a ler " + pend.length + " bloco(s) de dias no CBOS. Aparecem aqui sozinhos, com o PC ligado.</div>" : "") +
       (erro ? "<div class='notice' style='background:#fdecea'>⚠ Última leitura com erro: " + esc(erro.erro || "") + "</div>" : "") +
@@ -87,6 +109,7 @@ async function maqTurnos(w) {
         T.linhas.map(function (x) { return "<tr style='border-top:1px solid #e3e8ec'><td style='padding:5px 4px'>" + x.dia.slice(8) + "/" + x.dia.slice(5, 7) + "</td>" + cel(x.t1, func[x.dia + "t1"]) + cel(x.t2, func[x.dia + "t2"]) + "<td style='text-align:right;padding:5px 4px;white-space:nowrap'>" + eur(x.valor_c) + " €</td></tr>"; }).join("") +
         "</tbody><tfoot><tr style='border-top:2px solid #c9d1d8;font-weight:700'><td style='padding:6px 4px'>Total</td>" + cel(T.total.t1) + cel(T.total.t2) + "<td style='text-align:right;padding:6px 4px'>" + eur(T.valor_c) + " €<br><small style='color:#6b7680'>" + n(T.qtd, 0) + " maços</small></td></tr></tfoot></table></div>"
         : (pend.length ? "" : "<div class='notice'>Sem turnos lidos neste mês.</div>"));
+    var bp = w.document.getElementById("mqtPdf"); if (bp) bp.onclick = function () { maqPdfFolha(MAQT.pdf).catch(function (e) { status(false, "⚠ PDF: " + falhou(e)); }); };
     w.document.getElementById("mqtAnt").onclick = function () { MAQT_MES = MAQT.addDia(mes + "-01", -1).slice(0, 7); maqTurnos(w); };
     w.document.getElementById("mqtSeg").onclick = function () { MAQT_MES = MAQT.addDia(mes + "-28", 7).slice(0, 7); maqTurnos(w); };
     clearTimeout(maqTurnos.t);
