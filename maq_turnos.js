@@ -62,6 +62,8 @@ async function maqTurnos(w) {
   box.innerHTML = "<div class='notice'>A carregar a máquina por turno…</div>";
   try {
     var cods = await maqCodigos(w);
+    for (var k = 0; k < 5 && !Object.keys(cods || {}).length; k++) { await new Promise(function (ok) { setTimeout(ok, 2000); }); cods = await maqCodigos(w); }   // o módulo de stock ainda a carregar a regra
+    if (!Object.keys(cods || {}).length) throw new Error("ainda não sei que artigos são da máquina. Abre de novo esta página daqui a pouco.");
     var r = await sb.from("msb_pedidos").select("id,de,ate,estado,dias,erro").eq("estacao", est).eq("pasta", "TURNOS").lte("de", fim).gte("ate", mes + "-01").order("id");
     if (r.error) throw r.error;
     var P = r.data || [], lidos = MAQT.porDia(P), pend = P.filter(function (p) { return p.estado === "pendente" || p.estado === "a_ler"; });
