@@ -58,11 +58,11 @@ async function maqTurnos(w) {
   if (!box) { box = w.document.createElement("div"); box.id = "msbMaqTurnos"; box.style.marginTop = "18px"; L.parentNode.insertBefore(box, L.nextSibling); }
   var est = EST, cfg = await sb.from("msb_config").select("maquina").eq("estacao", est).maybeSingle();
   if (!cfg.data || !cfg.data.maquina) { box.innerHTML = ""; return; }
-  var mes = MAQT_MES || MES, hoje = new Date().toISOString().slice(0, 10);
+  var mes = MAQT_MES || MES, hoje = new Date().toISOString().slice(0, 10), fim = MAQT.addDia(MAQT.addDia(mes + "-28", 7).slice(0, 7) + "-01", -1);
   box.innerHTML = "<div class='notice'>A carregar a máquina por turno…</div>";
   try {
     var cods = await maqCodigos(w);
-    var r = await sb.from("msb_pedidos").select("id,de,ate,estado,dias,erro").eq("estacao", est).eq("pasta", "TURNOS").lte("de", mes + "-31").gte("ate", mes + "-01").order("id");
+    var r = await sb.from("msb_pedidos").select("id,de,ate,estado,dias,erro").eq("estacao", est).eq("pasta", "TURNOS").lte("de", fim).gte("ate", mes + "-01").order("id");
     if (r.error) throw r.error;
     var P = r.data || [], lidos = MAQT.porDia(P), pend = P.filter(function (p) { return p.estado === "pendente" || p.estado === "a_ler"; });
     var falta = MAQT.emFalta(mes, lidos, pend, hoje);
@@ -71,7 +71,7 @@ async function maqTurnos(w) {
       if (ins.error) throw ins.error;
       pend = pend.concat(falta);
     }
-    var tr = await sb.from("msb_turnos").select("dia,turno,func").eq("estacao", est).gte("dia", mes + "-01").lte("dia", mes + "-31");
+    var tr = await sb.from("msb_turnos").select("dia,turno,func").eq("estacao", est).gte("dia", mes + "-01").lte("dia", fim);
     var func = {}; (tr.data || []).forEach(function (t) { func[t.dia + t.turno] = t.func || ""; });
     var T = MAQT.tabela(mes, lidos, cods), n = function (v, c) { return FORMATOS.numero(v, c); }, eur = function (c) { return n(c / 100, 2); };
     var nm = new Date(mes + "-15").toLocaleDateString("pt-PT", {month: "long", year: "numeric"}), erro = P.filter(function (p) { return p.estado === "erro"; }).pop();
