@@ -147,7 +147,8 @@ function nexAplicar(pg) {
   try { NEX_OBS = new d.defaultView.MutationObserver(function () { if (NEXP[PAGINA]) nexVis(PAGINA); }); NEX_OBS.observe(d.body, {subtree: true, attributes: true, attributeFilter: ["class"], childList: true}); } catch (e) { NEX_OBS = null; }
   nexVis(pg);
   try { d.defaultView.scrollTo(0, 0); } catch (e) { /* nada */ }
-  if (pg === "maq" && typeof maqAuto === "function") { try { maqVigiar(d.defaultView); } catch (e) { /* nada */ } maqAuto(); }
+  if (pg === "maq" && typeof maqAuto === "function") { try { maqVigiar(d.defaultView); } catch (e) { /* nada */ } maqAuto(); if (typeof maqTurnosAuto === "function") maqTurnosAuto(); }
+
 }
 function nexVis(pg) {
   var cfg = NEXP[pg], d = nexDoc(); if (!cfg || !d) return;
