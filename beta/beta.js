@@ -47,7 +47,7 @@
     MSB_NAV.paginas();
     var app = $("#vApp"), lat = document.createElement("aside"), topo = document.createElement("div");
     lat.id = "bLat"; lat.setAttribute("aria-label", "Menu");
-    lat.innerHTML = "<div class='marca'><img src='logo.svg' alt=''><img class='wm' src='marca_clara.png' alt='mystationbox'></div><div id='bAreas'></div>" +
+    lat.innerHTML = "<div class='marca'><img src='logo.svg' alt=''><picture><source srcset='marca_clara.png' media='(prefers-color-scheme: dark)'><img class='wm' src='marca_escura.png' alt='mystationbox'></picture></div><div id='bAreas'></div>" +
       "<div class='fim'><span id='bQuem'></span><button id='bRec' title='Recolher o menu'>" + ic("r") + "<span class='tx'>Recolher menu</span></button></div>";
     topo.id = "bTopo";
     topo.innerHTML = "<div id='bCam'></div><button id='bBusca' aria-label='Procurar'>" + ic("b") + "<span>Procurar</span><kbd>Ctrl K</kbd></button><button id='bNovo' aria-haspopup='menu'>" + ic("m") + "<span>Novo</span></button>";

@@ -137,6 +137,17 @@
     var ates = ESTS.map(function (e) { var c = dadosLoja(X, e, M).c; return c ? c.ate : ""; }).filter(Boolean).sort();
     return ates.length ? +ates[0].slice(8) : PN.diasMes(M);
   }
+  /* Ícone redondo de cada indicador (tema azul, 15/11/2026): só enfeite, o texto do cartão diz tudo */
+  var ICO = {
+    vend: ["#3B8BFF,#1A55D6", "<path d='M17 6.5A6.5 6.5 0 1 0 17 17.5'/><path d='M5 10.5h8M5 13.5h8'/>"],
+    lit: ["#FFB547,#F57C00", "<path d='M12 3s6 7 6 11a6 6 0 0 1-12 0c0-4 6-11 6-11z'/>"], comb: ["#FFB547,#F57C00", "<path d='M12 3s6 7 6 11a6 6 0 0 1-12 0c0-4 6-11 6-11z'/>"],
+    loja: ["#A78BFA,#7C3AED", "<path d='M5 8h14l-1 12H6z'/><path d='M9 8a3 3 0 0 1 6 0'/>"],
+    mb: ["#3B8BFF,#1A55D6", "<rect x='3' y='6' width='18' height='12' rx='2'/><path d='M3 10h18'/>"], sol: ["#34D399,#059669", "<rect x='3' y='6' width='18' height='12' rx='2'/><path d='M3 10h18'/>"],
+    num: ["#34D399,#059669", "<rect x='3' y='6' width='18' height='12' rx='2'/><circle cx='12' cy='12' r='2.5'/>"],
+    tur: ["#3B8BFF,#1A55D6", "<path d='M4 20V10M10 20V4M16 20v-7M22 20H2'/>"], dif: ["#94A3B8,#64748B", "<path d='M12 4v16M5 8h14M7 8l-3 7h6zM17 8l-3 7h6z'/>"],
+    ont: ["#3B8BFF,#1A55D6", "<rect x='4' y='5' width='16' height='15' rx='2'/><path d='M4 10h16M9 3v4M15 3v4'/>"]
+  };
+  function icone(k) { var c = ICO[k]; return c ? "<span class='pnIco' aria-hidden='true' style='background:linear-gradient(135deg," + c[0] + ")'><svg viewBox='0 0 24 24'>" + c[1] + "</svg></span>" : ""; }
   function cartoes(X) {
     var M = MES_V || X.mes, A = addMes(M, -1), d = diasVistos(X, M), d0 = PN.diasMes(A), lista = indAtivos();
     return "<div class='pnKs'>" + lista.map(function (k, i) {
@@ -144,7 +155,7 @@
       if (rit != null) sub = "<span class='pn" + (rit >= 0 ? "Sobe" : "Desce") + "'>" + (rit >= 0 ? "▲ " : "▼ ") + num(Math.abs(rit), 1) + " %</span> por dia face a " + nomeMes(A);
       if (i === 0 && k === "vend" && v != null) sub += M === X.mes && d < PN.diasMes(M) ? " · a este ritmo, cerca de " + eur0(v / d * PN.diasMes(M)) + " no fim do mês" : (sub ? " · " : "") + eur0(v / d) + " por dia";
       var porLoja = LOJA_V === "todas" && ESTS.length > 1 ? "<small>" + ESTS.map(function (e) { var x = I[3](dadosLoja(X, e, M)); return esc(nomeLoja(e)) + " " + (x == null ? "—" : k === "lit" ? formato(x, "lit") : I[4] === "eur" ? eur0(x) : formato(x, I[4])); }).join(" · ") + "</small>" : "";
-      return "<div class='pnK" + (i ? "" : " hero") + "'><span class='rt'>" + I[1] + "</span><strong" + (v == null ? ">—" : " data-n='ind-" + k + "' data-v='" + v + "' data-t='" + I[4] + "'>" + formato(v, I[4])) + "</strong><p>" + sub + "</p>" + porLoja + "</div>";
+      return "<div class='pnK" + (i ? "" : " hero") + "'>" + (i ? icone(k) : "") + "<span class='rt'>" + I[1] + "</span><strong" + (v == null ? ">—" : " data-n='ind-" + k + "' data-v='" + v + "' data-t='" + I[4] + "'>" + formato(v, I[4])) + "</strong><p>" + sub + "</p>" + porLoja + "</div>";
     }).join("") + "</div>";
   }
   var GR = null, FAM_V = "TODAS";   // dados do gráfico que está no ecrã; família escolhida

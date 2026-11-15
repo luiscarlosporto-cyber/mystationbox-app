@@ -367,3 +367,49 @@ body:not(.b-duas) main{box-shadow:inset 5px 0 0 var(--est)}
 .carZona strong{font:600 17px var(--f-body)}.carZona span{color:var(--mut);font-size:14px}.carZona small{color:var(--mut);font-size:12.5px;max-width:720px;margin:4px auto 0}
 .carZona:hover,.carZona:focus-visible,.carZona.on{border-color:#F36C21;background:var(--soft);outline:0}
 .carT{min-width:560px}.carT .mini{white-space:nowrap}
+
+/* ---- Tema azul · opção E do Painel, aprovada pelo dono a 15/11/2026 ----
+ * Marca nova (logótipo azul). Só aparência: para voltar ao tema anterior, apagar este bloco.
+ * Os nomes --laranja/--lar2 ficam, mas passam a azul: são a cor da ação principal em toda a app. --t1 continua laranja para distinguir o Turno 1. */
+:root{
+  --bg:#F3F6FB;--card:#FFF;--fg:#0F172A;--mut:#5B6B80;--bd:#E3E9F1;--soft:#F1F5FA;--in:#FFF;
+  --azul:#1A63E8;--azul2:#EAF1FF;--sobre-azul:#FFF;--laranja:#1A63E8;--laranja-cl:#1A63E8;--lar2:#EAF1FF;
+  --nav:#FFF;--navtx:#1E293B;--navon:#EAF1FF;--head:#F3F6FB;--t1:#E8710A;--t2:#1A63E8;--r:12px;
+  --f-display:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",system-ui,sans-serif;--f-body:var(--f-display);--f-num:var(--f-display);
+  --sombra:0 1px 2px rgba(15,23,42,.04),0 6px 20px rgba(15,23,42,.05);--grad-azul:linear-gradient(135deg,#3B8BFF,#1A55D6);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0B1220;--card:#111A2E;--fg:#E8EEF7;--mut:#9AA9BD;--bd:#22304A;--soft:#17223A;--in:#0E1628;
+  --azul:#7FB0FF;--azul2:#1A2A4A;--sobre-azul:#0B1220;--laranja:#2563EB;--laranja-cl:#7FB0FF;--lar2:#1A2A4A;
+  --nav:#0F1828;--navtx:#CBD5E1;--navon:#1A2A4A;--head:#0B1220;--t1:#F59E0B;--t2:#7FB0FF;--sombra:none}}
+#bLat{border-right:1px solid var(--bd)}
+#bLat .marca{min-height:68px;padding:16px 14px 14px}
+#bLat .marca img:first-child{box-shadow:0 2px 6px rgba(26,99,232,.25)}
+#bLat .marca em{color:var(--azul);border-color:var(--azul)}
+#bAreas{padding:4px 10px}
+#bLat button{border-radius:10px;min-height:40px}
+#bLat button:hover{background:var(--soft);color:var(--fg)}
+#bLat button.on{background:var(--grad-azul);color:#FFF;box-shadow:0 4px 12px rgba(26,99,232,.25)}
+#bLat button:focus-visible{outline:2px solid var(--azul)}
+#bLat .sub b{color:var(--mut)}
+#bLat .sub button.on{background:none;color:var(--azul);box-shadow:inset 2px 0 0 var(--azul)}
+#bLat .fim{border-top:1px solid var(--bd)}
+#bTopo{border-bottom-color:transparent}
+#bTopo select,#bTopo button{border-radius:12px}
+.selo{background:#DC2626}
+.bl,.pnK,.card,.ini .c,.pnQd,.carZona{border-radius:18px}
+.bl,.pnK,.card,.ini .c{border-color:transparent;box-shadow:var(--sombra)}
+.btn,a.btn{border-radius:10px}
+.pnK{padding:18px 20px}
+.pnK.hero{background:var(--grad-azul);border-color:transparent;box-shadow:0 8px 24px rgba(26,99,232,.28)}
+.pnK.hero .rt,.pnK.hero p,.pnK.hero small{color:#DCE8FF}
+.painel{--pn1:#1A63E8;--pn2:#7C3AED;--pn3:#F59E0B;--pn4:#10B981;--pn5:#94A3B8}
+.pnGraf .l1{stroke:#1A63E8;stroke-width:3}
+.pnGraf .ar{fill:#1A63E8;fill-opacity:.14}
+.pnGraf .l2{stroke:#94A3B8}
+.pnGraf .pt{background:#1A63E8}
+.pnQd:hover,.pnQd:focus-visible{border-color:var(--azul)}
+.carZona:hover,.carZona:focus-visible,.carZona.on{border-color:var(--azul)}
+.pnIco{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:10px}
+.pnIco svg{width:20px;height:20px;fill:none;stroke:#FFF;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.pnChips button.on{color:var(--sobre-azul)}
