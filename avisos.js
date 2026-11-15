@@ -76,27 +76,43 @@ function aviPedidos(L) {
     var vi = p.visto_em ? "" : "<div style='margin-top:8px'><button class='btn' data-pv='" + p.id + "'>✔ Visto</button></div>";
     if (p.estado === "erro") return "<div class='card' style='padding:12px 14px'>❌ " + t + "<div class='bad'>" + esc(p.erro) + "</div>" + vi + "</div>";
     var L2 = p.linhas || [], q = L2.reduce(function (s, x) { return s + x[2]; }, 0), v = L2.reduce(function (s, x) { return s + x[3]; }, 0);
-    var usar = !p.artigo && (p.pasta === "TABACO" || p.pasta === "TODAS") && L2.length ? "<div class='bar' style='margin-top:8px'><button class='btn p' data-us='" + p.id + "|tabaco'>🛒 Encomenda Adelaide</button><button class='btn az' data-us='" + p.id + "|aquecido'>🛒 Encomenda Logista</button></div>" : "";
+    var xl = L2.length ? "<button class='btn' data-xl='" + p.id + "'>📥 Excel</button>" : "";
+    var usar = !p.artigo && (p.pasta === "TABACO" || p.pasta === "TODAS") && L2.length ? "<div class='bar' style='margin-top:8px'><button class='btn p' data-us='" + p.id + "|tabaco'>🛒 Encomenda Adelaide</button><button class='btn az' data-us='" + p.id + "|aquecido'>🛒 Encomenda Logista</button>" + xl + "</div>"
+      : xl ? "<div class='bar' style='margin-top:8px'>" + xl + "</div>" : "";
     return "<details class='card' style='padding:12px 14px'><summary>✅ " + t + "<div class='mut'>" + L2.length + " artigos · " + fmt(q * 100).replace(",00", "") + " un. · " + fmt(v * 100) + " €</div>" + usar + vi + "</summary>" +
       "<div class='sc' style='margin-top:6px'><table><thead><tr><th class='l'>Artigo</th><th>Qtd</th><th>Montante €</th></tr></thead><tbody>" +
       L2.map(function (x) { return "<tr><td class='l'>" + esc(x[1]) + "</td><td class='n'>" + fmt(x[2] * 100).replace(",00", "") + "</td><td class='n'>" + fmt(x[3] * 100) + "</td></tr>"; }).join("") + "</tbody></table></div></details>";
   }).join("");
+}
+/* As vendas de um pedido no formato do relatório «Vendas por período» do CBOS (linha do posto + cabeçalho), o mesmo que a Nova encomenda lê */
+function aviFolha(p, e) {
+  var dias = [], d = new Date(p.de + "T12:00:00"), fim = new Date(p.ate + "T12:00:00");
+  for (; d <= fim; d.setDate(d.getDate() + 1)) dias.push(dmy(d.toISOString().slice(0, 10)) + " - Quantidade");
+  var L = [["Posto", (e.posto_repsol || "") + " - " + e.name], ["Código", "Artigos"].concat(dias, ["Total quantidade", "Total Montante"])];
+  (p.linhas || []).forEach(function (l) { L.push([l[0], l[1]].concat(dias.map(function () { return 0; }), [l[2], l[3]])); });
+  return L;
+}
+/* Descarrega o pedido em Excel (dono, 15/11/2026), para guardar ou levar a outro fornecedor */
+async function aviExcel(id) {
+  var p = AVI_PD.find(function (x) { return x.id === id; }), e = (ESTS || []).find(function (x) { return x.id === p.estacao; }) || {name: p.estacao};
+  try {
+    await carregarXlsxMSB();
+    var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aviFolha(p, e)), "Vendas");
+    var nome = function (t) { return String(t || "").toLowerCase().replace(/[^a-z0-9]+/g, "_"); };
+    XLSX.writeFile(wb, "vendas_" + nome(e.short_name || e.name) + "_" + nome(p.pasta) + (p.artigo ? "_" + nome(p.artigo) : "") + "_" + p.de + "_" + p.ate + ".xlsx");
+  } catch (x) { status(false, "⚠ Excel: " + falhou(x)); }
 }
 /* Usa as vendas lidas no CBOS na Nova encomenda, pelo mesmo caminho do relatório em Excel: mesmas regras, confirmação e aprovação. */
 async function aviUsar(id, sup) {
   var p = AVI_PD.find(function (x) { return x.id === id; }), e = (ESTS || []).find(function (x) { return x.id === p.estacao; });
   if (p.estacao !== EST) return status(false, "⚠ Este pedido é de " + aviLoja(p.estacao) + ". Mude de estação no cabeçalho e carregue de novo.");
   if (!e || !e.posto_repsol) return status(false, "⚠ A estação não tem o posto Repsol configurado.");
-  var dias = [], d = new Date(p.de + "T12:00:00"), fim = new Date(p.ate + "T12:00:00");
-  for (; d <= fim; d.setDate(d.getDate() + 1)) dias.push(dmy(d.toISOString().slice(0, 10)) + " - Quantidade");
   ir("nova");
   try {
     /* o módulo de stock demora a confirmar quem entrou: sem isto recusa a encomenda logo que abre */
     var w = await esperarNex(function (x) { try { return typeof x.salesChange === "function" && typeof x.carregarXlsx === "function" && x.eval("typeof currentRole !== 'undefined' && currentRole === 'admin'"); } catch (e) { return false; } });
     await w.carregarXlsx();
-    var cab = ["Código", "Artigos"].concat(dias, ["Total quantidade", "Total Montante"]), L = [["Posto", e.posto_repsol + " - " + e.name], cab];
-    (p.linhas || []).forEach(function (l) { L.push([l[0], l[1]].concat(dias.map(function () { return 0; }), [l[2], l[3]])); });
-    var wb = w.XLSX.utils.book_new(); w.XLSX.utils.book_append_sheet(wb, w.XLSX.utils.aoa_to_sheet(L), "Vendas");
+    var wb = w.XLSX.utils.book_new(); w.XLSX.utils.book_append_sheet(wb, w.XLSX.utils.aoa_to_sheet(aviFolha(p, e)), "Vendas");
     var f = new w.File([w.XLSX.write(wb, {type: "array", bookType: "xlsx"})], "vendas_pedido_" + id + ".xlsx");
     return w.salesChange({target: {files: [f], value: "", dataset: {sup: sup}}});
   } catch (x) { status(false, "⚠ " + (x.message || x)); }
@@ -157,13 +173,14 @@ async function carregarAvisos() {
     var nArq = arq.length + pArq.length;
     var arquivo = nArq ? "<details class='card' style='padding:12px 14px'><summary><b>🗄️ Arquivo (" + nArq + ")</b></summary><div style='display:grid;gap:10px;margin-top:10px'>" + aviPedidos(pArq) + arq.map(cartaoAviso).join("") + "</div></details>" : "";
     var er = await aviErros(); h += er.html;
-    box.innerHTML = window.MSB_NAV ? h + aviPedidos(pAbertos) + aviForm() + MSB_NAV.fechado("Histórico de preços", aviHistorico()) + arquivo : aviForm() + aviPedidos(pAbertos) + h + aviHistorico() + arquivo;
+    box.innerHTML = window.MSB_NAV ? aviPedidos(pAbertos) + aviForm() + h + MSB_NAV.fechado("Histórico de preços", aviHistorico()) + arquivo : aviForm() + aviPedidos(pAbertos) + h + aviHistorico() + arquivo;
     /* enquanto houver pedido em espera, a resposta aparece sozinha */
     clearTimeout(AVI_ESPERA);
     if (PD.some(function (x) { return x.estado === "pendente" || x.estado === "a_ler"; })) AVI_ESPERA = setTimeout(function () { if (PAGINA === "avi") carregarAvisos(); }, 20000);
     $("#pvPedir").onclick = aviPedir;
     $$("#aviCorpo [data-aprova]").forEach(function (b) { b.onclick = function () { var k = b.dataset.aprova.split("|"); aviAprovar(k[0], k[1]); }; });
     $$("#aviCorpo [data-avi]").forEach(function (b) { b.onclick = function () { aviVisto([Number(b.dataset.avi)]); }; });
+    $$("#aviCorpo [data-xl]").forEach(function (b) { b.onclick = function (ev) { ev.preventDefault(); aviExcel(Number(b.dataset.xl)); }; });
     $$("#aviCorpo [data-us]").forEach(function (b) { b.onclick = function (ev) { ev.preventDefault(); var k = b.dataset.us.split("|"); aviUsar(Number(k[0]), k[1]); }; });
     $$("#aviCorpo [data-pv]").forEach(function (b) { b.onclick = async function (ev) { ev.preventDefault(); var r = await sb.from("msb_pedidos").update({visto_em: new Date().toISOString()}).eq("id", Number(b.dataset.pv)); if (r.error) return status(false, "⚠ " + falhou(r.error)); carregarAvisos(); }; });
     $$("#aviCorpo [data-erv]").forEach(function (b) { b.onclick = function () { aviErroVisto(b.dataset.erv === "todos" ? er.ids : [Number(b.dataset.erv)]); }; });
