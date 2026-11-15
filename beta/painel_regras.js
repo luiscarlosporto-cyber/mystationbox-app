@@ -73,6 +73,14 @@
     var dia = m[3] + "-" + m[2] + "-" + m[1];
     return (P || []).some(function (x) { return x.estacao === a.estacao && x.dia === dia && (x.aprovado_em || x.estado === "comunicado"); });
   }
-  var PN = {ense: ense, avisoAprovado: avisoAprovado, totaisFam: totaisFam, serieFam: serieFam, diasMes: diasMes, ultimoDia: ultimoDia, serie: serie, aLer: aLer, pedir: pedir, escala: escala, ritmo: ritmo, formas: formas};
+  /* Cópia de segurança diária: msb-copia-pc regista cada cópia em msb_copias (desde 15/11/2026; a primeira corre a 16/11 às 03:30).
+   * Mais de 36 horas sem cópia = o PC esteve desligado ou a tarefa não correu. Sem registo nenhum, só avisa 36 horas depois do arranque. */
+  var COPIA_ARRANQUE = Date.parse("2026-11-16T03:30:00Z"), COPIA_HORAS = 36;
+  function copiaAtrasada(feito, agora) {
+    var desde = feito ? Date.parse(feito) : COPIA_ARRANQUE, horas = Math.floor((agora - desde) / 3600000);
+    if (agora - desde <= COPIA_HORAS * 3600000) return null;
+    return {horas: feito ? horas : null};
+  }
+  var PN = {copiaAtrasada: copiaAtrasada, ense: ense, avisoAprovado: avisoAprovado, totaisFam: totaisFam, serieFam: serieFam, diasMes: diasMes, ultimoDia: ultimoDia, serie: serie, aLer: aLer, pedir: pedir, escala: escala, ritmo: ritmo, formas: formas};
   if (typeof module !== "undefined" && module.exports) module.exports = PN; else raiz.PN = PN;
 })(this);
