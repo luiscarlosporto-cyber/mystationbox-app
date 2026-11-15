@@ -102,13 +102,14 @@ async function maqTurnos(w) {
         "</tbody></table></div><div class='actions'><button class='btn' id='mqtPdf' style='flex:1'>📄 Descarregar PDF (uma folha)</button></div>" : "");
     box.innerHTML = topo + "<div style='display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:18px'><b style='font-size:17px'>Por turno</b></div>" +
       "" +
-      "<p style='color:#6b7680;font-size:13px;margin:4px 0 8px'>Euros com IVA e maços de cada turno, lidos no CBOS pelo OCTAN AI sozinho depois de cada fecho (vê de hora a hora, das 7h às 23h, com o PC ligado). M = fecho 1, T = fecho 2; o OPT noturno fica de fora. Para conferir com a caixa de cada turno.</p>" +
+      "<p style='color:#6b7680;font-size:13px;margin:4px 0 8px'>Euros com IVA e maços de cada turno, lidos no CBOS pelo OCTAN AI sozinho depois de cada fecho (vê de hora a hora e logo depois das 14h, com o PC ligado). M = fecho 1, T = fecho 2; o OPT noturno fica de fora. Para conferir com a caixa de cada turno.</p>" +
       (pend.length ? "<div class='notice'>⏳ O OCTAN AI está a ler " + pend.length + " bloco(s) de dias no CBOS. Aparecem aqui sozinhos, com o PC ligado.</div>" : "") +
       (erro ? "<div class='notice' style='background:#fdecea'>⚠ Última leitura com erro: " + esc(erro.erro || "") + "</div>" : "") +
       (T.linhas.length ? "<div style='overflow-x:auto'><table style='width:100%;border-collapse:collapse;font-size:14px'><thead><tr><th style='text-align:left;padding:6px 4px'>Dia</th><th style='text-align:right;padding:6px 4px'>☀️ M</th><th style='text-align:right;padding:6px 4px'>🌙 T</th><th style='text-align:right;padding:6px 4px'>Dia</th></tr></thead><tbody>" +
         T.linhas.map(function (x) { return "<tr style='border-top:1px solid #e3e8ec'><td style='padding:5px 4px'>" + x.dia.slice(8) + "/" + x.dia.slice(5, 7) + "</td>" + cel(x.t1, func[x.dia + "t1"]) + cel(x.t2, func[x.dia + "t2"]) + "<td style='text-align:right;padding:5px 4px;white-space:nowrap'>" + eur(x.valor_c) + " €</td></tr>"; }).join("") +
         "</tbody><tfoot><tr style='border-top:2px solid #c9d1d8;font-weight:700'><td style='padding:6px 4px'>Total</td>" + cel(T.total.t1) + cel(T.total.t2) + "<td style='text-align:right;padding:6px 4px'>" + eur(T.valor_c) + " €<br><small style='color:#6b7680'>" + n(T.qtd, 0) + " maços</small></td></tr></tfoot></table></div>"
-        : (pend.length ? "" : "<div class='notice'>Sem turnos lidos neste mês.</div>"));
+        : (pend.length ? "" : "<div class='notice'>Sem turnos lidos neste mês.</div>")) + (ADMIN ? "<div id='mqtEnvio' style='margin-top:18px'></div>" : "");
+    if (ADMIN) maqEnvio(w, est);
     var bp = w.document.getElementById("mqtPdf"); if (bp) bp.onclick = function () { maqPdfFolha(MAQT.pdf).catch(function (e) { status(false, "⚠ PDF: " + falhou(e)); }); };
     w.document.getElementById("mqtAnt").onclick = function () { MAQT_MES = MAQT.addDia(mes + "-01", -1).slice(0, 7); maqTurnos(w); };
     w.document.getElementById("mqtSeg").onclick = function () { MAQT_MES = MAQT.addDia(mes + "-28", 7).slice(0, 7); maqTurnos(w); };
@@ -122,4 +123,34 @@ async function maqTurnosAuto() {
     var w = await esperarNex(function (w) { try { return w.document.getElementById("maqList") && w.eval("typeof regraMaquina === 'function' && typeof company !== 'undefined' && !!company && products.length > 0"); } catch (e) { return false; } }, 45000);
     if (PAGINA === "maq" && est === EST) await maqTurnos(w);
   } catch (e) { /* o módulo de stock não abriu: o relatório do mês já avisa */ }
+}
+
+/* Envio da lista de cada turno por email a um colaborador (dono, 15/11/2026). Quem envia é o OCTAN AI, logo que o turno fecha. Só o administrador vê e muda. */
+async function maqEnvio(w, est) {
+  var box = w.document.getElementById("mqtEnvio"); if (!box) return;
+  try {
+    var d = await sb.from("msb_maq_destino").select("email,ativo").eq("estacao", est).maybeSingle(); if (d.error) throw d.error;
+    var ev = await sb.from("msb_maq_envios").select("dia,turno,estado,erro,qtd,valor_c,enviado_em,criado").eq("estacao", est).order("dia", {ascending: false}).order("turno", {ascending: false}).limit(6); if (ev.error) throw ev.error;
+    var D = d.data, E = ev.data || [], eur = function (c) { return FORMATOS.numero(c / 100, 2) + " €"; };
+    var hora = function (t) { return t ? new Date(t).toLocaleString("pt-PT", {day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"}) : ""; };
+    box.innerHTML = "<b style='font-size:17px'>📧 Envio por email</b>" +
+      "<p style='color:#6b7680;font-size:13px;margin:4px 0 8px'>Logo que cada turno fecha, o OCTAN AI envia a lista desse turno (texto no email e PDF em anexo). O M segue pouco depois das 14h; o T à noite. Precisa do PC ligado.</p>" +
+      "<div class='actions' style='gap:6px;flex-wrap:wrap'><input id='mqtEmail' type='email' placeholder='email do colaborador' value='" + esc(D ? D.email : "") + "' style='flex:1;min-width:220px'>" +
+      "<button class='btn' id='mqtGuardar'>Guardar</button>" + (D ? "<button class='btn' id='mqtLigar'>" + (D.ativo ? "Desligar" : "Ligar") + "</button>" : "") + "</div>" +
+      "<div class='notice'>" + (!D ? "ℹ️ Desligado: escreve o email e carrega em Guardar." : D.ativo ? "✅ Ligado: envia para <b>" + esc(D.email) + "</b>." : "⏸️ Desligado. Não envia nada.") + "</div>" +
+      (E.length ? "<div style='overflow-x:auto'><table style='width:100%;border-collapse:collapse;font-size:14px'><thead><tr><th style='text-align:left;padding:6px 4px'>Turno</th><th style='text-align:right;padding:6px 4px'>Lista</th><th style='text-align:left;padding:6px 4px'>Estado</th></tr></thead><tbody>" +
+        E.map(function (x) { return "<tr style='border-top:1px solid #e3e8ec'><td style='padding:5px 4px'>" + dmy(x.dia).slice(0, 5) + " " + (x.turno === "t1" ? "☀️ M" : "🌙 T") + "</td><td style='text-align:right;padding:5px 4px;white-space:nowrap'>" + (x.qtd == null ? "" : x.qtd + " maços · " + eur(x.valor_c)) + "</td><td style='padding:5px 4px'>" +
+          (x.estado === "enviado" ? "✅ enviado " + hora(x.enviado_em) : x.estado === "erro" ? "❌ falhou: " + esc(x.erro || "") : "⏳ a enviar " + hora(x.criado)) + "</td></tr>"; }).join("") + "</tbody></table></div>" : "");
+    w.document.getElementById("mqtGuardar").onclick = async function () {
+      var v = w.document.getElementById("mqtEmail").value.trim();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) return status(false, "⚠ Email inválido");
+      var r = await sb.from("msb_maq_destino").upsert({estacao: est, email: v, ativo: true, atualizado_em: new Date().toISOString(), atualizado_por: (PERFIL && PERFIL.display_name) || ""});
+      if (r.error) return status(false, "⚠ " + falhou(r.error));
+      status(true, "✅ Envio da máquina para " + v); maqEnvio(w, est);
+    };
+    var bl = w.document.getElementById("mqtLigar"); if (bl) bl.onclick = async function () {
+      var r = await sb.from("msb_maq_destino").update({ativo: !D.ativo, atualizado_em: new Date().toISOString(), atualizado_por: (PERFIL && PERFIL.display_name) || ""}).eq("estacao", est);
+      if (r.error) return status(false, "⚠ " + falhou(r.error)); maqEnvio(w, est);
+    };
+  } catch (e) { box.innerHTML = "<div class='notice'>⚠ Envio por email: " + esc(falhou(e)) + "</div>"; }
 }
