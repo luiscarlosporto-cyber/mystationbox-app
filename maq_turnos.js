@@ -10,20 +10,20 @@ var MAQT = (function () {
     (linhas || []).forEach(function (l) { if (cods[String(l[0])]) { q += +l[2] || 0; v += Math.round((+l[3] || 0) * 100); } });
     return {qtd: Math.round(q * 100) / 100, valor_c: v};
   }
-  /* Junta os pedidos feitos: o mais recente manda em cada dia */
+  /* Junta os pedidos feitos: o mais recente manda em cada turno de cada dia (o OCTAN AI lê M e T em separado, depois de cada fecho) */
   function porDia(pedidos) {
     var D = {};
     (pedidos || []).filter(function (p) { return p.estado === "feito" && p.dias; }).sort(function (a, b) { return a.id - b.id; })
-      .forEach(function (p) { Object.keys(p.dias).forEach(function (d) { D[d] = p.dias[d]; }); });
+      .forEach(function (p) { Object.keys(p.dias).forEach(function (d) { D[d] = Object.assign({}, D[d], p.dias[d]); }); });
     return D;
   }
   function addDia(d, n) { var x = new Date(d + "T12:00:00Z"); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); }
-  /* Dias do mês já fechados (até ontem) sem leitura nem pedido em curso, em blocos de até 7 dias seguidos */
+  /* Dias do mês já fechados (até ontem) sem os dois turnos lidos nem pedido em curso, em blocos de até 7 dias seguidos */
   function emFalta(mes, lidos, pendentes, hoje) {
     var falta = [], d = mes + "-01";
     for (; d.slice(0, 7) === mes && d < hoje; d = addDia(d, 1)) {
       var pend = (pendentes || []).some(function (p) { return d >= p.de && d <= p.ate; });
-      if (!lidos[d] && !pend) falta.push(d);
+      if (!(lidos[d] && lidos[d].t1 && lidos[d].t2) && !pend) falta.push(d);
     }
     var blocos = [];
     falta.forEach(function (d) { var b = blocos[blocos.length - 1]; if (b && addDia(b.ate, 1) === d && b.n < 7) { b.ate = d; b.n++; } else blocos.push({de: d, ate: d, n: 1}); });
@@ -102,7 +102,7 @@ async function maqTurnos(w) {
         "</tbody></table></div><div class='actions'><button class='btn' id='mqtPdf' style='flex:1'>📄 Descarregar PDF (uma folha)</button></div>" : "");
     box.innerHTML = topo + "<div style='display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:18px'><b style='font-size:17px'>Por turno</b></div>" +
       "" +
-      "<p style='color:#6b7680;font-size:13px;margin:4px 0 8px'>Euros com IVA e maços de cada turno, lidos no CBOS pelo OCTAN AI (M = fecho 1, T = fecho 2; o OPT noturno fica de fora). Para conferir com a caixa de cada turno.</p>" +
+      "<p style='color:#6b7680;font-size:13px;margin:4px 0 8px'>Euros com IVA e maços de cada turno, lidos no CBOS pelo OCTAN AI sozinho depois de cada fecho (vê de hora a hora, das 7h às 23h, com o PC ligado). M = fecho 1, T = fecho 2; o OPT noturno fica de fora. Para conferir com a caixa de cada turno.</p>" +
       (pend.length ? "<div class='notice'>⏳ O OCTAN AI está a ler " + pend.length + " bloco(s) de dias no CBOS. Aparecem aqui sozinhos, com o PC ligado.</div>" : "") +
       (erro ? "<div class='notice' style='background:#fdecea'>⚠ Última leitura com erro: " + esc(erro.erro || "") + "</div>" : "") +
       (T.linhas.length ? "<div style='overflow-x:auto'><table style='width:100%;border-collapse:collapse;font-size:14px'><thead><tr><th style='text-align:left;padding:6px 4px'>Dia</th><th style='text-align:right;padding:6px 4px'>☀️ M</th><th style='text-align:right;padding:6px 4px'>🌙 T</th><th style='text-align:right;padding:6px 4px'>Dia</th></tr></thead><tbody>" +
