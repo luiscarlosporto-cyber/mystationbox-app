@@ -89,7 +89,7 @@
   var ABERTA = "";
   /* estação bem visível (dono, 10/11/2026): cor, sigla, nome e posto na barra de cima e uma borda da mesma cor na página.
      Não depende só da cor: a sigla e o nome estão sempre escritos. No Painel e em Comparar estações (as duas) não aparece. */
-  var EST_ID = {sto: {s: "ST", c: "#0E7C7B"}, pnf: {s: "PN", c: "#6B4FBB"}};
+  var EST_ID = {sto: {s: "ST", c: "#0B3D91"}, pnf: {s: "PN", c: "#1A63E8"}};
   var DUAS = ["ini", "cmp", "car", "doc", "forn"];
   function estInfo(id) { var e = ESTS.find(function (x) { return x.id === id; }) || {}, k = EST_ID[id] || {s: String(id || "").slice(0, 2).toUpperCase(), c: "#566878"}; return {e: e, s: k.s, c: k.c, n: e.short_name || e.name || id}; }
   function pintarEst(pg) {
