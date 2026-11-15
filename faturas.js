@@ -12,7 +12,7 @@ function carregarJsQR() {
 async function paginasImagem(f) {   // cada página como imagem, a 300 dpi nos PDF
   if (!/pdf/i.test(f.type) && !/\.pdf$/i.test(f.name)) return [await imagem(f)];
   await carregarPdfJsCBOS();
-  var doc = await pdfjsLib.getDocument({data: new Uint8Array(await f.arrayBuffer())}).promise, out = [];
+  var doc = await pdfjsLib.getDocument({data: new Uint8Array(await f.arrayBuffer()), isEvalSupported: false}).promise, out = [];
   for (var i = 1; i <= Math.min(doc.numPages, 4); i++) {
     var p = await doc.getPage(i), v = p.getViewport({scale: 1}), esc2 = 2480 / v.width, vp = p.getViewport({scale: esc2}), c = document.createElement("canvas");
     c.width = vp.width; c.height = vp.height; await p.render({canvasContext: c.getContext("2d"), viewport: vp}).promise; out.push(c);

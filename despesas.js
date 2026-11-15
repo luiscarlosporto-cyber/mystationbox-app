@@ -147,7 +147,7 @@ async function dspLerGuia(d, b) {
   try {
     var f = await sb.storage.from("msb-despesas").download(d.original); if (f.error) throw f.error;
     await carregarPdfJsCBOS(); await carregarTesseract();
-    var doc = await pdfjsLib.getDocument({data: new Uint8Array(await f.data.arrayBuffer())}).promise, pg = await doc.getPage(1), vp = pg.getViewport({scale: 2.5});
+    var doc = await pdfjsLib.getDocument({data: new Uint8Array(await f.data.arrayBuffer()), isEvalSupported: false}).promise, pg = await doc.getPage(1), vp = pg.getViewport({scale: 2.5});
     var c = document.createElement("canvas"); c.width = vp.width; c.height = vp.height; await pg.render({canvasContext: c.getContext("2d"), viewport: vp}).promise;
     var w = await Tesseract.createWorker("eng"), res = await w.recognize(c); await w.terminate();
     var g = DESPESAS.lerGuiaSS(res.data.text);

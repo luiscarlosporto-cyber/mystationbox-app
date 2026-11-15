@@ -357,7 +357,7 @@ function sinal(d){return d==null?"—":(d>0?"+":d<0?"−":"")+fmt(Math.abs(d))}
 function cls(d){if(d==null)return "";return d>=-50?"ok":"wn"}
 function recebido(r){return RECEBIDO.reduce(function(s,k){return s+(r&&r[k]||0)},0)}
 function dif(r){return !r||r.vendas_c==null?null:recebido(r)-r.vendas_c}
-function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function iso(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
 function addDia(s,n){var d=new Date(s+"T12:00:00");d.setDate(d.getDate()+n);return iso(d)}
 function addMes(m,n){var p=m.split("-"),d=new Date(+p[0],+p[1]-1+n,1);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")}

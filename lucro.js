@@ -262,7 +262,7 @@ function carregarPdfJsCBOS() {
 }
 async function linhasPdf(bytes) {
   await carregarPdfJsCBOS();
-  var doc = await pdfjsLib.getDocument({data: bytes}).promise, out = [];
+  var doc = await pdfjsLib.getDocument({data: bytes, isEvalSupported: false}).promise, out = [];
   for (var n = 1; n <= doc.numPages; n++) {
     var tc = await (await doc.getPage(n)).getTextContent(), itens = tc.items.filter(function (i) { return i.str && i.str.trim(); })
       .map(function (i) { return {x: i.transform[4], y: i.transform[5], w: i.width, t: i.str}; });
