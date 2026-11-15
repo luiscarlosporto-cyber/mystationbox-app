@@ -13,7 +13,7 @@ try {
   $impressora = (Get-Content (Join-Path $pasta 'impressora.txt') -Raw -Encoding UTF8).Trim()
   $sumatra = (Get-ChildItem (Join-Path $pasta 'sumatra') -Filter 'SumatraPDF*.exe' -Recurse | Select-Object -First 1).FullName
   $cab = @{ 'x-impressora' = $codigo }
-  function Pedido($corpo) { [Text.Encoding]::UTF8.GetBytes(($corpo | ConvertTo-Json -Compress)) }
+  function Pedido($corpo) { ,([Text.Encoding]::UTF8.GetBytes(($corpo | ConvertTo-Json -Compress))) }   # a vírgula impede o PowerShell de desfazer os bytes numa lista
   $r = Invoke-RestMethod -Uri $url -Method Post -Headers $cab -ContentType 'application/json; charset=utf-8' -Body (Pedido @{ acao = 'pendentes'; impressora = $impressora }) -UseBasicParsing
   foreach ($f in $r.pendentes) {
     try {
