@@ -4,7 +4,7 @@
  * (Partilhar no telemóvel; no computador descarrega). Nada se apaga: um engano anula-se com motivo.
  * Regras (plano, estado, extenso, sugestões do extrato) em dividas_regras.js. Dados pessoais só na base de dados. */
 "use strict";
-var DIV = {acordos: [], pag: {}, mov: {}, assin: null, blobs: {}, aberto: {}};
+var DIV = {acordos: [], pag: {}, mov: {}, docs: {}, assin: null, blobs: {}, aberto: {}};
 function falhouDiv(e) { var m = falhou(e); return /msb_dividas|does not exist|schema cache|42P01|PGRST205/i.test(m + " " + (e && e.code || "")) ? "Os acordos de dívida ainda não estão ativos na base de dados." : m; }
 function eurDiv(c) { return DIVIDAS.eur(c); }
 function nomeLojaDiv(id) { var e = (window.ESTS || []).find(function (x) { return x.id === id; }); return e ? (e.short_name || e.name) : id; }
@@ -19,7 +19,7 @@ async function carregarDividas() {
     var p = await sb.from("msb_dividas_pagamentos").select("*").in("divida_id", ids).order("data").order("id"); if (p.error) throw p.error;
     DIV.pag = {}; (p.data || []).forEach(function (x) { (DIV.pag[x.divida_id] = DIV.pag[x.divida_id] || []).push(x); });
     var k = await sb.from("msb_kms_config").select("assinatura").eq("id", 1).maybeSingle(); DIV.assin = k.data ? k.data.assinatura : null;
-    await Promise.all(DIV.acordos.map(lerExtratoDiv));
+    await Promise.all(DIV.acordos.map(lerExtratoDiv).concat(DIV.acordos.map(lerDocsDiv)));
     desenharDividas();
   } catch (e) { box.innerHTML = "<div class='card msgErr' style='padding:12px'>✖ " + esc(falhouDiv(e)) + "</div>"; }
 }
@@ -48,6 +48,7 @@ function desenharDividas() {
         (prox ? "<div class='card' style='padding:10px'><div class='mut' style='font-size:12px'>Próxima</div><b style='font-size:15px'>n.º " + prox.n + " · " + dmy(prox.vence) + "</b><div class='mut' style='font-size:12px'>" + eurDiv(prox.valor_c - prox.pago_c) + "</div></div>" : "") + "</div>" +
       (sug.length ? "<div class='card' style='padding:10px;border:1px solid #f0b429'><b>ℹ️ No extrato do banco há " + (sug.length === 1 ? "1 entrada" : sug.length + " entradas") + " que parece" + (sug.length === 1 ? "" : "m") + " do " + esc(a.devedor.split(" ")[0]) + "</b>" +
         sug.map(function (m) { return "<div class='bar' style='margin-top:6px'><span>" + dmy(m.dia) + " · <b>" + eurDiv(m.valor_c) + "</b> · <span class='mut'>" + esc((m.descricao || "") + " " + (m.contraparte || "")) + "</span></span><button class='btn divUsar' data-a='" + a.id + "' data-m='" + m.id + "'>Usar no pagamento</button></div>"; }).join("") + "</div>" : "") +
+      docsDiv(a) +
       (E.falta_c > 0 ? formPagDiv(a, prox) : "") +
       "<div class='sc'><table><thead><tr><th class='l'>N.º</th><th class='l'>Mês</th><th class='l'>Vence</th><th>Valor</th><th>Pago</th><th class='l'>Estado</th></tr></thead><tbody>" +
         linhas.map(function (x) { return "<tr><td class='l'>" + x.n + "</td><td class='l'>" + esc(nomeMes(x.mes)) + "</td><td class='l'>" + dmy(x.vence) + "</td><td class='n'>" + eurDiv(x.valor_c) + "</td><td class='n'>" + (x.pago_c ? eurDiv(x.pago_c) : "") + "</td><td class='l'>" + nomeEst[x.estado] + "</td></tr>"; }).join("") +
@@ -68,6 +69,53 @@ function desenharDividas() {
   $$("#divCorpo .divPart").forEach(function (b) { b.onclick = function () { partilharReciboDiv(+b.dataset.p, b, !!navigator.canShare); }; });
   $$("#divCorpo .divPdf").forEach(function (b) { b.onclick = function () { partilharReciboDiv(+b.dataset.p, b, false); }; });
   $$("#divCorpo .divAnular").forEach(function (b) { b.onclick = function () { anularPagDiv(+b.dataset.p); }; });
+  $$("#divCorpo .divDocBtn").forEach(function (b) { b.onclick = function () { $("#divDocF" + b.dataset.a).click(); }; });
+  $$("#divCorpo .divDocF").forEach(function (i) { i.onchange = function () { var f = Array.from(this.files); this.value = ""; if (f.length) carregarDocsDiv(+i.dataset.a, f); }; });
+  $$("#divCorpo .divDocAbrir").forEach(function (b) { b.onclick = function () { abrirOriginal(b.dataset.c); }; });
+}
+/* Documentos do acordo (16/11/2026, pedido do dono): declaração assinada, comprovativos, outros. Ficam no arquivo privado,
+   pasta <estação>/dividas/<acordo>/docs/, com a data no nome; nunca se substituem nem se apagam. */
+var TIPOS_DOC_DIV = [["declaracao", "Declaração assinada"], ["comprovativo", "Comprovativo de pagamento"], ["outro", "Outro documento"]];
+function pastaDocsDiv(a) { return a.estacao + "/dividas/" + a.id + "/docs"; }
+async function lerDocsDiv(a) {
+  var r = await sb.storage.from("msb-originais").list(pastaDocsDiv(a), {limit: 200, sortBy: {column: "name", order: "desc"}});
+  DIV.docs[a.id] = r.error ? null : (r.data || []).filter(function (f) { return f.name && f.id; });
+}
+function nomeDocDiv(n) {   // 20261116-164700_declaracao_Acordo.pdf → tipo, data, nome
+  var m = /^(\d{8})-(\d{6})_([a-z]+)_(.*)$/.exec(n); if (!m) return {tipo: "", data: "", nome: n};
+  var t = TIPOS_DOC_DIV.find(function (x) { return x[0] === m[3]; });
+  return {tipo: t ? t[1] : m[3], data: m[1].slice(6) + "/" + m[1].slice(4, 6) + "/" + m[1].slice(0, 4), nome: m[4].replace(/_/g, " ")};
+}
+function docsDiv(a) {
+  var L = DIV.docs[a.id];
+  return "<div class='card' style='padding:12px;display:grid;gap:8px'><div class='bar' style='justify-content:space-between'><b>📎 Documentos do acordo</b>" +
+    (a.declaracao ? "<span class='b ok'>✅ Declaração assinada guardada</span>" : "<span class='b wn'>⚠️ Falta a declaração assinada</span>") + "</div>" +
+    (L === null ? "<div class='mut'>Não consegui ler a lista de documentos.</div>" : !L || !L.length ? "<div class='mut'>Ainda não há documentos.</div>" :
+      L.map(function (f) { var d = nomeDocDiv(f.name), kb = f.metadata && f.metadata.size ? Math.round(f.metadata.size / 1024) : 0;
+        return "<div class='bar' style='justify-content:space-between'><span>📄 <b>" + esc(d.tipo || "Documento") + "</b> · " + esc(d.nome) + " <span class='mut' style='font-size:12px'>" + esc(d.data) + (kb ? " · " + (kb > 1024 ? (kb / 1024).toFixed(1).replace(".", ",") + " MB" : kb + " KB") : "") + "</span></span>" +
+          "<button class='btn divDocAbrir' data-c='" + esc(pastaDocsDiv(a) + "/" + f.name) + "'>Abrir</button></div>"; }).join("")) +
+    "<div class='bar'><select id='divDocT" + a.id + "'>" + TIPOS_DOC_DIV.map(function (t) { return "<option value='" + t[0] + "'" + (!a.declaracao && t[0] === "declaracao" ? " selected" : a.declaracao && t[0] === "comprovativo" ? " selected" : "") + ">" + t[1] + "</option>"; }).join("") + "</select>" +
+    "<button class='btn divDocBtn' data-a='" + a.id + "'>⬆️ Carregar documento (PDF ou fotografia)</button><input type='file' class='divDocF' id='divDocF" + a.id + "' data-a='" + a.id + "' accept='application/pdf,image/*' multiple hidden></div>" +
+    "<div id='divDocMsg" + a.id + "'></div></div>";
+}
+async function carregarDocsDiv(aid, ficheiros) {
+  var a = DIV.acordos.find(function (x) { return x.id === aid; }), tipo = $("#divDocT" + aid).value, msg = $("#divDocMsg" + aid), feitos = 0;
+  try {
+    for (var i = 0; i < ficheiros.length; i++) {
+      var f = ficheiros[i];
+      if (f.size > 20 * 1024 * 1024) throw new Error("«" + f.name + "» tem mais de 20 MB.");
+      if (!/^(application\/pdf|image\/)/.test(f.type)) throw new Error("«" + f.name + "» não é PDF nem fotografia.");
+      msg.innerHTML = "<span class='mut'>A carregar " + (i + 1) + " de " + ficheiros.length + "…</span>";
+      var agora = new Date(), carimbo = agora.getFullYear() + String(agora.getMonth() + 1).padStart(2, "0") + String(agora.getDate()).padStart(2, "0") + "-" + [agora.getHours(), agora.getMinutes(), agora.getSeconds()].map(function (n) { return String(n).padStart(2, "0"); }).join("") + (i ? String(i) : "");
+      var limpo = f.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9.\-]+/g, "_").replace(/_+/g, "_").slice(-80);
+      var cam = pastaDocsDiv(a) + "/" + carimbo + "_" + tipo + "_" + limpo;
+      await guardarOriginal(cam, f, f.type);
+      if (tipo === "declaracao" && !a.declaracao) { var u = await sb.from("msb_dividas").update({declaracao: cam}).eq("id", aid); if (u.error) throw u.error; a.declaracao = cam; }
+      feitos++;
+    }
+    await lerDocsDiv(a); desenharDividas();
+    $("#divDocMsg" + aid).innerHTML = "<span class='ok'>✔ " + (feitos === 1 ? "Documento guardado." : feitos + " documentos guardados.") + "</span>";
+  } catch (e) { await lerDocsDiv(a); desenharDividas(); $("#divDocMsg" + aid).innerHTML = "<span class='bad'>✖ " + esc(falhouDiv(e)) + (feitos ? " (" + feitos + " já guardado" + (feitos > 1 ? "s" : "") + ")" : "") + "</span>"; }
 }
 function formPagDiv(a, prox) {
   var v = prox ? prox.valor_c - prox.pago_c : 0;
