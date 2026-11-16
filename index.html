@@ -264,6 +264,8 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
   <div id="v-liv" class="v" hidden><div id="nucCorpo" style="display:grid;gap:12px"></div></div>
   <!-- CONTROLO: FRAUDE (VENDAS POR COLABORADOR) -->
   <div id="v-fra" class="v" hidden><div id="fraCorpo" style="display:grid;gap:14px"></div></div>
+  <!-- GESTÃO: ACORDOS DE DÍVIDA (só administrador) -->
+  <div id="v-div" class="v" hidden><div id="divCorpo" style="display:grid;gap:14px"></div></div>
   <!-- RELATÓRIOS: ENSE MENSAL -->
   <div id="v-ense" class="v" hidden>
     <div class="bar"><button class="btn" id="eAnt">‹</button><input type="month" id="eMes"><button class="btn" id="eSeg">›</button><button class="btn p" id="bEnsePdf">📄 Gerar PDF para a ENSE</button></div>
@@ -537,9 +539,11 @@ entrar().catch(function(e){$("#vLogin").hidden=false;$("#lErro").textContent=fal
 <script src="conta.js"></script>
 <script src="fraude_regras.js"></script>
 <script src="fraude.js"></script>
+<script src="dividas_regras.js"></script>
+<script src="dividas.js"></script>
 <script src="beta/beta.js?v=40f92232"></script>
 <script src="beta/painel_regras.js?v=b677e7ea"></script>
-<script src="beta/painel.js?v=e5493292"></script>
+<script src="beta/painel.js?v=16a41da1"></script>
 <script src="beta/paginas.js?v=a5c22158"></script>
 <script src="beta/horario_regras.js?v=24be9c07"></script>
 <script src="beta/horario_gerar.js?v=c4e08e4e"></script>
