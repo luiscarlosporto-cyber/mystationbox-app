@@ -36,7 +36,7 @@ function aviQuadro(x) {
     "<div class='bar' style='margin-top:8px'><button class='btn p' data-aprova='" + x.estacao + "|" + x.dia + "'>" + (x.ense_erro ? "↻ Verifiquei: tentar outra vez" : "✔ Aprovar e gravar na ENSE") + "</button></div></div>";
 }
 function aviEspera(x) {
-  return "<div class='aviso'>⏳ " + esc(aviLoja(x.estacao)) + " · preços de " + dmy(x.dia) + (x.ense_tentado_em ? ": a gravar na ENSE." : ": aprovados. O OCTAN AI grava na ENSE às 00:30.") + "</div>";
+  return "<div class='aviso'>⏳ " + esc(aviLoja(x.estacao)) + " · preços de " + dmy(x.dia) + (x.ense_tentado_em ? ": a gravar na ENSE." : ": aprovados. O OCTAN AI grava na ENSE dentro de minutos (de dia; à noite às 00:30).") + "</div>";
 }
 function aviHistorico() {
   return (ESTS || []).map(function (e) {

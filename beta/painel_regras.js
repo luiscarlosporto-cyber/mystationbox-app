@@ -65,7 +65,7 @@
     if (u.estado === "comunicado") return {tom: "ok", t: "Publicados", s: "Tabela em vigor a " + dia + (u.comunicado_em ? ", publicada na ENSE a " + hora(u.comunicado_em) : ", publicada na ENSE") + "."};
     if (u.ense_erro) return {tom: "at", t: "Erro ao publicar", s: "Tabela em vigor a " + dia + ". " + u.ense_erro};
     if (!u.aprovado_em) return {tom: "at", t: "Por aprovar", s: "Tabela em vigor a " + dia + ": falta a tua aprovação."};
-    return {tom: "at", t: "Por publicar", s: "Tabela em vigor a " + dia + " aprovada a " + hora(u.aprovado_em) + ". O OCTAN AI grava-a na ENSE às 00:30, com o PC ligado."};
+    return {tom: "at", t: "Por publicar", s: "Tabela em vigor a " + dia + " aprovada a " + hora(u.aprovado_em) + ". O OCTAN AI grava-a na ENSE dentro de minutos (de dia; à noite às 00:30), com o PC ligado."};
   }
   /* Aviso do OCTAN AI «Novos preços em vigor a dd/mm/aaaa: falta a tua aprovação» que já foi aprovado: deixa de estar por decidir */
   function avisoAprovado(a, P) {
