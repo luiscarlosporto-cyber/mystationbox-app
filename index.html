@@ -266,6 +266,8 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
   <div id="v-fra" class="v" hidden><div id="fraCorpo" style="display:grid;gap:14px"></div></div>
   <!-- GESTÃO: ACORDOS DE DÍVIDA (só administrador) -->
   <div id="v-div" class="v" hidden><div id="divCorpo" style="display:grid;gap:14px"></div></div>
+  <!-- COMBUSTÍVEL: REDUÇÃO REPSOL (16/11/2026) -->
+  <div id="v-red" class="v" hidden><div id="redCorpo" style="display:grid;gap:14px"></div></div>
   <!-- RELATÓRIOS: ENSE MENSAL -->
   <div id="v-ense" class="v" hidden>
     <div class="bar"><button class="btn" id="eAnt">‹</button><input type="month" id="eMes"><button class="btn" id="eSeg">›</button><button class="btn p" id="bEnsePdf">📄 Gerar PDF para a ENSE</button></div>
@@ -541,6 +543,8 @@ entrar().catch(function(e){$("#vLogin").hidden=false;$("#lErro").textContent=fal
 <script src="fraude.js"></script>
 <script src="dividas_regras.js"></script>
 <script src="dividas.js"></script>
+<script src="reducao_regras.js"></script>
+<script src="reducao.js"></script>
 <script src="beta/beta.js?v=40f92232"></script>
 <script src="beta/painel_regras.js?v=2c3a1342"></script>
 <script src="beta/painel.js?v=16a41da1"></script>
