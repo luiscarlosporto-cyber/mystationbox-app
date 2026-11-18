@@ -27,6 +27,31 @@ async function codProdutos() {
   if (r.error) throw r.error;
   return (COD_PRODUTOS = (r.data || []).filter(function (p) { return /^\d{8}$/.test(p.repsol_code || ""); }));
 }
+/* Preço de venda de cada artigo (cêntimos, com IVA) numa leitura do CBOS: montante ÷ quantidade. linhas = [código, nome, qtd, montante €] */
+function codPrecoVenda(linhas) {
+  var m = {};
+  (linhas || []).forEach(function (l) { if (l && l[2] > 0 && l[3] > 0) m[String(l[0])] = Math.round(l[3] * 100 / l[2]); });
+  return m;
+}
+/* Margem sobre o preço de venda, em %, com uma casa (compra em milésimos com o IVA que a fatura cobra, venda em cêntimos com IVA) */
+function codMargem(compra_m, venda_c) {
+  if (!(compra_m > 0) || !(venda_c > 0)) return null;
+  return Math.round((venda_c * 10 - compra_m) / (venda_c * 10) * 1000) / 10;
+}
+/* A leitura do CBOS mais recente de cada estação (Painel de cada dia, ou um pedido de vendas), para o preço de venda atual */
+async function codVendas() {
+  var r = await sb.from("msb_pedidos").select("estacao,criado,linhas").eq("estado", "feito").order("criado", {ascending: false}).limit(12);
+  if (r.error) throw r.error;
+  var V = {};
+  (r.data || []).forEach(function (p) {
+    if (!(p.linhas || []).length) return;
+    var e = V[p.estacao] || (V[p.estacao] = {criado: p.criado, precos: {}});
+    var m = codPrecoVenda(p.linhas);
+    Object.keys(m).forEach(function (k) { if (!(k in e.precos)) e.precos[k] = m[k]; });   // a mais recente manda
+  });
+  return V;
+}
+function codEur(c) { return fmt(c) + " €"; }
 /* Devolve {html, ligar}. Só o administrador vê; sem códigos por confirmar não mostra nada. */
 async function codigosNovos(recarregar) {
   if (typeof ADMIN === "undefined" || !ADMIN) return {html: "", ligar: function () {}};
@@ -34,15 +59,22 @@ async function codigosNovos(recarregar) {
   if (r.error) throw r.error;
   var L = r.data || [];
   if (!L.length) return {html: "", ligar: function () {}};
-  var P = await codProdutos();
+  var P = await codProdutos(), V = {};
+  try { V = await codVendas(); } catch (e) { V = {}; }   // sem leituras do CBOS, confirma-se na mesma, só sem o preço de venda
   var linha = function (c) {
-    var op = codParecidos(c.descricao, P, c.proposta, 5);
+    var op = codParecidos(c.descricao, P, c.proposta, 5), vend = (V[c.estacao] || {}).precos || {};
+    var compra = c.compra_m > 0 ? "Compra: <b>" + codEur(Math.round(c.compra_m / 10)) + "</b> por unidade" + (c.fatura ? " (fatura " + esc(String(c.fatura).split("/").pop()) + ")" : "") : "Compra: sem preço lido na fatura";
+    var pvpF = c.pvp_fatura_c > 0 ? " · PVP na fatura: <b>" + codEur(c.pvp_fatura_c) + "</b>" + (codMargem(c.compra_m, c.pvp_fatura_c) != null ? " (margem " + String(codMargem(c.compra_m, c.pvp_fatura_c)).replace(".", ",") + " %)" : "") : "";
     var opcoes = op.map(function (p, i) {
-      return "<label style='display:flex;gap:8px;align-items:flex-start;margin:4px 0'><input type='radio' name='cod" + c.id + "' value='" + p.repsol_code + "' data-nome='" + esc(p.name) + "'" + (i === 0 && p.repsol_code === c.proposta ? " checked" : "") + ">" +
-        "<span><b>" + esc(p.repsol_code) + "</b> " + esc(p.name) + (p.category ? " <span class='mut'>· " + esc(p.category) + "</span>" : "") + (p.repsol_code === c.proposta ? " <span class='mut'>· proposta do OCTAN AI</span>" : "") + "</span></label>";
+      var pv = vend[p.repsol_code], mg = codMargem(c.compra_m, pv);
+      var venda = pv ? "<div class='mut'>Vende-se a <b>" + codEur(pv) + "</b>" + (mg != null ? " · margem " + String(mg).replace(".", ",") + " %" : "") +
+        (c.pvp_fatura_c > 0 ? (pv === c.pvp_fatura_c ? " · ✅ igual ao PVP da fatura" : " · ⚠️ diferente do PVP da fatura") : "") + "</div>" : "<div class='mut'>ℹ️ Sem vendas na última leitura do CBOS</div>";
+      return "<label style='display:flex;gap:8px;align-items:flex-start;margin:6px 0'><input type='radio' name='cod" + c.id + "' value='" + p.repsol_code + "' data-nome='" + esc(p.name) + "'" + (i === 0 && p.repsol_code === c.proposta ? " checked" : "") + ">" +
+        "<span><b>" + esc(p.repsol_code) + "</b> " + esc(p.name) + (p.category ? " <span class='mut'>· " + esc(p.category) + "</span>" : "") + (p.repsol_code === c.proposta ? " <span class='mut'>· proposta do OCTAN AI</span>" : "") + venda + "</span></label>";
     }).join("");
     return "<div class='card' style='padding:12px 14px' data-codcard='" + c.id + "'>" +
       "<b>" + esc(c.codigo) + " · " + esc(c.descricao || "") + "</b><div class='mut'>" + esc(aviLoja(c.estacao)) + " · na fatura desde " + aviDataHora(c.criado) + "</div>" +
+      "<div style='margin-top:4px'>🧾 " + compra + pvpF + "</div>" +
       (opcoes ? "<div style='margin-top:6px'>" + opcoes + "</div>" : "<div class='mut' style='margin-top:6px'>ℹ️ Nenhum artigo parecido no catálogo. Se ainda não existe no CBOS, deixa ficar: a fatura espera.</div>") +
       "<label style='display:flex;gap:8px;align-items:center;margin:4px 0'><input type='radio' name='cod" + c.id + "' value='outro'><span>Outro código</span></label>" +
       "<div style='display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))'>" +
@@ -50,7 +82,7 @@ async function codigosNovos(recarregar) {
       "<div class='bar' style='margin-top:8px'><button class='btn p' data-codok='" + c.id + "'>✔ Confirmar</button></div></div>";
   };
   var html = "<div class='card' style='padding:12px 14px'><b>🏷️ Códigos novos por confirmar (" + L.length + ")</b>" +
-    "<div class='mut'>A fatura fica à espera até confirmares a que artigo Repsol corresponde cada código. Confirma só quando tiveres a certeza: a fatura é gravada no CBOS com esse artigo.</div>" +
+    "<div class='mut'>A fatura fica à espera até confirmares a que artigo Repsol corresponde cada código. Confirma só quando tiveres a certeza: a fatura é gravada no CBOS com esse artigo. O preço de venda vem da última leitura do CBOS da estação; a margem é sobre o preço de venda.</div>" +
     "<div style='display:grid;gap:10px;margin-top:10px'>" + L.map(linha).join("") + "</div></div>";
   var ligar = function (raiz) {
     Array.prototype.slice.call(raiz.querySelectorAll("[data-codnum]")).forEach(function (i) { i.oninput = function () { var o = raiz.querySelector("input[name='cod" + i.dataset.codnum + "'][value='outro']"); if (o) o.checked = true; }; });
@@ -73,4 +105,4 @@ async function codigosNovos(recarregar) {
   };
   return {html: html, ligar: ligar};
 }
-if (typeof module !== "undefined") module.exports = {codPalavras: codPalavras, codParecidos: codParecidos};
+if (typeof module !== "undefined") module.exports = {codPalavras: codPalavras, codParecidos: codParecidos, codPrecoVenda: codPrecoVenda, codMargem: codMargem};
