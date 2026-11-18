@@ -173,7 +173,9 @@ async function carregarAvisos() {
     var nArq = arq.length + pArq.length;
     var arquivo = nArq ? "<details class='card' style='padding:12px 14px'><summary><b>🗄️ Arquivo (" + nArq + ")</b></summary><div style='display:grid;gap:10px;margin-top:10px'>" + aviPedidos(pArq) + arq.map(cartaoAviso).join("") + "</div></details>" : "";
     var er = await aviErros(); h += er.html;
-    box.innerHTML = window.MSB_NAV ? aviPedidos(pAbertos) + aviForm() + h + MSB_NAV.fechado("Histórico de preços", aviHistorico()) + arquivo : aviForm() + aviPedidos(pAbertos) + h + aviHistorico() + arquivo;
+    var cn = typeof codigosNovos === "function" ? await codigosNovos(carregarAvisos) : {html: "", ligar: function () {}};
+    box.innerHTML = cn.html + (window.MSB_NAV ? aviPedidos(pAbertos) + aviForm() + h + MSB_NAV.fechado("Histórico de preços", aviHistorico()) + arquivo : aviForm() + aviPedidos(pAbertos) + h + aviHistorico() + arquivo);
+    cn.ligar(box);
     /* enquanto houver pedido em espera, a resposta aparece sozinha */
     clearTimeout(AVI_ESPERA);
     if (PD.some(function (x) { return x.estado === "pendente" || x.estado === "a_ler"; })) AVI_ESPERA = setTimeout(function () { if (PAGINA === "avi") carregarAvisos(); }, 20000);
