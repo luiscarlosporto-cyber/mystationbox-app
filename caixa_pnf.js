@@ -56,7 +56,8 @@ function pnfDesenhar() {
     var r = LINHAS[t] || {}, ant = t === "t1" ? PNF.ant : (LINHAS.t1 || null), vm = PNF.maq[t] === undefined ? null : PNF.maq[t];
     var c = CAIXA_PNF.cofre(ant, r, vm), al = CAIXA_PNF.alerta(dif(r), c), dis = ADMIN ? "" : " disabled";
     var v = function (k) { return r[k] == null ? "" : fmt(r[k]); };
-    var h = "<div class='lin'><b>🎰 Cofre da máquina</b><span class='mut'>" + (c.ini === null ? "início: —" : "início " + eur(c.ini) + " (" + fmt(c.iniCont) + " + " + fmt(c.iniMacos) + " maços)") + "</span></div>" +
+    var h = "<div class='lin'><b>🎰 Cofre da máquina</b><span class='mut'>" + (c.ini === null ? "início: —" : "início " + eur(c.ini) + " (" + fmt(c.iniCont) + " + " + fmt(c.iniMacos) + " maços)" + (c.manual ? " · definido à mão" : "")) +
+      (ADMIN ? " <button class='mini' data-pini='" + t + "'>" + (c.manual ? "mudar início" : c.ini === null ? "Definir valor inicial" : "definir início") + "</button>" : "") + "</span></div>" +
       "<div class='fl'><label class='novo'>Contador no fim<input inputmode='decimal' data-pnf='cofre_c' data-t='" + t + "' value='" + v("cofre_c") + "' placeholder='0,00'" + dis + "></label>" +
       "<label class='novo'>Maços por fora (€)<input inputmode='decimal' data-pnf='macos_c' data-t='" + t + "' value='" + v("macos_c") + "' placeholder='0,00'" + dis + "></label></div>" +
       "<div class='lin'><span>Passa ao turno seguinte</span><b>" + (c.fim === null ? "—" : eur(c.fim)) + "</b></div>";
@@ -95,6 +96,7 @@ function pnfDeposito() {
 }
 function pnfLigar() {
   document.querySelectorAll("[data-pnf]").forEach(function (el) { el.onchange = function () { pnfGuardar(el); }; });
+  document.querySelectorAll("[data-pini]").forEach(function (b) { b.onclick = function () { pnfInicio(b.dataset.pini); }; });
   document.querySelectorAll("[data-pdv]").forEach(function (b) { b.onclick = function () { pnfDever(b.dataset.pdv); }; });
   document.querySelectorAll("[data-ppg]").forEach(function (b) { b.onclick = function () { pnfPagar(b.dataset.ppg); }; });
   document.querySelectorAll("[data-pan]").forEach(function (b) { b.onclick = function () { pnfAnular(+b.dataset.pan); }; });
@@ -121,6 +123,24 @@ function pnfJanela(html, ligar) {
   bg.onclick = function (e) { if (e.target === bg) fechar(); };
   ligar(bg, fechar);
   var i = bg.querySelector("input"); if (i) i.focus();
+}
+/* Valor inicial do cofre definido à mão (o primeiro turno, ou para recomeçar a contagem). Fica no histórico do turno. */
+function pnfInicio(t) {
+  var r = LINHAS[t] || {}, v = function (k) { return r[k] == null ? "" : fmt(r[k]); };
+  pnfJanela("<h3>Valor inicial do cofre · " + (t === "t1" ? "Turno 1" : "Turno 2") + " de " + dmy(DIA) + "</h3><div class='mut'>O que o cofre tem no início deste turno. A partir daqui, cada turno começa com o fim do anterior. Deixe vazio para voltar a usar o fim do turno anterior.</div>" +
+    "<div class='fl'><label>Contador no início<input id='pnfIc' inputmode='decimal' value='" + v("cofre_ini_c") + "' placeholder='0,00'></label><label>Maços por fora (€)<input id='pnfIm' inputmode='decimal' value='" + v("macos_ini_c") + "' placeholder='0,00'></label></div>" +
+    "<p class='bad' id='pnfErr'></p><div class='bts'><button class='mini' data-x>Cancelar</button><button class='mini p' data-ok>Guardar</button></div>", function (bg, fechar) {
+    bg.querySelector("[data-x]").onclick = fechar;
+    bg.querySelector("[data-ok]").onclick = async function () {
+      var err = bg.querySelector("#pnfErr"), tc = bg.querySelector("#pnfIc").value.trim(), tm = bg.querySelector("#pnfIm").value.trim(), c = cent(tc), m = cent(tm);
+      if ((tc && (isNaN(c) || c < 0)) || (tm && (isNaN(m) || m < 0))) { err.textContent = "Valor inválido."; return; }
+      if (!tc && tm) { err.textContent = "Escreva também o contador."; return; }
+      try {
+        var q = await sb.from("msb_turnos").upsert({estacao: EST, dia: DIA, turno: t, cofre_ini_c: c, macos_ini_c: tc ? (m || 0) : null}, {onConflict: "estacao,dia,turno"}).select().single(); if (q.error) throw q.error;
+        LINHAS[t] = q.data; fechar(); totais(); status(true, "Valor inicial do cofre guardado ✓");
+      } catch (e) { err.textContent = falhou(e); }
+    };
+  });
 }
 function pnfDever(t) {
   var cli = CAIXA_PNF.CLIENTES[0];

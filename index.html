@@ -513,7 +513,7 @@ async function carregarSaidas(){$("#sT").innerHTML="<tr><td colspan='5' class='m
   catch(e){$("#sT").innerHTML="<tr><td colspan='5' class='bad'>"+esc(falhou(e))+"</td></tr>"}}
 
 /* ---------------- histórico ---------------- */
-var NOMECAMPO={func:"Funcionário",vendas_c:"Vendas",mb_c:"MB",solred_c:"Solred €",pres_c:"Solred presente",num_c:"Numerário",forn_c:"Fornecedores",chq_c:"Cheques",lit_cl:"Solred litros",cred_c:"Clientes a crédito",tab_c:"Saída TABACO",cofre_c:"Contador do cofre",macos_c:"Maços por fora",dever_c:"Ficou a dever",pagou_c:"Dívidas pagas",txt:"texto original",valor_c:"valor",recebido:"entregue",nota:"nota"};
+var NOMECAMPO={func:"Funcionário",vendas_c:"Vendas",mb_c:"MB",solred_c:"Solred €",pres_c:"Solred presente",num_c:"Numerário",forn_c:"Fornecedores",chq_c:"Cheques",lit_cl:"Solred litros",cred_c:"Clientes a crédito",tab_c:"Saída TABACO",cofre_c:"Contador do cofre",macos_c:"Maços por fora",cofre_ini_c:"Contador do cofre no início",macos_ini_c:"Maços por fora no início",dever_c:"Ficou a dever",pagou_c:"Dívidas pagas",txt:"texto original",valor_c:"valor",recebido:"entregue",nota:"nota"};
 function valHist(campo,v){if(v===""||v==null)return "<span class='mut'>vazio</span>";if(/_c$|_cl$/.test(campo)&&/^-?\d+$/.test(v))return fmt(+v);if(campo==="txt")return "<span class='mut'>"+esc(v)+"</span>";return esc(v)}
 async function carregarHist(){var d=$("#hDia").value||DIA;$("#hT").innerHTML="<tr><td colspan='5' class='mut'>A carregar…</td></tr>";
   try{var r=await sb.from("msb_eventos").select("*").eq("estacao",EST).eq("dia",d).order("id",{ascending:false}).limit(300);if(r.error)throw r.error;

@@ -18,12 +18,13 @@ var CAIXA_PNF = (function () {
   /* ant = linha do turno anterior (ou null); r = este turno; vendMaq = vendas tabaco máquina do CBOS em cêntimos (null = ainda não lido) */
   function cofre(ant, r, vendMaq) {
     r = r || {};
+    if (!vazio(r.cofre_ini_c)) ant = {cofre_c: r.cofre_ini_c, macos_c: r.macos_ini_c || 0, manual: true};   // início definido à mão neste turno: manda sobre o turno anterior
     var faltaAnt = !ant || vazio(ant.cofre_c), ini = faltaAnt ? null : ant.cofre_c + (ant.macos_c || 0);
     var temFim = !vazio(r.cofre_c), fim = temFim ? r.cofre_c + (r.macos_c || 0) : null;
     var devia = faltaAnt || vazio(vendMaq) ? null : ini + (r.tab_c || 0) - vendMaq;
     var dif = devia === null || !temFim ? null : fim - devia;
     var estado = faltaAnt ? "falta_anterior" : !temFim ? "falta_contador" : vazio(vendMaq) ? "espera_cbos" : dif === 0 ? "certo" : dif < 0 ? "falta" : "sobra";
-    return {ini: ini, iniCont: faltaAnt ? null : ant.cofre_c, iniMacos: faltaAnt ? null : (ant.macos_c || 0), fim: fim, devia: devia, dif: dif, estado: estado};
+    return {manual: !!(ant && ant.manual), ini: ini, iniCont: faltaAnt ? null : ant.cofre_c, iniMacos: faltaAnt ? null : (ant.macos_c || 0), fim: fim, devia: devia, dif: dif, estado: estado};
   }
 
   /* Alerta (só aviso, nunca corrige): falta na caixa e sobra no cofre = saída TABACO provavelmente esquecida; o contrário = saída TABACO a mais */
