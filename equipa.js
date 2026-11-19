@@ -27,13 +27,15 @@ async function carregarEquipa() {
 }
 function nomeEst(id) { var e = EQ.estacoes.find(function (x) { return x.id === id; }); return e ? (e.short_name || e.name) : id; }
 function optsEst(sel) { return (EQ.estacoes.length ? EQ.estacoes : ESTS).map(function (e) { return "<option value='" + e.id + "'" + (e.id === sel ? " selected" : "") + ">" + esc(e.short_name || e.name) + "</option>"; }).join(""); }
-function optsPapel(sel) { return "<option value='staff'" + (sel !== "admin" ? " selected" : "") + ">Funcionário</option><option value='admin'" + (sel === "admin" ? " selected" : "") + ">Administrador</option>"; }
+var PAPEIS_EQ = [["staff", "Funcionário"], ["gestor", "Gestor de estação"], ["admin", "Administrador"]];   // gestor: só a sua estação, Caixa, Vendas e Conferências (19/11/2026)
+function nomePapel(r) { return (PAPEIS_EQ.find(function (x) { return x[0] === r; }) || PAPEIS_EQ[0])[1]; }
+function optsPapel(sel) { return PAPEIS_EQ.map(function (x) { return "<option value='" + x[0] + "'" + ((sel || "staff") === x[0] ? " selected" : "") + ">" + x[1] + "</option>"; }).join(""); }
 function desenharEquipa() {
   /* A edição abre num cartão por cima da tabela (e não dentro dela): no telemóvel a tabela desliza para o lado e
    * os campos ficavam fora do ecrã, incluindo a palavra-passe e a mensagem de erro. */
   $("#eqLista").innerHTML = EQ.lista.map(function (p) {
     var eu = p.user_id === EQ.eu, ed = EQ.edita === p.user_id;
-    return "<tr" + (ed ? " style='background:var(--soft)'" : "") + "><td><a href='#' data-ed='" + p.user_id + "' style='font-weight:600'>" + esc(p.display_name || "—") + "</a>" + (eu ? " <span class='b ok'>você</span>" : "") + (ed ? " <span class='b'>a editar</span>" : "") + "</td><td class='l'>" + esc(p.email || "") + "</td><td class='l'>" + (p.role === "admin" ? "Administrador" : "Funcionário") + "</td><td class='l'>" + esc(nomeEst(p.company_id)) + "</td><td class='l'>" + (p.banido ? "<span class='b bad'>desativada</span>" : p.ultimo ? "entrou " + new Date(p.ultimo).toLocaleDateString("pt-PT") : "<span class='mut'>nunca entrou</span>") + "</td><td><button class='mini' data-ed='" + p.user_id + "'>Editar</button>" + (eu ? "" : " <button class='mini' data-ban='" + p.user_id + "' data-x='" + (p.banido ? "ativar" : "desativar") + "'>" + (p.banido ? "Reativar" : "Desativar") + "</button>") + "</td></tr>";
+    return "<tr" + (ed ? " style='background:var(--soft)'" : "") + "><td><a href='#' data-ed='" + p.user_id + "' style='font-weight:600'>" + esc(p.display_name || "—") + "</a>" + (eu ? " <span class='b ok'>você</span>" : "") + (ed ? " <span class='b'>a editar</span>" : "") + "</td><td class='l'>" + esc(p.email || "") + "</td><td class='l'>" + nomePapel(p.role) + "</td><td class='l'>" + esc(nomeEst(p.company_id)) + "</td><td class='l'>" + (p.banido ? "<span class='b bad'>desativada</span>" : p.ultimo ? "entrou " + new Date(p.ultimo).toLocaleDateString("pt-PT") : "<span class='mut'>nunca entrou</span>") + "</td><td><button class='mini' data-ed='" + p.user_id + "'>Editar</button>" + (eu ? "" : " <button class='mini' data-ban='" + p.user_id + "' data-x='" + (p.banido ? "ativar" : "desativar") + "'>" + (p.banido ? "Reativar" : "Desativar") + "</button>") + "</td></tr>";
   }).join("") || "<tr><td colspan='6' class='mut'>Sem contas.</td></tr>";
   var box = $("#eqEdita"), p = EQ.lista.find(function (x) { return x.user_id === EQ.edita; });
   if (!p) { box.hidden = true; box.innerHTML = ""; }
