@@ -61,9 +61,32 @@ async function importarCatalogo(f) {
       rel.push({est: est, m: c.mudou, primeiro: !(a.data || []).length});
     }
     FAD.relCat = rel;
+    try { FAD.relCods = await fadVerificarCodigos(); } catch (e) { FAD.relCods = {erro: falhou(e)}; }
     fadMsg("Catálogo do CBOS atualizado (" + d.artigos.length + " artigos).", true);
     carregarFad();
   } catch (e) { fadMsg(falhouFad(e)); }
+}
+
+/* Depois de cada catálogo novo (dono, 19/11/2026): os códigos novos dos fornecedores por confirmar (Painel → OCTAN AI)
+   verificam-se contra o CBOS de cada estação: já existe, PVP diferente do da fatura, sem preço ou não existe. */
+async function fadVerificarCodigos() {
+  var r = await sb.from("msb_codigos_novos").select("*").eq("estado", "por").order("criado"); if (r.error) throw r.error;
+  var L = r.data || []; if (!L.length) return {linhas: []};
+  var P = await codProdutos(), CAT = await codCatalogo();
+  return {linhas: L.map(function (c) { return Object.assign({c: c}, CAT[c.estacao] ? codNoCatalogo(c, codJuntar(P, CAT[c.estacao])) : {estado: "sem_catalogo"}); })};
+}
+function fadCodigos(v) {
+  if (!v) return "";
+  if (v.erro) return "<p>⚠️ Não consegui verificar os códigos novos: " + esc(v.erro) + "</p>";
+  if (!v.linhas.length) return "<p>✅ Não há códigos novos de fornecedores por confirmar.</p>";
+  var EST = {existe: "✅ já existe no CBOS", pvp_diferente: "⚠️ PVP no CBOS diferente do da fatura", sem_preco: "❌ sem preço no CBOS", nao_existe: "❌ não existe no CBOS (tem de ser criado)", sem_catalogo: "ℹ️ sem catálogo desta estação"};
+  var ordem = {nao_existe: 0, sem_preco: 1, pvp_diferente: 2, existe: 3, sem_catalogo: 4};
+  var L = v.linhas.slice().sort(function (a, b) { return ordem[a.estado] - ordem[b.estado]; });
+  return "<h3 style='margin:12px 0 4px'>🏷️ Códigos novos por confirmar (" + L.length + ")</h3><div class='sc'><table><thead><tr><th class='l'>Estação</th><th class='l'>Na fatura</th><th>PVP fatura</th><th class='l'>No CBOS</th><th class='l'>Verificação</th></tr></thead><tbody>" +
+    L.map(function (x) { var c = x.c;
+      return "<tr><td class='l'>" + esc(nomeEstFad(c.estacao)) + "</td><td class='l'>" + esc(c.codigo + " · " + (c.descricao || "")) + "</td><td class='n'>" + (c.pvp_fatura_c > 0 ? fmt(c.pvp_fatura_c) : "—") + "</td><td class='l'>" +
+        (x.artigo ? esc(x.artigo.repsol_code + " · " + x.artigo.name) + (x.pvp_c ? " · " + fmt(x.pvp_c) + " €" : "") : "—") + "</td><td class='l'>" + EST[x.estado] + "</td></tr>"; }).join("") +
+    "</tbody></table></div><p class='mut' style='margin:4px 0'>Confirme cada código em 🏠 Painel → OCTAN AI. Os que não existem no CBOS: crie-os no CBOS e carregue um catálogo novo.</p>";
 }
 
 /* ---------- ler e conferir ---------- */
@@ -187,6 +210,7 @@ function fadCatalogo() {
       lista("💶 PVP mudou", m.pvp, function (x) { return "<li>" + esc(x.nome) + ": " + (x.antes_c == null ? "sem preço" : fmt(x.antes_c) + " €") + " → " + (x.depois_c == null ? "❌ sem preço" : fmt(x.depois_c) + " €") + "</li>"; }) +
       lista("🚫 Passaram a descatalogados", m.descatalogados, function (x) { return "<li>" + esc(x.nome) + " <span class='mut'>(" + x.poscode + ")</span></li>"; });
   }).join("");
+  h += fadCodigos(FAD.relCods);
   var cods = Object.keys(FAD.cat);
   if (!cods.length) return h + "<p>Ainda não há catálogo. No CBOS: Catálogo → Exportar; depois carregue aqui o Excel, tal como vem (ou no 📥 Carregar).</p></div>";
   var semPreco = cods.map(function (c) { return FAD.cat[c]; }).filter(function (x) { return x.estado === "Ativo" && !x.pvp_c; });

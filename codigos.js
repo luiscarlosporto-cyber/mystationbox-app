@@ -21,6 +21,31 @@ function codParecidos(desc, produtos, proposta, n) {
     .sort(function (x, y) { return y.nota - x.nota || String(x.p.name).localeCompare(y.p.name); })
     .slice(0, n || 5).map(function (x) { return x.p; });
 }
+/* Catálogo do CBOS (19/11/2026, dono: «sempre que carrego novo catálogo a app deverá verificar estes erros»): os artigos do CBOS
+   da estação entram nas propostas, com o PVP do CBOS; os que só existem no CBOS (ainda não estão no Stock) também aparecem.
+   O que saiu do export («Fora do export») não conta. catalogo = linhas de msb_catalogo_cbos de uma estação. */
+function codJuntar(produtos, catalogo) {
+  var C = {}, fora = "Fora do export";
+  (catalogo || []).forEach(function (x) { if (x.estado !== fora) C[x.poscode] = x; });
+  var out = produtos.map(function (p) { var c = C[p.repsol_code]; return c ? Object.assign({}, p, {cbos: c}) : p; }), vistos = {};
+  produtos.forEach(function (p) { vistos[p.repsol_code] = 1; });
+  Object.keys(C).forEach(function (k) { if (!vistos[k]) out.push({repsol_code: k, name: C[k].nome, cbos: C[k], soCbos: true}); });
+  return out;
+}
+/* Verificação de um código novo contra o catálogo do CBOS: o artigo do CBOS mais parecido (ou o da proposta), o PVP e se bate com o da fatura */
+function codNoCatalogo(c, juntos) {
+  var noCbos = juntos.filter(function (p) { return p.cbos; }), m = codParecidos(c.descricao, noCbos, c.proposta, 1)[0];
+  if (!m) return {estado: "nao_existe"};
+  var pvp = m.cbos.pvp_c || null;
+  return {estado: !pvp ? "sem_preco" : c.pvp_fatura_c > 0 && pvp !== c.pvp_fatura_c ? "pvp_diferente" : "existe", artigo: m, pvp_c: pvp};
+}
+async function codCatalogo() {
+  var r = await lerTudo(function () { return sb.from("msb_catalogo_cbos").select("estacao,poscode,nome,categoria,estado,pvp_c,importado_em").order("estacao").order("poscode"); }, ["estacao", "poscode"]);
+  if (r.error) throw r.error;
+  var porEst = {};
+  (r.data || []).forEach(function (x) { (porEst[x.estacao] = porEst[x.estacao] || []).push(x); });
+  return porEst;
+}
 async function codProdutos() {
   if (COD_PRODUTOS) return COD_PRODUTOS;
   var r = await lerTudo(function () { return sb.from("products").select("id,name,category,repsol_code"); }, ["id"]);
@@ -59,23 +84,30 @@ async function codigosNovos(recarregar) {
   if (r.error) throw r.error;
   var L = r.data || [];
   if (!L.length) return {html: "", ligar: function () {}};
-  var P = await codProdutos(), V = {};
+  var P0 = await codProdutos(), V = {}, CAT = {};
   try { V = await codVendas(); } catch (e) { V = {}; }   // sem leituras do CBOS, confirma-se na mesma, só sem o preço de venda
+  try { CAT = await codCatalogo(); } catch (e) { CAT = {}; }   // sem o catálogo do CBOS, as propostas vêm só do Stock
+  var P = P0, juntosDe = function (est) { return CAT[est] ? codJuntar(P0, CAT[est]) : P0; };
   var linha = function (c) {
+    P = juntosDe(c.estacao);
     var op = codParecidos(c.descricao, P, c.proposta, 5), vend = (V[c.estacao] || {}).precos || {};
     var compra = c.compra_m > 0 ? "Compra: <b>" + codEur(Math.round(c.compra_m / 10)) + "</b> por unidade" + (c.fatura ? " (fatura " + esc(String(c.fatura).split("/").pop()) + ")" : "") : "Compra: sem preço lido na fatura";
     var pvpF = c.pvp_fatura_c > 0 ? " · PVP na fatura: <b>" + codEur(c.pvp_fatura_c) + "</b>" + (codMargem(c.compra_m, c.pvp_fatura_c) != null ? " (margem " + String(codMargem(c.compra_m, c.pvp_fatura_c)).replace(".", ",") + " %)" : "") : "";
     var opcoes = op.map(function (p, i) {
       var pv = vend[p.repsol_code], mg = codMargem(c.compra_m, pv);
-      var venda = pv ? "<div class='mut'>Vende-se a <b>" + codEur(pv) + "</b>" + (mg != null ? " · margem " + String(mg).replace(".", ",") + " %" : "") +
-        (c.pvp_fatura_c > 0 ? (pv === c.pvp_fatura_c ? " · ✅ igual ao PVP da fatura" : " · ⚠️ diferente do PVP da fatura") : "") + "</div>" : "<div class='mut'>ℹ️ Sem vendas na última leitura do CBOS</div>";
+      var cb = !CAT[c.estacao] ? "" : !p.cbos ? "<div>❌ <b>Não existe no catálogo do CBOS</b></div>" : !p.cbos.pvp_c ? "<div>❌ <b>Sem preço no CBOS</b></div>"
+        : "<div>PVP no CBOS: <b>" + codEur(p.cbos.pvp_c) + "</b>" + (c.pvp_fatura_c > 0 ? (p.cbos.pvp_c === c.pvp_fatura_c ? " · ✅ igual ao PVP da fatura" : " · ⚠️ <b>diferente do PVP da fatura</b>") : "") +
+          (codMargem(c.compra_m, p.cbos.pvp_c) != null ? " · margem " + String(codMargem(c.compra_m, p.cbos.pvp_c)).replace(".", ",") + " %" : "") + (p.soCbos ? " <span class='mut'>· só no CBOS (ainda não está no Stock)</span>" : "") + "</div>";
+      var venda = cb + (pv ? "<div class='mut'>Vende-se a <b>" + codEur(pv) + "</b>" + (mg != null ? " · margem " + String(mg).replace(".", ",") + " %" : "") +
+        (c.pvp_fatura_c > 0 ? (pv === c.pvp_fatura_c ? " · ✅ igual ao PVP da fatura" : " · ⚠️ diferente do PVP da fatura") : "") + "</div>" : "<div class='mut'>ℹ️ Sem vendas na última leitura do CBOS</div>");
       return "<label style='display:flex;gap:8px;align-items:flex-start;margin:6px 0'><input type='radio' name='cod" + c.id + "' value='" + p.repsol_code + "' data-nome='" + esc(p.name) + "'" + (i === 0 && p.repsol_code === c.proposta ? " checked" : "") + ">" +
         "<span><b>" + esc(p.repsol_code) + "</b> " + esc(p.name) + (p.category ? " <span class='mut'>· " + esc(p.category) + "</span>" : "") + (p.repsol_code === c.proposta ? " <span class='mut'>· proposta do OCTAN AI</span>" : "") + venda + "</span></label>";
     }).join("");
     return "<div class='card' style='padding:12px 14px' data-codcard='" + c.id + "'>" +
       "<b>" + esc(c.codigo) + " · " + esc(c.descricao || "") + "</b><div class='mut'>" + esc(aviLoja(c.estacao)) + " · na fatura desde " + aviDataHora(c.criado) + "</div>" +
       "<div style='margin-top:4px'>🧾 " + compra + pvpF + "</div>" +
-      (opcoes ? "<div style='margin-top:6px'>" + opcoes + "</div>" : "<div class='mut' style='margin-top:6px'>ℹ️ Nenhum artigo parecido no catálogo. Se ainda não existe no CBOS, deixa ficar: a fatura espera.</div>") +
+      (opcoes ? "<div style='margin-top:6px'>" + opcoes + "</div>" : CAT[c.estacao] ? "<div style='margin-top:6px'>❌ <b>Não existe no catálogo do CBOS</b> desta estação. Tem de ser criado no CBOS; até lá a fatura espera.</div>"
+        : "<div class='mut' style='margin-top:6px'>ℹ️ Nenhum artigo parecido no catálogo. Se ainda não existe no CBOS, deixa ficar: a fatura espera.</div>") +
       "<label style='display:flex;gap:8px;align-items:center;margin:4px 0'><input type='radio' name='cod" + c.id + "' value='outro'><span>Outro código</span></label>" +
       "<div style='display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))'>" +
       "<input inputmode='numeric' maxlength='8' placeholder='Código Repsol (8 algarismos)' data-codnum='" + c.id + "'><input placeholder='Nome do artigo' data-codnome='" + c.id + "'></div>" +
@@ -93,6 +125,7 @@ async function codigosNovos(recarregar) {
         var cod = esc1.value, nome = esc1.dataset.nome || "";
         if (cod === "outro") { cod = (raiz.querySelector("[data-codnum='" + id + "']").value || "").trim(); nome = (raiz.querySelector("[data-codnome='" + id + "']").value || "").trim(); }
         if (!/^\d{8}$/.test(cod)) return status(false, "⚠ O código Repsol tem 8 algarismos");
+        P = juntosDe((L.find(function (x) { return x.id === id; }) || {}).estacao);
         if (!nome) { var p = P.find(function (x) { return x.repsol_code === cod; }); nome = p ? p.name : ""; }
         if (!nome) return status(false, "⚠ Falta o nome do artigo");
         b.disabled = true;
@@ -105,4 +138,4 @@ async function codigosNovos(recarregar) {
   };
   return {html: html, ligar: ligar};
 }
-if (typeof module !== "undefined") module.exports = {codPalavras: codPalavras, codParecidos: codParecidos, codPrecoVenda: codPrecoVenda, codMargem: codMargem};
+if (typeof module !== "undefined") module.exports = {codJuntar: codJuntar, codNoCatalogo: codNoCatalogo, codPalavras: codPalavras, codParecidos: codParecidos, codPrecoVenda: codPrecoVenda, codMargem: codMargem};
