@@ -8,7 +8,7 @@ var AREAS = [   // reorganização de 10/11/2026 (dono, «avança com tudo»): c
   {id: "cx", n: "💶 Caixa", adm: 1, p: [["reg", "Registo diário"], ["sai", "Saídas de caixa"], ["his", "Histórico"]]},
   {id: "cmb", n: "⛽ Combustível", adm: 1, p: [["comb", "Entradas de combustível"], ["pre", "Preços ENSE", {g: "ENSE"}], ["ense", "Reporte mensal ENSE", {g: "ENSE"}], ["red", "Redução Repsol", {g: "Preços"}]]},   // «Redução Repsol» 16/11/2026: app/reducao.js
   {id: "stk", n: "📦 Stock", p: [["contar", "Contar"], ["ler", "Ler código"], ["stock", "Stock atual"], ["inv", "Inventário"], ["mov", "Movimentos"]]},
-  {id: "cpr", n: "🛒 Compras", adm: 1, p: [["enc", "Por aprovar"], ["nova", "Nova encomenda"], ["comh", "Encomendas feitas"], ["ent", "Entrada de mercadoria", {g: "Receções"}], ["dig", "Digitalizar fatura", {g: "Receções"}]]},
+  {id: "cpr", n: "🛒 Compras", adm: 1, p: [["enc", "Por aprovar"], ["nova", "Nova encomenda"], ["comh", "Encomendas feitas"], ["ent", "Entrada de mercadoria", {g: "Receções"}], ["dig", "Digitalizar fatura", {g: "Receções"}], ["fad", "Faturas da Adelaide", {g: "Receções"}]]},
   {id: "cnf", n: "🏦 Conferências", b: "Controlo", adm: 1, p: [["rep", "Repsol e Multibanco"], ["tms", "Fecho mensal TMS"], ["ban", "Banco"], ["liv", "Livro de movimentos"]]},
   {id: "frn", n: "🧾 Fornecedores", adm: 1, p: [["dsp", "Despesas"]]},   // «Por fornecedor» acrescentado em beta/paginas.js
   {id: "res", n: "💰 Resultados", adm: 1, p: [["cdm", "Conta do mês", {g: "O mês"}], ["luc", "Lucro (margens)", {g: "O mês"}], ["mes", "Resultado mensal", {g: "O mês"}], ["ven", "Vendas e margens", {g: "Vendas"}], ["va", "Relatório de vendas", {g: "Vendas"}], ["maq", "Máquina de tabaco", {g: "Vendas"}], ["fun", "Por funcionário", {g: "Análise"}]]},
@@ -29,7 +29,7 @@ var NEXP = {
   prod: {tab: "settings", only: ["Gestão de produtos"]},
   cfg: {tab: "settings", only: ["Configuração da base de dados central", "Importante"]}
 };
-var VISTA_DA = {avi: "avi", ini: "ini", reg: "reg", sai: "sai", his: "his", ven: "tab", comh: "tab", mov: "tab", rep: "rep", tms: "tms", mes: "mes", fun: "fun", eq: "ges", luc: "luc", cdm: "cdm", mrg: "mrg", comb: "comb", ense: "ense", va: "va", kms: "kms", pre: "pre", dig: "dig", dsp: "dsp", ban: "ban", liv: "liv", fra: "fra", div: "div", red: "red"};
+var VISTA_DA = {avi: "avi", ini: "ini", reg: "reg", sai: "sai", his: "his", ven: "tab", comh: "tab", mov: "tab", rep: "rep", tms: "tms", mes: "mes", fun: "fun", eq: "ges", luc: "luc", cdm: "cdm", mrg: "mrg", comb: "comb", ense: "ense", va: "va", kms: "kms", pre: "pre", dig: "dig", dsp: "dsp", ban: "ban", liv: "liv", fra: "fra", div: "div", red: "red", fad: "fad"};
 var PAGINA = "ini";
 /* confirmação: na beta é uma janela da app; na versão atual continua a do navegador */
 function msbConfirma(t, acao) { return window.MSB_NAV ? MSB_NAV.confirma(t, acao) : Promise.resolve(confirm(t)); }
@@ -93,6 +93,7 @@ window.depoisVista = function (v) {
   if (v === "fra") carregarFraude();
   if (v === "div") carregarDividas();
   if (v === "red") carregarReducao();
+  if (v === "fad") carregarFad();
 };
 
 /* ---------------- módulo de stock embutido ---------------- */
@@ -266,9 +267,12 @@ async function carregarFicheiros(fs) {
   var ext = []; if (ADMIN) for (var x = g.vendas.length - 1; x >= 0; x--) if (await ehExtrato(g.vendas[x])) ext.push(g.vendas.splice(x, 1)[0]);
   /* histórico de movimentos de carburante (receções de combustível): reconhece-se pelo cabeçalho (Nº Documento · Tanque · Produto) */
   var hcb = []; if (ADMIN) for (var y = g.vendas.length - 1; y >= 0; y--) if (await ehHistCarburante(g.vendas[y])) hcb.push(g.vendas.splice(y, 1)[0]);
+  /* exportCatalog do CBOS (folhas PRODUTOS + TARIFAS POR PRODUTO) e fatura da Adelaide (PDF), 19/11/2026 */
+  var cat = []; if (ADMIN) for (var z = g.vendas.length - 1; z >= 0; z--) if (await ehCatalogo(g.vendas[z])) cat.push(g.vendas.splice(z, 1)[0]);
+  var fad = []; if (ADMIN) for (var w = g.pdf.length - 1; w >= 0; w--) if (await ehFaturaAdelaide(g.pdf[w])) fad.push(g.pdf.splice(w, 1)[0]);
   var trf = []; for (var k = g.vendas.length - 1; k >= 0; k--) if (await ehTransferencias(g.vendas[k])) trf.push(g.vendas.splice(k, 1)[0]);
   if (g[""].length || g.csv.length) ir("reg");      // a mensagem aparece na barra do Registo
-  if (g[""].length) status(false, "⚠ Não reconheço: " + g[""].map(function (f) { return f.name; }).join(", ") + ". Ficheiros aceites: folha de turno (.xls), fotografia do talão, PDF da Repsol, fecho mensal TMS (.csv), relatório de vendas de tabaco (Excel .xlsx), extrato do banco (Excel), histórico de movimentos de carburante (Excel), relatório «Turno por formas de cobrança» (PDF feito com «Guardar como PDF»).");
+  if (g[""].length) status(false, "⚠ Não reconheço: " + g[""].map(function (f) { return f.name; }).join(", ") + ". Ficheiros aceites: folha de turno (.xls), fotografia do talão, PDF da Repsol, fecho mensal TMS (.csv), relatório de vendas de tabaco (Excel .xlsx), extrato do banco (Excel), histórico de movimentos de carburante (Excel), catálogo do CBOS (Excel «exportCatalog»), fatura da Adelaide (PDF), relatório «Turno por formas de cobrança» (PDF feito com «Guardar como PDF»).");
   if (g.csv.length) status(false, "⚠ " + g.csv.map(function (f) { return f.name; }).join(", ") + ": o relatório de vendas tem de ser em Excel (.xlsx), porque o CSV não diz de que estação é.");
   if (g.tms.length) { ir("tms"); for (var j = 0; j < g.tms.length; j++) await importarTMS(g.tms[j]); }
   if (g.pdf.length) { ir("rep"); carregarPdfs(g.pdf); }
@@ -280,6 +284,8 @@ async function carregarFicheiros(fs) {
   if (g.foto.length) escolherFoto(g.foto[0]);
   if (trf.length) await importarTransferencias(trf[0]);
   if (ext.length) await importarExtrato(ext[0]);
+  if (cat.length) await importarCatalogo(cat[0]);
+  for (var fa = 0; fa < fad.length; fa++) await importarFaturaAdelaide(fad[fa]);
   if (hcb.length) { COMB_PEND = hcb[0]; ir("comb"); }
   if (g.vendas.length) escolherVendas(g.vendas[0]);
   var varios = g.xls.length + g.foto.length + g.vendas.length > (g.xls.length ? 1 : 0) + (g.foto.length ? 1 : 0) + (g.vendas.length ? 1 : 0);

@@ -21,7 +21,7 @@
     u: '<circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14c2.8 0 5 2.2 5 5"/>'
   };
   /* páginas que no menu são uma só, com separadores em cima */
-  var GRUPOS = [{n: "Receções", p: ["ent", "dig"]}, {n: "Vendas", p: ["ven", "va", "maq"]}];
+  var GRUPOS = [{n: "Receções", p: ["ent", "dig", "fad"]}, {n: "Vendas", p: ["ven", "va", "maq"]}];
   function grupoDe(pg) { return GRUPOS.find(function (g) { return g.p.indexOf(pg) >= 0; }); }
   var IC_AREA = {ini: "p", cx: "t", cmb: "g", stk: "c", cpr: "h", cnf: "f", frn: "k", res: "d", fra: "b", dcs: "o", eqp: "u", def: "a"};
   /* título de cada bloco do menu (Dia a dia · Controlo · Gestão), quando a área seguinte muda de bloco; o funcionário, com 2 áreas, não os vê */
