@@ -369,7 +369,7 @@ var CAMPOS = [["vendas","vendas_c","🧾 Vendas (sistema)"],["mb","mb_c","💳 M
 var RECEBIDO = ["mb_c","solred_c","pres_c","num_c","forn_c","chq_c","cred_c"];
 /* Penafiel (dono, 19/11/2026): clientes a crédito (meio de pagamento) e saída TABACO (caixa → cofre da máquina, já dentro do numerário); ver caixa_pnf.js */
 var CAMPOS_PNF = [["cred","cred_c","🤝 Clientes a crédito"],["tab","tab_c","🎰 Saída TABACO"]];
-function camposDe(e){return e==="pnf"?CAMPOS.concat(CAMPOS_PNF):CAMPOS}
+function camposCaixa(e){return e==="pnf"?CAMPOS.concat(CAMPOS_PNF):CAMPOS}
 function num1(v){var s=String(v==null?"":v).replace(/[\s ]/g,"").replace(/[^0-9,.\-]/g,""),c=s.lastIndexOf(","),p=s.lastIndexOf(".");
   if(c>-1&&p>-1)s=c>p?s.replace(/\./g,"").replace(",","."):s.replace(/,/g,"");else if(c>-1)s=s.replace(",",".");var n=parseFloat(s);return isNaN(n)?0:n}
 /* aceita contas como "2647,24-54,14" (MB = compras − devoluções) */
@@ -452,7 +452,7 @@ function desenharDia(pronto){var h="";if(pronto)carregarFuncionarios();
   ["t1","t2"].forEach(function(t){var r=LINHAS[t]||{},txt=r.txt||{};
     h+="<div class='card'><div class='ch "+t+"'><span>"+(t==="t1"?"☀️ Turno 1":"🌙 Turno 2")+"</span><span class='dif' id='df-"+t+"'>—</span></div><div class='cb'><div class='fl'>";
     h+="<label class='w'>👤 Funcionário<input data-t='"+t+"' data-k='func' list='lFunc' autocomplete='off' value='"+esc(r.func||"")+"' placeholder='Escolher ou escrever o nome'"+(ADMIN&&pronto?"":" disabled")+"></label>";
-    camposDe(EST).forEach(function(c){var v=r[c[1]];h+="<label"+(CAMPOS.indexOf(c)<0?" class='novo'":"")+">"+c[2]+"<input inputmode='decimal' data-t='"+t+"' data-k='"+c[0]+"' value='"+(v==null?"":fmt(v))+"' placeholder='0,00'"+(txt[c[0]]&&/[-+]/.test(String(txt[c[0]]).slice(1))?" title='Escrito como "+esc(txt[c[0]])+"'":"")+(ADMIN&&pronto?"":" disabled")+"></label>"});
+    camposCaixa(EST).forEach(function(c){var v=r[c[1]];h+="<label"+(CAMPOS.indexOf(c)<0?" class='novo'":"")+">"+c[2]+"<input inputmode='decimal' data-t='"+t+"' data-k='"+c[0]+"' value='"+(v==null?"":fmt(v))+"' placeholder='0,00'"+(txt[c[0]]&&/[-+]/.test(String(txt[c[0]]).slice(1))?" title='Escrito como "+esc(txt[c[0]])+"'":"")+(ADMIN&&pronto?"":" disabled")+"></label>"});
     h+="</div><div class='sai' id='sai-"+t+"'></div>"+(EST==="pnf"?"<div class='pnf' id='pnf-"+t+"'></div>":"")+"<div class='res'><span>Recebido <b id='rc-"+t+"'>—</b></span><span>Diferença <b id='dd-"+t+"'>—</b></span></div></div></div>"});
   $("#turnos").innerHTML=h;
   $$("#turnos input[data-k]").forEach(function(el){el.onchange=function(){guardar(el)};el.onfocus=function(){var r=LINHAS[el.dataset.t]||{},o=(r.txt||{})[el.dataset.k];if(o&&/[-+]/.test(String(o).slice(1)))el.value=o}});
@@ -466,7 +466,7 @@ function corRes(d){return cls(d)}
 async function guardar(el){var t=el.dataset.t,k=el.dataset.k,val=el.value.trim(),r=LINHAS[t]||{estacao:EST,dia:DIA,turno:t,txt:{}};
   var linha={estacao:EST,dia:DIA,turno:t},txt=Object.assign({},r.txt||{});
   if(k==="func"){linha.func=val.slice(0,40)}
-  else{var col=camposDe(EST).find(function(c){return c[0]===k})[1];var c=cent(val);if(val&&isNaN(num(val))){status(false,"Valor inválido");return}
+  else{var col=camposCaixa(EST).find(function(c){return c[0]===k})[1];var c=cent(val);if(val&&isNaN(num(val))){status(false,"Valor inválido");return}
     linha[col]=c;if(val)txt[k]=val;else delete txt[k];linha.txt=txt;el.value=c==null?"":fmt(c)}
   status(true,"A guardar…");
   try{var res=await sb.from("msb_turnos").upsert(linha,{onConflict:"estacao,dia,turno"}).select().single();if(res.error)throw res.error;
