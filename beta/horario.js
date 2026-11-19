@@ -538,6 +538,17 @@
     });
     pg.drawText("M manhã · T tarde" + (X.mt ? " · MT turno M/T" : "") + " · FG folga · F férias · FD feriado", {x: M, y: y - 16, size: 8, font: F, color: tx});
     { var lx = M + F.widthOfTextAtSize("M manhã · T tarde" + (X.mt ? " · MT turno M/T" : "") + " · FG folga · F férias · FD feriado", 8) + 14; pg.drawRectangle({x: lx, y: y - 18, width: 11, height: 11, color: ver, borderColor: P.rgb(0.08, 0.19, 0.11), borderWidth: 0.6}); pg.drawText("Turno extra", {x: lx + 15, y: y - 16, size: 8, font: B, color: tx}); }
+    if (!funcionarios && ADMIN) {   // horas do mês (dono, 19/11/2026): só no PDF do administrador, como na app
+      var rv = verif(), cx = [M, M + 150, M + 250, M + 340, M + 430], cab = ["Horas", "Previstas no mês", "Ausências", "A realizar", "Extra"], yy = y - 44;
+      var dir = function (t, i, fonte) { if (i === 0) pg.drawText(t, {x: cx[0] + 3, y: yy, size: 8.5, font: fonte, color: tx}); else pg.drawText(t, {x: cx[i] + 80 - fonte.widthOfTextAtSize(t, 8.5), y: yy, size: 8.5, font: fonte, color: tx}); };
+      cab.forEach(function (t, i) { dir(t, i, B); }); pg.drawLine({start: {x: M, y: yy - 4}, end: {x: cx[4] + 84, y: yy - 4}, thickness: 0.6, color: az});
+      rv.metas.forEach(function (m) {
+        yy -= 14;
+        [m.nome, rv.base * 8 + " h", m.ausencias ? "-" + m.ausencias * 8 + " h" : "—", m.turnos * 8 + " h", m.extra ? (m.extra > 0 ? "+" : "") + m.extra + " h" : "—"].forEach(function (t, i) { dir(t, i, i === 0 || i === 4 ? B : F); });
+        pg.drawLine({start: {x: M, y: yy - 4}, end: {x: cx[4] + 84, y: yy - 4}, thickness: 0.3, color: lin});
+      });
+      pg.drawText("Previstas: dias úteis do mês sem feriados × 8 h (" + rv.base + " dias). Ausências: férias, baixa, formação e dias fora da equipa. A realizar: turnos marcados × 8 h. Extra = a realizar - (previstas - ausências).", {x: M, y: yy - 16, size: 7, font: F, color: tx});
+    }
     await marcaPdf(doc, pg, F, B, M, 18);
     return new Blob([await doc.save()], {type: "application/pdf"});
   }
