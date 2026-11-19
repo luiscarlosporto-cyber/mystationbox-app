@@ -3,6 +3,8 @@
 "use strict";
 (function (raiz) {
   var TRAB = {M: 1, T: 1, MT: 1};
+  /* Ausências com código próprio (dono, 19/11/2026): F férias, B baixa, FJ falta justificada, FI falta injustificada. F, B e FJ descontam nas horas previstas; a FI não (são horas que ficam por fazer) */
+  var AUS = {F: 1, B: 1, FJ: 1, FI: 1}, DESC = {F: 1, B: 1, FJ: 1};
   function dt(y, m, d) { return new Date(Date.UTC(y, m - 1, d)); }
   function iso(x) { return x.toISOString().slice(0, 10); }
   /* semanas seg-dom cuja quinta-feira cai neste mês, só com dias deste mês */
@@ -52,7 +54,7 @@
       var seq = {M: "T", T: "FG", FG: "M"}, prev = p.fdsAnt || "";
       for (var s = 1; s < n; s++) {
         if (dt(y, m, s).getUTCDay() !== 6) continue;
-        var a = p.dias[s - 1] || "", b = p.dias[s] || ""; if (!a || !b || a === "F" || b === "F") { prev = ""; continue; }
+        var a = p.dias[s - 1] || "", b = p.dias[s] || ""; if (!a || !b || AUS[a] || AUS[b]) { prev = ""; continue; }
         if (a !== b) aviso(s, p.nome + ": sábado " + s + " e domingo diferentes");
         else if (prev && seq[prev] && seq[prev] !== a) aviso(s, p.nome + ": fim de semana " + s + " fora da rotação (" + prev + " → " + a + ")");
         prev = a === b ? a : "";
@@ -67,7 +69,7 @@
     }
     var base = meta(y, m, n, fer);
     var metas = L.filter(function (p) { return p.escala !== false; }).map(function (p) {
-      var fu = 0, tur = 0; p.dias.forEach(function (c, i) { if (TRAB[c]) tur++; var w = dt(y, m, i + 1).getUTCDay(); if (c === "F" && w > 0 && w < 6 && !fer[iso(dt(y, m, i + 1))]) fu++; });
+      var fu = 0, tur = 0; p.dias.forEach(function (c, i) { if (TRAB[c]) tur++; var w = dt(y, m, i + 1).getUTCDay(); if (DESC[c] && w > 0 && w < 6 && !fer[iso(dt(y, m, i + 1))]) fu++; });
       var ab = p.abate || 0;   // dias especiais pagos (baixa, formação, outros); o aniversário é só folga e não conta
       return {nome: p.nome, turnos: tur, meta: base - fu - ab, ferias: fu, ausencias: fu + ab, extra: (tur - (base - fu - ab)) * 8};
     });
@@ -95,6 +97,6 @@
     });
     return res;
   }
-  var H = {emailsContas: emailsContas, emails: emails, verificar: verificar, extras: extras, meta: meta, semanasMT: semanasMT, CODIGOS: ["M", "T", "MT", "FG", "F", "FD"]};
+  var H = {emailsContas: emailsContas, emails: emails, verificar: verificar, extras: extras, meta: meta, semanasMT: semanasMT, CODIGOS: ["M", "T", "MT", "FG", "F", "FD", "B", "FJ", "FI"], AUS: AUS, DESC: DESC};
   if (typeof module !== "undefined") module.exports = H; else raiz.HOR = H;
 })(typeof window !== "undefined" ? window : this);

@@ -78,7 +78,7 @@
     h += "</table></div><p class='rod'>❌ crítico: a app pergunta antes de gravar ou aprovar, mas pode fazê-lo na mesma. ⚠️ só aviso.</p>";
     if (ADMIN) h += "<div class='sc' style='margin-top:8px'><table><thead><tr><th class='l'>Horas</th><th>Previstas no mês</th><th>Ausências</th><th>A realizar</th><th>Extra</th></tr></thead><tbody>" +
       r.metas.map(function (m) { return "<tr><td class='l'>" + esc(m.nome) + "</td><td class='n'>" + r.base * 8 + " h</td><td class='n'>" + (m.ausencias ? "−" + m.ausencias * 8 + " h" : "—") + "</td><td class='n'>" + m.turnos * 8 + " h</td><td class='n'>" + (m.extra ? (m.extra > 0 ? "+" : "") + m.extra + " h" : "—") + "</td></tr>"; }).join("") +
-      "</tbody></table></div><p class='rod'>Previstas: dias úteis do mês sem feriados × 8 h (" + r.base + " dias). Ausências: férias, baixa, formação e dias fora da equipa. A realizar: turnos marcados × 8 h. Extra = a realizar − (previstas − ausências).</p>";
+      "</tbody></table></div><p class='rod'>Previstas: dias úteis do mês sem feriados × 8 h (" + r.base + " dias). Ausências: férias, baixa, falta justificada, formação e dias fora da equipa (a falta injustificada não desconta). A realizar: turnos marcados × 8 h. Extra = a realizar − (previstas − ausências).</p>";
     return h + "</div>";
   }
   function pintar() {
@@ -91,7 +91,7 @@
       "<button class='btn' id='horExp'>⬇ Exportar ▾</button><button class='btn' id='horMais' aria-label='Mais opções'>⋯</button>";
     if (ADMIN && X.menu === "exp") b += "</div><div class='bar'><button class='btn' id='horPdf'>📄 PDF</button><button class='btn' id='horXls'>📊 Excel do Picaponto</button>";
     if (ADMIN && X.menu === "mais") b += "</div><div class='bar'>" + (X.apr ? "<button class='btn' id='horTira'>Tirar a aprovação</button>" : (X.INI ? "<button class='btn' id='horIni'>Voltar ao horário inicial</button>" : "") + "<button class='btn' id='horDefIni'>Guardar como inicial</button>");
-    box.innerHTML = b + "</div>" + (ADMIN && X.P.length ? equipa() : "") + (ADMIN && X.apr && X.env && X.atu > X.env ? "<div class='aviso'><p>⚠ Alterado depois de enviado. Os funcionários ainda têm a versão anterior: carrega em Reenviar.</p></div>" : "") + (ADMIN && X.apr && !X.env ? "<div class='aviso'><p>Horário selado. Falta enviar aos funcionários.</p></div>" : "") + (X.envio ? cartaoEnvio() : "") + (X.esp ? cartaoEsp() : "") + inviavel() + (X.P.length ? celulas() + "<p class='rod'>M manhã · T tarde · MT turno M/T · FG folga · F férias · FD feriado. Fundo azul: fim de semana; creme: feriado." + (ADMIN ? " <span class='exl'>M</span> Turno extra." : "") + (X.ESP.length ? " Especiais: B baixa · Fr formação · A aniversário · O outros."  : "") + (X.ed ? " Toque numa célula para mudar o turno. A app nunca muda outros turnos sozinha: se faltar alguma coisa, sugere (a laranja) e espera pelo seu ✔. ✨ Propor horário refaz o mês, menos o que já passou, o que mudou à mão (sublinhado) e as férias." : "") + "</p>" + regras()
+    box.innerHTML = b + "</div>" + (ADMIN && X.P.length ? equipa() : "") + (ADMIN && X.apr && X.env && X.atu > X.env ? "<div class='aviso'><p>⚠ Alterado depois de enviado. Os funcionários ainda têm a versão anterior: carrega em Reenviar.</p></div>" : "") + (ADMIN && X.apr && !X.env ? "<div class='aviso'><p>Horário selado. Falta enviar aos funcionários.</p></div>" : "") + (X.envio ? cartaoEnvio() : "") + (X.esp ? cartaoEsp() : "") + inviavel() + (X.P.length ? celulas() + "<p class='rod'>M manhã · T tarde · MT turno M/T · FG folga · F férias · FD feriado · B baixa · FJ falta justificada · FI falta injustificada. Fundo azul: fim de semana; creme: feriado." + (ADMIN ? " <span class='exl'>M</span> Turno extra." : "") + (X.ESP.length ? " Especiais: Fr formação · A aniversário · O outros."  : "") + (X.ed ? " Toque numa célula para mudar o turno. A app nunca muda outros turnos sozinha: se faltar alguma coisa, sugere (a laranja) e espera pelo seu ✔. ✨ Propor horário refaz o mês, menos o que já passou, o que mudou à mão (sublinhado) e as férias." : "") + "</p>" + regras()
       : "<div class='vazio'>" + (ADMIN ? "Ainda não há horário de " + nomeMes(X.M) + " nesta estação." : "O horário de " + nomeMes(X.M) + " ainda não está disponível.") + (ADMIN ? "<p><button class='btn p' id='horNovo'>Criar horário do mês</button></p>" : "") + "</div>");
     $("#horAnt").onclick = function () { sair(function () { abrir(addMes(X.M, -1)); }); };
     $("#horSeg").onclick = function () { sair(function () { abrir(addMes(X.M, 1)); }); };
@@ -188,7 +188,7 @@
     var es = (X.EM[id] || {})[d]; if (es) return editarEsp(es);
     var cods = HOR.CODIGOS.filter(function (k) { return k !== "MT" || X.mt; });
     var fx = (X.FX[id] || {})[d], atual = (X.G[id] || {})[d] || "";
-    m.innerHTML = "<b>Turno · " + esc(c.curto || "") + " · dia " + d + "</b><div>" + cods.map(function (k) { return "<button data-k='" + k + "'>" + k + "</button>"; }).join("") + (/^(F|FD)$/.test(atual) ? "<button data-k=''>Limpar</button>" : X.apr ? "" : fx ? "<button data-s='1'>Soltar turno</button>" : atual ? "<button data-f='1'>Fixar turno</button>" : "") + "</div>";
+    m.innerHTML = "<b>Turno · " + esc(c.curto || "") + " · dia " + d + "</b><div>" + cods.map(function (k) { return "<button data-k='" + k + "'>" + k + "</button>"; }).join("") + (/^(F|FD|B|FJ|FI)$/.test(atual) ? "<button data-k=''>Limpar</button>" : X.apr ? "" : fx ? "<button data-s='1'>Soltar turno</button>" : atual ? "<button data-f='1'>Fixar turno</button>" : "") + "</div>";
     m.onclick = function (e) {
       var b = e.target.closest("button"); if (!b) return; m.remove();
       if (b.dataset.f) { pôr(id, d, atual, true); pintar(); }   // fica como está: não é preciso ajustar nada
@@ -220,7 +220,7 @@
     X.SUG = {}; projetar("propor");
   }
   /* Dias especiais: cada período põe o código no horário (fixado) e o ajuste trata do resto. Motivo só para administradores (RLS) */
-  var TIPOS = {ferias: ["Férias", "F", ""], baixa: ["Baixa doença", "FG", "B"], formacao: ["Formação", "FG", "Fr"], aniversario: ["Dia de aniversário", "FG", "A"], outros: ["Outros", "FG", "O"]}, ADIAR = {};
+  var TIPOS = {ferias: ["Férias", "F", ""], baixa: ["Baixa doença", "B", ""], falta_just: ["Falta justificada", "FJ", ""], falta_inj: ["Falta injustificada", "FI", ""], formacao: ["Formação", "FG", "Fr"], aniversario: ["Dia de aniversário", "FG", "A"], outros: ["Outros", "FG", "O"]}, ADIAR = {};
   function diasDe(e) {
     var ini = X.M + "-01", fim = X.M + "-" + String(X.dias.length).padStart(2, "0"), L = [];
     if (e.ate < ini || e.de > fim) return L;
@@ -238,7 +238,7 @@
     X.dias.forEach(function (d) { var iso = X.M + "-" + String(d).padStart(2, "0"), w = new Date(iso + "T12:00:00").getDay(); if (!m[d] && foraDe(id, d) && w > 0 && w < 6 && !X.fer[iso]) n++; });   // dias úteis fora do período baixam a meta
     Object.keys(m).forEach(function (d) {
       var e = m[d], iso = X.M + "-" + String(d).padStart(2, "0"), w = new Date(iso + "T12:00:00").getDay();
-      if (e.tipo !== "ferias" && e.tipo !== "aniversario" && w > 0 && w < 6 && !X.fer[iso]) n++;
+      if (TIPOS[e.tipo][1] === "FG" && e.tipo !== "aniversario" && w > 0 && w < 6 && !X.fer[iso]) n++;   // baixa e faltas contam pelo código (B, FJ), como as férias
     });
     return n;
   }
@@ -344,8 +344,8 @@
         var c = g[d], iso = X.M + "-" + String(d).padStart(2, "0");
         if (!c && foraDe(l.colaborador_id, d)) { fixos[d] = "FG"; return; }   // ainda não tinha entrado ou já saiu: a escala não lhe dá turnos (no ecrã fica vazio)
         if (!c) return;
-        if (fx[d] || c === "F" || c === "FD" || iso < hj) fixos[d] = c;
-        var w = new Date(iso + "T12:00:00").getDay(); if (c === "F" && w > 0 && w < 6 && !X.fer[iso]) fu++;
+        if (fx[d] || /^(F|FD|B|FJ|FI)$/.test(c) || iso < hj) fixos[d] = c;
+        var w = new Date(iso + "T12:00:00").getDay(); if (HOR.DESC[c] && w > 0 && w < 6 && !X.fer[iso]) fu++;
       });
       return {id: l.colaborador_id, fixos: fixos, ant: (X.ANT[l.colaborador_id] || []).slice(-6).map(function (x) { return x[1]; }), fdsAnt: X.FDS[l.colaborador_id] || "", meta: base - fu - abate(l.colaborador_id), off: {M: a.M - minM, T: a.T - minT}, reforco: l.codigo === X.reforco, atual: auto ? Object.assign({}, g) : null};
     });
@@ -492,7 +492,7 @@
   /* Excel com a estrutura do template do Picaponto: título em C1, dias da semana na linha 2, Código | Colaborador | dias na linha 3, legenda em AI:AJ */
   async function excel() {
     var inval = [], val = {}; X.leg.forEach(function (l) { val[l[0]] = 1; });
-    X.P.forEach(function (l) { X.dias.forEach(function (d) { var v = (X.G[l.colaborador_id] || {})[d]; if (v && !val[v]) inval.push((X.C[l.colaborador_id] || {}).curto + " dia " + d + ": " + v); }); if (!l.nome_picaponto) inval.push((X.C[l.colaborador_id] || {}).curto + ": sem nome do Picaponto"); });
+    X.P.forEach(function (l) { X.dias.forEach(function (d) { var v = (X.G[l.colaborador_id] || {})[d]; if (v && !val[v] && !/^(B|FJ|FI)$/.test(v)) inval.push((X.C[l.colaborador_id] || {}).curto + " dia " + d + ": " + v); }); if (!l.nome_picaponto) inval.push((X.C[l.colaborador_id] || {}).curto + ": sem nome do Picaponto"); });
     if (inval.length) return msbAviso("Erro: o Picaponto não aceitaria " + inval.slice(0, 4).join("; "));
     var n = X.R.erros.length; if (n && !await msbConfirma("O horário tem " + n + " erro(s) nas regras. Exportar na mesma?", "Exportar na mesma")) return;
     await carregarXlsxMSB();
@@ -503,7 +503,7 @@
     var nl = Math.max(X.P.length, X.leg.length);
     for (var i = 0; i < nl; i++) {
       var r = lin(), p = X.P[i], g = X.leg[i];
-      if (p) { r[0] = +p.codigo; r[1] = p.nome_picaponto; X.dias.forEach(function (d) { var v = (X.G[p.colaborador_id] || {})[d]; if (v) r[1 + d] = v; }); }
+      if (p) { r[0] = +p.codigo; r[1] = p.nome_picaponto; X.dias.forEach(function (d) { var v = (X.G[p.colaborador_id] || {})[d]; if (v) r[1 + d] = /^(B|FJ|FI)$/.test(v) ? "FG" : v; }); }   // o Picaponto não tem códigos de baixa nem de falta: vão como folga
       if (g) { r[AI] = g[0]; r[AI + 1] = g[1]; }
       A.push(r);
     }
@@ -536,8 +536,8 @@
       pg.drawText(c.nome || "", {x: M + 3, y: y + 9, size: 9, font: B, color: tx});
       pg.drawLine({start: {x: M, y: y}, end: {x: W - M, y: y}, thickness: 0.4, color: lin});
     });
-    pg.drawText("M manhã · T tarde" + (X.mt ? " · MT turno M/T" : "") + " · FG folga · F férias · FD feriado", {x: M, y: y - 16, size: 8, font: F, color: tx});
-    { var lx = M + F.widthOfTextAtSize("M manhã · T tarde" + (X.mt ? " · MT turno M/T" : "") + " · FG folga · F férias · FD feriado", 8) + 14; pg.drawRectangle({x: lx, y: y - 18, width: 11, height: 11, color: ver, borderColor: P.rgb(0.08, 0.19, 0.11), borderWidth: 0.6}); pg.drawText("Turno extra", {x: lx + 15, y: y - 16, size: 8, font: B, color: tx}); }
+    pg.drawText("M manhã · T tarde" + (X.mt ? " · MT turno M/T" : "") + " · FG folga · F férias · FD feriado · B baixa · FJ/FI falta just./injust.", {x: M, y: y - 16, size: 8, font: F, color: tx});
+    { var lx = M + F.widthOfTextAtSize("M manhã · T tarde" + (X.mt ? " · MT turno M/T" : "") + " · FG folga · F férias · FD feriado · B baixa · FJ/FI falta just./injust.", 8) + 14; pg.drawRectangle({x: lx, y: y - 18, width: 11, height: 11, color: ver, borderColor: P.rgb(0.08, 0.19, 0.11), borderWidth: 0.6}); pg.drawText("Turno extra", {x: lx + 15, y: y - 16, size: 8, font: B, color: tx}); }
     if (!funcionarios && ADMIN) {   // horas do mês (dono, 19/11/2026): só no PDF do administrador, como na app
       var rv = verif(), cx = [M, M + 150, M + 250, M + 340, M + 430], cab = ["Horas", "Previstas no mês", "Ausências", "A realizar", "Extra"], yy = y - 44;
       var dir = function (t, i, fonte) { if (i === 0) pg.drawText(t, {x: cx[0] + 3, y: yy, size: 8.5, font: fonte, color: tx}); else pg.drawText(t, {x: cx[i] + 80 - fonte.widthOfTextAtSize(t, 8.5), y: yy, size: 8.5, font: fonte, color: tx}); };
@@ -547,7 +547,7 @@
         [m.nome, rv.base * 8 + " h", m.ausencias ? "-" + m.ausencias * 8 + " h" : "—", m.turnos * 8 + " h", m.extra ? (m.extra > 0 ? "+" : "") + m.extra + " h" : "—"].forEach(function (t, i) { dir(t, i, i === 0 || i === 4 ? B : F); });
         pg.drawLine({start: {x: M, y: yy - 4}, end: {x: cx[4] + 84, y: yy - 4}, thickness: 0.3, color: lin});
       });
-      pg.drawText("Previstas: dias úteis do mês sem feriados × 8 h (" + rv.base + " dias). Ausências: férias, baixa, formação e dias fora da equipa. A realizar: turnos marcados × 8 h. Extra = a realizar - (previstas - ausências).", {x: M, y: yy - 16, size: 7, font: F, color: tx});
+      pg.drawText("Previstas: dias úteis do mês sem feriados × 8 h (" + rv.base + " dias). Ausências: férias, baixa, falta justificada, formação e fora da equipa (falta injustificada não desconta). A realizar: turnos × 8 h. Extra = a realizar - (previstas - ausências).", {x: M, y: yy - 16, size: 7, font: F, color: tx});
     }
     await marcaPdf(doc, pg, F, B, M, 18);
     return new Blob([await doc.save()], {type: "application/pdf"});

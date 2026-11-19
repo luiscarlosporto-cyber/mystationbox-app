@@ -51,10 +51,10 @@
     var fds = dias.filter(function (d) { return sem(y, m, d) === 6 && d < n; });
     P.forEach(function (p, a) {
       var prev = p.fdsAnt || "", seq = {M: "T", T: "G", G: "M"}, ult = estadoDe((p.ant || []).slice(-1)[0] || "");
-      if (!prev || prev === "F" || prev === "FD") prev = ""; else prev = estadoDe(prev);
+      if (!prev || /^(F|FD|B|FJ|FI)$/.test(prev)) prev = ""; else prev = estadoDe(prev);
       fds.forEach(function (s) {
         var f1 = p.fixos[s], f2 = p.fixos[s + 1];
-        if (f1 === "F" || f2 === "F") { prev = ""; return; }
+        if (/^(F|B|FJ|FI)$/.test(f1 || "") || /^(F|B|FJ|FI)$/.test(f2 || "")) { prev = ""; return; }
         var mexido = P.some(function (q) { return q.fixos[s] || q.fixos[s + 1]; });   // com turnos fixados no fim de semana, sábado = domingo deixa de ser obrigatório
         if (!(f1 && f2 && estadoDe(f1) !== estadoDe(f2))) ["M", "T", "G"].forEach(function (k) {
           if (!mexido) eq([[v(a, s, k), 1], [v(a, s + 1, k), -1]], 0);
