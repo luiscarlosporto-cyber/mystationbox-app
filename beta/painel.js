@@ -36,7 +36,7 @@
   async function dados() {
     var hoje = hojeISO(0), mes = hoje.slice(0, 7), ant = addMes(mes, -1), f = [], guarda = function (nome, p) { return ler2(p).catch(function (e) { f.push(nome); console.warn(nome, e); return null; }); };
     var R = await Promise.all([
-      guarda("turnos", sb.from("msb_turnos").select("estacao,dia,turno,vendas_c,mb_c,solred_c,pres_c,num_c,forn_c,chq_c").gte("dia", ant + "-01").not("vendas_c", "is", null)),
+      guarda("turnos", sb.from("msb_turnos").select("estacao,dia,turno,vendas_c,mb_c,solred_c,pres_c,num_c,forn_c,chq_c,cred_c,dever_c,pagou_c").gte("dia", ant + "-01").not("vendas_c", "is", null)),
       guarda("folha de fecho", sb.from("msb_folha_fecho").select("estacao,mes,dados").order("mes", {ascending: false}).limit(8)),
       guarda("saídas", sb.from("msb_saidas").select("estacao,valor_c").is("recebido", null)),
       guarda("encomendas", sb.from("orders").select("id,company_id,lines,created_at").eq("status", "pendente")),

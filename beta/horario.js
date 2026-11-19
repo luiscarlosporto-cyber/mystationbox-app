@@ -78,7 +78,7 @@
     h += "</table></div><p class='rod'>❌ crítico: a app pergunta antes de gravar ou aprovar, mas pode fazê-lo na mesma. ⚠️ só aviso.</p>";
     if (ADMIN) h += "<div class='sc' style='margin-top:8px'><table><thead><tr><th class='l'>Horas</th><th>Previstas no mês</th><th>Ausências</th><th>A realizar</th><th>Extra</th></tr></thead><tbody>" +
       r.metas.map(function (m) { return "<tr><td class='l'>" + esc(m.nome) + "</td><td class='n'>" + r.base * 8 + " h</td><td class='n'>" + (m.ausencias ? "−" + m.ausencias * 8 + " h" : "—") + "</td><td class='n'>" + m.turnos * 8 + " h</td><td class='n'>" + (m.extra ? (m.extra > 0 ? "+" : "") + m.extra + " h" : "—") + "</td></tr>"; }).join("") +
-      "</tbody></table></div><p class='rod'>Previstas: dias úteis do mês sem feriados × 8 h (" + r.base + " dias). Ausências: férias, baixa, formação, aniversário e dias fora da equipa. A realizar: turnos marcados × 8 h. Extra = a realizar − (previstas − ausências).</p>";
+      "</tbody></table></div><p class='rod'>Previstas: dias úteis do mês sem feriados × 8 h (" + r.base + " dias). Ausências: férias, baixa, formação e dias fora da equipa. A realizar: turnos marcados × 8 h. Extra = a realizar − (previstas − ausências).</p>";
     return h + "</div>";
   }
   function pintar() {
@@ -233,12 +233,12 @@
     var l = (X.LJ || []).find(function (q) { return q.colaborador_id === id; }) || {}, iso = X.M + "-" + String(d).padStart(2, "0");
     return !!((l.desde && iso < l.desde) || (l.ate && iso > l.ate));
   }
-  function abate(id) {   // férias contam pelo código F; os outros contam em dias úteis, e o aniversário é sempre folga paga
+  function abate(id) {   // férias contam pelo código F; baixa, formação e outros contam em dias úteis. O aniversário é só um dia de folga: não baixa a meta (dono, 19/11/2026)
     var n = 0, m = X.EM[id] || {};
     X.dias.forEach(function (d) { var iso = X.M + "-" + String(d).padStart(2, "0"), w = new Date(iso + "T12:00:00").getDay(); if (!m[d] && foraDe(id, d) && w > 0 && w < 6 && !X.fer[iso]) n++; });   // dias úteis fora do período baixam a meta
     Object.keys(m).forEach(function (d) {
       var e = m[d], iso = X.M + "-" + String(d).padStart(2, "0"), w = new Date(iso + "T12:00:00").getDay();
-      if (e.tipo === "aniversario" || (e.tipo !== "ferias" && w > 0 && w < 6 && !X.fer[iso])) n++;
+      if (e.tipo !== "ferias" && e.tipo !== "aniversario" && w > 0 && w < 6 && !X.fer[iso]) n++;
     });
     return n;
   }
