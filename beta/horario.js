@@ -126,8 +126,14 @@
     return L;
   }
   function mapaEsp() { X.EM = {}; X.ESP.forEach(function (e) { var m = X.EM[e.colaborador_id] = X.EM[e.colaborador_id] || {}; diasDe(e).forEach(function (d) { m[d] = e; }); }); }
+  /* fora do período da pessoa nesta estação (msb_colab_lojas.desde / ate, 19/11/2026): entrou ou saiu a meio do mês */
+  function foraDe(id, d) {
+    var l = (X.LJ || []).find(function (q) { return q.colaborador_id === id; }) || {}, iso = X.M + "-" + String(d).padStart(2, "0");
+    return !!((l.desde && iso < l.desde) || (l.ate && iso > l.ate));
+  }
   function abate(id) {   // férias contam pelo código F; os outros contam em dias úteis, e o aniversário é sempre folga paga
     var n = 0, m = X.EM[id] || {};
+    X.dias.forEach(function (d) { var iso = X.M + "-" + String(d).padStart(2, "0"), w = new Date(iso + "T12:00:00").getDay(); if (!m[d] && foraDe(id, d) && w > 0 && w < 6 && !X.fer[iso]) n++; });   // dias úteis fora do período baixam a meta
     Object.keys(m).forEach(function (d) {
       var e = m[d], iso = X.M + "-" + String(d).padStart(2, "0"), w = new Date(iso + "T12:00:00").getDay();
       if (e.tipo === "aniversario" || (e.tipo !== "ferias" && w > 0 && w < 6 && !X.fer[iso])) n++;
@@ -232,7 +238,9 @@
     var P = ES.map(function (l) {
       var g = X.G[l.colaborador_id] || {}, fx = X.FX[l.colaborador_id] || {}, fixos = {}, fu = 0, a = AC[l.colaborador_id] || {M: 0, T: 0};
       X.dias.forEach(function (d) {
-        var c = g[d], iso = X.M + "-" + String(d).padStart(2, "0"); if (!c) return;
+        var c = g[d], iso = X.M + "-" + String(d).padStart(2, "0");
+        if (!c && foraDe(l.colaborador_id, d)) { fixos[d] = "FG"; return; }   // ainda não tinha entrado ou já saiu: a escala não lhe dá turnos (no ecrã fica vazio)
+        if (!c) return;
         if (fx[d] || c === "F" || c === "FD" || iso < hj) fixos[d] = c;
         var w = new Date(iso + "T12:00:00").getDay(); if (c === "F" && w > 0 && w < 6 && !X.fer[iso]) fu++;
       });
@@ -429,7 +437,7 @@
       var ini = addDia(M + "-01", -14), fim = addMes(M, 1) + "-01";
       var R = await Promise.all([
         sb.from("msb_horario_dias").select("dia,colaborador_id,codigo,fixo").eq("estacao", est).gte("dia", ini).lt("dia", fim).limit(2000),
-        sb.from("msb_colab_lojas").select("colaborador_id,codigo,ordem,nome_picaponto,escala,espelho").eq("estacao", est).order("ordem"),
+        sb.from("msb_colab_lojas").select("colaborador_id,codigo,ordem,nome_picaponto,escala,espelho,desde,ate").eq("estacao", est).order("ordem"),
         sb.from("msb_colaboradores").select("id,curto,nome,ativo"),
         sb.from("msb_horario_meses").select("estado,sem_mt,aprovado_em,enviado_em,atualizado_em").eq("estacao", est).eq("mes", M).maybeSingle(),
         sb.from("msb_config").select("horario").eq("estacao", est).maybeSingle(),
@@ -448,7 +456,7 @@
       });
       Object.keys(ANT).forEach(function (i) { ANT[i].sort(function (a, b) { return a[0] < b[0] ? -1 : 1; }); });
       var FDS = {}; Object.keys(ANT).forEach(function (i) { ANT[i].forEach(function (a) { var w = new Date(a[0] + "T12:00:00").getDay(); if (w === 6 || w === 0) FDS[i] = a[1]; }); });
-      var existe = !!R[3].data && (ADMIN || R[3].data.estado === "real"), P = existe ? R[1].data.filter(function (l) { return G[l.colaborador_id] || (C[l.colaborador_id] || {}).ativo; }) : [];
+      var existe = !!R[3].data && (ADMIN || R[3].data.estado === "real"), P = existe ? R[1].data.filter(function (l) { return G[l.colaborador_id] || ((C[l.colaborador_id] || {}).ativo && (!l.desde || l.desde < fim) && (!l.ate || l.ate >= M + "-01")); }) : [];
       X = {M: M, dias: dias, fer: feriados(ano), G: G, ORI: ORI, ANT: ANT, FX: FX, FXO: FXO, reforco: cfg.reforco, INI: R[5].data, LJ: R[1].data, ER0: [], inv: "", ESP: [], EM: {}, esp: !!(X && X.esp && X.M === M), espF: novoEspF(), FDS: FDS, C: C, P: P, ALT: {}, ed: !!(X && X.criado), rolar: true, apr: existe ? R[3].data.aprovado_em : null, env: existe ? R[3].data.enviado_em : null, atu: existe ? R[3].data.atualizado_em : null, envio: false, MAIL: {}, ultEnv: null, estado: existe ? R[3].data.estado : "simulacao", semMT: existe && R[3].data.sem_mt, mt: !!cfg.mt, leg: cfg.legenda || []};
       var nEsp = 0;
       if (ADMIN) { await lerEsp(R[1].data.map(function (l) { return l.colaborador_id; })); if (est !== EST || M !== MES) return; X.ER0 = verif().erros.map(function (e) { return e.msg; }); if (!ADIAR[est + M] && !X.apr) nEsp = aplicarEsp(); }
