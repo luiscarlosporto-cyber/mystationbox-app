@@ -49,7 +49,8 @@ function pnfTxtEstado(c) {
     falta: "<span class='chip c-er'>❌ cofre falta " + eur(-(c.dif || 0)) + "</span>", sobra: "<span class='chip c-wa'>⚠️ cofre sobra " + eur(c.dif || 0) + "</span>"}[c.estado];
 }
 function pnfDesenhar() {
-  if (EST !== "pnf" || PNF.dia !== DIA) return;
+  if (EST !== "pnf") { var bd = document.getElementById("pnf-dia"); if (bd) bd.hidden = true; return; }
+  if (PNF.dia !== DIA) return;
   ["t1", "t2"].forEach(function (t) {
     var box = document.getElementById("pnf-" + t); if (!box) return;
     var r = LINHAS[t] || {}, ant = t === "t1" ? PNF.ant : (LINHAS.t1 || null), vm = PNF.maq[t] === undefined ? null : PNF.maq[t];
@@ -78,7 +79,19 @@ function pnfDesenhar() {
     });
     box.innerHTML = h;
   });
+  pnfDeposito();
   pnfLigar();
+}
+/* Numerário a depositar no banco, total do dia: aparece depois de fechado o turno 2 (por baixo do total do dia) */
+function pnfDeposito() {
+  var tot = document.getElementById("dRec"), card = tot && tot.closest(".card"); if (!card) return;
+  var box = document.getElementById("pnf-dia");
+  if (!box) { box = document.createElement("div"); box.id = "pnf-dia"; box.className = "pnf"; box.style.marginTop = "10px"; (card.querySelector(".cb") || card).appendChild(box); }
+  var d = CAIXA_PNF.deposito(LINHAS.t1, LINHAS.t2, typeof SAIDAS !== "undefined" ? SAIDAS : []);
+  box.hidden = !d;
+  if (!d) { box.innerHTML = ""; return; }
+  box.innerHTML = "<div class='lin'><b>🏦 Numerário a depositar no banco</b><b style='font-size:18px'>" + eur(d.valor_c) + "</b></div>" +
+    "<div class='lin mut' style='font-size:13px'><span>Numerário T1 + T2 " + eur(d.num_c) + (d.saidas_c ? " − saídas de caixa " + eur(d.saidas_c) : "") + (d.tab_c ? " − saída TABACO " + eur(d.tab_c) : "") + "</span></div>";
 }
 function pnfLigar() {
   document.querySelectorAll("[data-pnf]").forEach(function (el) { el.onchange = function () { pnfGuardar(el); }; });

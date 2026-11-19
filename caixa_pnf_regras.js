@@ -51,7 +51,15 @@ var CAIXA_PNF = (function () {
     if (MEIOS.indexOf(meio) < 0) throw new Error("Escolha como pagou.");
     return {pago_c: valor_c, resto_c: d.valor_c - valor_c};
   }
+  /* Numerário a depositar no banco, total do dia (dono, 19/11/2026): só depois de fechado o turno 2.
+     O numerário de cada turno já inclui as saídas de caixa e a saída TABACO, que já não estão na caixa: tiram-se. */
+  function deposito(t1, t2, saidas) {
+    if (!t2 || t2.num_c === null || t2.num_c === undefined) return null;
+    var num = (t1 && t1.num_c || 0) + (t2.num_c || 0), sai = (saidas || []).reduce(function (s, x) { return s + (x.valor_c || 0); }, 0);
+    var tab = (t1 && t1.tab_c || 0) + (t2.tab_c || 0);
+    return {num_c: num, saidas_c: sai, tab_c: tab, valor_c: num - sai - tab};
+  }
   var CLIENTES = ["Penachama", "Lateral", "Obragenial", "Granitec"];
-  return {anterior: anterior, recebido: recebido, diferenca: diferenca, cofre: cofre, alerta: alerta, porPagar: porPagar, pagar: pagar, CLIENTES: CLIENTES, MEIOS: MEIOS, RECEBIDO: RECEBIDO};
+  return {deposito: deposito, anterior: anterior, recebido: recebido, diferenca: diferenca, cofre: cofre, alerta: alerta, porPagar: porPagar, pagar: pagar, CLIENTES: CLIENTES, MEIOS: MEIOS, RECEBIDO: RECEBIDO};
 })();
 if (typeof module !== "undefined") module.exports = CAIXA_PNF;
