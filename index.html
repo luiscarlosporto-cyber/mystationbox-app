@@ -405,14 +405,15 @@ async function entrar(){
   if(!EU){$("#vApp").hidden=true;$("#vLogin").hidden=false;return}
   var p=await sb.from("profiles").select("user_id,display_name,role,company_id,other_companies").eq("user_id",EU.id).maybeSingle();
   if(p.error||!p.data){$("#lErro").textContent="A conta não tem perfil. Peça ao administrador para a criar.";await sb.auth.signOut();$("#vLogin").hidden=false;return}
-  PERFIL=p.data;ADMIN=PERFIL.role==="admin";
+  PERFIL=p.data;ADMIN=PERFIL.role==="admin";window.GESTOR=null;
+  if(!ADMIN){var gs=await sb.from("msb_gestores").select("estacao").eq("user_id",EU.id).eq("ativo",true).maybeSingle();if(gs.data){window.GESTOR=gs.data.estacao;ADMIN=true}}   // gestor de estação: trabalha como administrador, mas só na sua estação e nas páginas de areas.js (GESTOR_PAGINAS)
   var c=await sb.from("companies").select("id,name,short_name,posto_repsol").order("sort");
-  ESTS=(c.data||[]).filter(function(x){return ADMIN||x.id===PERFIL.company_id||(PERFIL.other_companies||[]).indexOf(x.id)>=0});
+  ESTS=(c.data||[]).filter(function(x){return window.GESTOR?x.id===window.GESTOR:ADMIN||x.id===PERFIL.company_id||(PERFIL.other_companies||[]).indexOf(x.id)>=0});
   var guard=null;try{guard=localStorage.getItem("msb_est")}catch(e){}
   EST=(ESTS.find(function(x){return x.id===guard})||ESTS.find(function(x){return x.id===PERFIL.company_id})||ESTS[0]||{}).id;
   if(ADMIN){var pr=await sb.from("profiles").select("user_id,display_name");(pr.data||[]).forEach(function(x){NOMES[x.user_id]=x.display_name})}
   $("#vLogin").hidden=true;$("#vApp").hidden=false;
-  $("#hQuem").textContent=(PERFIL.display_name||EU.email)+(ADMIN?" · admin":"");
+  $("#hQuem").textContent=(PERFIL.display_name||EU.email)+(window.GESTOR?" · gestor":ADMIN?" · admin":"");
   $("#avRO").hidden=ADMIN;
   var sel=$("#selEst");sel.innerHTML=ESTS.map(function(x){return "<option value='"+x.id+"'>"+esc(x.short_name||x.name)+"</option>"}).join("");sel.value=EST;sel.hidden=ESTS.length<2;
   var cf=await sb.from("msb_config").select("estacao,pos_mb,pos_opt");POSES={};POSES_OPT={};(cf.data||[]).forEach(function(x){POSES[x.estacao]=x.pos_mb;POSES_OPT[x.estacao]=x.pos_opt||""});

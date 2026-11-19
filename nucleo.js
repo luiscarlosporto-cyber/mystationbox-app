@@ -46,7 +46,7 @@ function desenharNucleo() {
   var falhas = NUC.conf.filter(function (c) { return Number(c.fonte_c) !== Number(c.nucleo_c); }).length;
   var h = "<div class='bar'><button class='btn' id='nucAnt' aria-label='Mês anterior'>‹</button><input type='month' id='nucMes' min='" + NUC_INICIO + "' value='" + esc(NUC.mes) + "'><button class='btn' id='nucSeg' aria-label='Mês seguinte'>›</button>" +
     "<button class='btn p' id='nucGerar'" + (fechado ? " disabled title='Mês fechado'" : "") + ">Atualizar a partir das fontes</button>" +
-    (NUC.movs.length ? "<button class='btn' id='nucFechar'>" + (fechado ? "Reabrir o mês" : "Fechar o mês") + "</button>" : "") + "<span id='nucSt' class='st'></span></div>";
+    (NUC.movs.length && !window.GESTOR ? "<button class='btn' id='nucFechar'>" + (fechado ? "Reabrir o mês" : "Fechar o mês") + "</button>" : "") + "<span id='nucSt' class='st'></span></div>";
   h += "<div class='card' style='padding:14px'><b>" + esc(nucMesPt(NUC.mes)) + "</b> · " + (fechado ? "🔒 fechado por " + esc(NUC.per.alterado_por || "") + " em " + dmy(NUC.per.alterado_em) : "aberto") +
     (NUC.per && NUC.per.gerado_em ? " · atualizado em " + dmy(NUC.per.gerado_em) + " " + NUC.per.gerado_em.slice(11, 16) : "") +
     "<p class='mut' style='margin:6px 0 0;font-size:13px'>O livro junta numa só lista os turnos, os créditos da Repsol, o banco e as despesas confirmadas. Atualize depois de carregar documentos novos. Um mês fechado já não muda.</p></div>";

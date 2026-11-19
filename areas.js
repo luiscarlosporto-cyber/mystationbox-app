@@ -33,15 +33,18 @@ var VISTA_DA = {avi: "avi", ini: "ini", reg: "reg", sai: "sai", his: "his", ven:
 var PAGINA = "ini";
 /* confirmação: na beta é uma janela da app; na versão atual continua a do navegador */
 function msbConfirma(t, acao) { return window.MSB_NAV ? MSB_NAV.confirma(t, acao) : Promise.resolve(confirm(t)); }
-function areasVisiveis() { return AREAS.filter(function (a) { return ADMIN || !a.adm; }); }
-function paginasDe(a) { return a.p.filter(function (x) { return ADMIN || !(x[2] && x[2].adm); }); }
+/* Gestor de estação (dono, 19/11/2026): administrador externo de uma estação, só com estas páginas (msb_gestores; as regras de acesso estão na base de dados) */
+var GESTOR_PAGINAS = {reg: 1, sai: 1, cdv: 1, his: 1, ven: 1, va: 1, maq: 1, rep: 1, tms: 1, liv: 1};   // Livro de movimentos: sim do dono, 19/11/2026 (sem fechar o mês)
+function paraGestor(x) { return !window.GESTOR || GESTOR_PAGINAS[x[0]]; }
+function areasVisiveis() { return AREAS.filter(function (a) { return (ADMIN || !a.adm) && a.p.some(paraGestor); }); }
+function paginasDe(a) { return a.p.filter(function (x) { return (ADMIN || !(x[2] && x[2].adm)) && paraGestor(x); }); }
 /* primeira página de quem entra: o funcionário só vê Stock e Horário (dono, 10/11/2026) */
-function inicio() { return ADMIN ? "ini" : "contar"; }
+function inicio() { return window.GESTOR ? "reg" : ADMIN ? "ini" : "contar"; }
 function areaDe(pg) { return AREAS.find(function (a) { return a.p.some(function (x) { return x[0] === pg; }); }); }
 
 function montarMenu() {
   if (!$("#equipa").parentElement.matches("#v-ges")) $("#v-ges").appendChild($("#equipa"));
-  AREAS_TEL = ADMIN ? ["ini", "cx", "dcs", "cpr"] : ["stk", "eqp"];
+  AREAS_TEL = window.GESTOR ? ["cx", "res", "cnf"] : ADMIN ? ["ini", "cx", "dcs", "cpr"] : ["stk", "eqp"];
   if (!ADMIN) AREAS.find(function (x) { return x.id === "eqp"; }).n = "👥 Horário";   // o funcionário só tem o Horário nesta área
   if (window.MSB_NAV) { MSB_NAV.montar(); ir(inicio()); if (ADMIN && window.tmsEmail) setTimeout(tmsEmail, 1500); if (window.pdocLink) pdocLink(); return; }   // navegação da beta; #doc=… abre um documento
   var vis = areasVisiveis(), mais = vis.some(function (a) { return AREAS_TEL.indexOf(a.id) < 0; });
@@ -60,7 +63,7 @@ function marcar(pg) {
 }
 /* ir para uma página (também chamado pelo módulo de stock, ex.: depois de criar uma encomenda) */
 function ir(pg) {
-  var a = areaDe(pg), ent = a && a.p.find(function (x) { return x[0] === pg; }); if (!a || (a.adm && !ADMIN) || (ent[2] && ent[2].adm && !ADMIN)) { pg = inicio(); a = areaDe(pg); }
+  var a = areaDe(pg), ent = a && a.p.find(function (x) { return x[0] === pg; }); if (!a || (a.adm && !ADMIN) || (ent[2] && ent[2].adm && !ADMIN) || !paraGestor([pg])) { pg = inicio(); a = areaDe(pg); }
   if (NEXP[pg]) { vistaBase("nex"); marcar(pg); nexMostrar(pg); }
   else {
     var v = VISTA_DA[pg] || pg;
