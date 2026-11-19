@@ -442,9 +442,13 @@ async function irDia(d){DIA=d;$("#dDia").value=d;$("#st").textContent="";desenha
 /* nomes dos funcionários da estação aberta, para escolher no registo: contas da equipa desta estação (primeiro nome, como nos turnos) + nomes usados nos turnos dos últimos 120 dias */
 var FUNC_EST={};
 async function carregarFuncionarios(){var e=EST;if(FUNC_EST[e])return mostrarFuncionarios();
-  try{var n={},desde=addDia(iso(new Date()),-120);
+  try{var n={},desde=addDia(iso(new Date()),-120),hj=iso(new Date());
+    /* a equipa da estação, como está em Equipa (nome curto do horário), sem quem já saiu (dono, 19/11/2026) */
+    var eq=await sb.from("msb_colab_lojas").select("ate,msb_colaboradores!msb_colab_lojas_colaborador_id_fkey(curto,ativo)").eq("estacao",e);
+    (eq.data||[]).forEach(function(x){var c=x.msb_colaboradores;if(c&&c.ativo&&c.curto&&(!x.ate||x.ate>=hj))n[c.curto]=1});
+    if(!Object.keys(n).length){   // sem equipa definida: contas da estação e nomes usados nos turnos, como antes
     var pr=await sb.from("profiles").select("display_name,company_id,other_companies");(pr.data||[]).forEach(function(x){var nm=(x.display_name||"").trim().split(/\s+/)[0];if(nm&&!/^administrador$/i.test(nm)&&(x.company_id===e||(x.other_companies||[]).indexOf(e)>=0))n[nm]=1});
-    var tr=await sb.from("msb_turnos").select("func").eq("estacao",e).gte("dia",desde);(tr.data||[]).forEach(function(x){var f=(x.func||"").trim();if(f)n[f]=1});
+    var tr=await sb.from("msb_turnos").select("func").eq("estacao",e).gte("dia",desde);(tr.data||[]).forEach(function(x){var f=(x.func||"").trim();if(f)n[f]=1});}
     FUNC_EST[e]=Object.keys(n).sort(function(a,b){return a.localeCompare(b,"pt")});}catch(err){FUNC_EST[e]=[]}
   if(e===EST)mostrarFuncionarios()}
 function mostrarFuncionarios(){var l=$("#lFunc");if(!l){l=document.createElement("datalist");l.id="lFunc";document.body.appendChild(l)}l.innerHTML=(FUNC_EST[EST]||[]).map(function(x){return "<option value='"+esc(x)+"'>"}).join("")}
