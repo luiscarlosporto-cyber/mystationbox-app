@@ -95,7 +95,7 @@ async function codigosNovos(recarregar) {
     var pvpF = c.pvp_fatura_c > 0 ? " · PVP na fatura: <b>" + codEur(c.pvp_fatura_c) + "</b>" + (codMargem(c.compra_m, c.pvp_fatura_c) != null ? " (margem " + String(codMargem(c.compra_m, c.pvp_fatura_c)).replace(".", ",") + " %)" : "") : "";
     var opcoes = op.map(function (p, i) {
       var pv = vend[p.repsol_code], mg = codMargem(c.compra_m, pv);
-      var cb = !CAT[c.estacao] ? "" : !p.cbos ? "<div>❌ <b>Não existe no catálogo do CBOS</b></div>" : !p.cbos.pvp_c ? "<div>❌ <b>Sem preço no CBOS</b></div>"
+      var cb = !CAT[c.estacao] ? "" : !p.cbos ? "<div>❌ <b>Não está no catálogo do CBOS carregado</b></div>" : !p.cbos.pvp_c ? "<div>❌ <b>Sem preço no CBOS</b></div>"
         : "<div>PVP no CBOS: <b>" + codEur(p.cbos.pvp_c) + "</b>" + (c.pvp_fatura_c > 0 ? (p.cbos.pvp_c === c.pvp_fatura_c ? " · ✅ igual ao PVP da fatura" : " · ⚠️ <b>diferente do PVP da fatura</b>") : "") +
           (codMargem(c.compra_m, p.cbos.pvp_c) != null ? " · margem " + String(codMargem(c.compra_m, p.cbos.pvp_c)).replace(".", ",") + " %" : "") + (p.soCbos ? " <span class='mut'>· só no CBOS (ainda não está no Stock)</span>" : "") + "</div>";
       var venda = cb + (pv ? "<div class='mut'>Vende-se a <b>" + codEur(pv) + "</b>" + (mg != null ? " · margem " + String(mg).replace(".", ",") + " %" : "") +
@@ -106,7 +106,7 @@ async function codigosNovos(recarregar) {
     return "<div class='card' style='padding:12px 14px' data-codcard='" + c.id + "'>" +
       "<b>" + esc(c.codigo) + " · " + esc(c.descricao || "") + "</b><div class='mut'>" + esc(aviLoja(c.estacao)) + " · na fatura desde " + aviDataHora(c.criado) + "</div>" +
       "<div style='margin-top:4px'>🧾 " + compra + pvpF + "</div>" +
-      (opcoes ? "<div style='margin-top:6px'>" + opcoes + "</div>" : CAT[c.estacao] ? "<div style='margin-top:6px'>❌ <b>Não existe no catálogo do CBOS</b> desta estação. Tem de ser criado no CBOS; até lá a fatura espera.</div>"
+      (opcoes ? "<div style='margin-top:6px'>" + opcoes + "</div>" : CAT[c.estacao] ? "<div style='margin-top:6px'>❌ <b>Não está no catálogo do CBOS carregado</b> desta estação. Se é tabaco, tem de ser criado no CBOS; até lá a fatura espera. (O catálogo só traz as famílias exportadas.)</div>"
         : "<div class='mut' style='margin-top:6px'>ℹ️ Nenhum artigo parecido no catálogo. Se ainda não existe no CBOS, deixa ficar: a fatura espera.</div>") +
       "<label style='display:flex;gap:8px;align-items:center;margin:4px 0'><input type='radio' name='cod" + c.id + "' value='outro'><span>Outro código</span></label>" +
       "<div style='display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))'>" +

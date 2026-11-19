@@ -79,14 +79,14 @@ function fadCodigos(v) {
   if (!v) return "";
   if (v.erro) return "<p>⚠️ Não consegui verificar os códigos novos: " + esc(v.erro) + "</p>";
   if (!v.linhas.length) return "<p>✅ Não há códigos novos de fornecedores por confirmar.</p>";
-  var EST = {existe: "✅ já existe no CBOS", pvp_diferente: "⚠️ PVP no CBOS diferente do da fatura", sem_preco: "❌ sem preço no CBOS", nao_existe: "❌ não existe no CBOS (tem de ser criado)", sem_catalogo: "ℹ️ sem catálogo desta estação"};
+  var EST = {existe: "✅ já existe no CBOS", pvp_diferente: "⚠️ PVP no CBOS diferente do da fatura", sem_preco: "❌ sem preço no CBOS", nao_existe: "❌ não está no catálogo do CBOS carregado", sem_catalogo: "ℹ️ sem catálogo desta estação"};
   var ordem = {nao_existe: 0, sem_preco: 1, pvp_diferente: 2, existe: 3, sem_catalogo: 4};
   var L = v.linhas.slice().sort(function (a, b) { return ordem[a.estado] - ordem[b.estado]; });
   return "<h3 style='margin:12px 0 4px'>🏷️ Códigos novos por confirmar (" + L.length + ")</h3><div class='sc'><table><thead><tr><th class='l'>Estação</th><th class='l'>Na fatura</th><th>PVP fatura</th><th class='l'>No CBOS</th><th class='l'>Verificação</th></tr></thead><tbody>" +
     L.map(function (x) { var c = x.c;
       return "<tr><td class='l'>" + esc(nomeEstFad(c.estacao)) + "</td><td class='l'>" + esc(c.codigo + " · " + (c.descricao || "")) + "</td><td class='n'>" + (c.pvp_fatura_c > 0 ? fmt(c.pvp_fatura_c) : "—") + "</td><td class='l'>" +
         (x.artigo ? esc(x.artigo.repsol_code + " · " + x.artigo.name) + (x.pvp_c ? " · " + fmt(x.pvp_c) + " €" : "") : "—") + "</td><td class='l'>" + EST[x.estado] + "</td></tr>"; }).join("") +
-    "</tbody></table></div><p class='mut' style='margin:4px 0'>Confirme cada código em 🏠 Painel → OCTAN AI. Os que não existem no CBOS: crie-os no CBOS e carregue um catálogo novo.</p>";
+    "</tbody></table></div><p class='mut' style='margin:4px 0'>Confirme cada código em 🏠 Painel → OCTAN AI. Os que não estão no catálogo: crie-os no CBOS e carregue um catálogo novo. Atenção: o catálogo só traz as famílias que exportou no CBOS (este traz só tabaco); um artigo de outra família (ex.: bolachas) aparece sempre como «não está no catálogo».</p>";
 }
 
 /* ---------- ler e conferir ---------- */
