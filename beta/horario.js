@@ -73,11 +73,12 @@
       var E = r.erros.filter(function (e) { return g[1].test(e.msg); }).map(function (e) { return e.msg; }), A = r.avisos.filter(function (e) { return g[1].test(e.msg); }).map(function (e) { return e.msg; });
       h += linha(E.length ? "❌" : A.length ? "⚠️" : "✅", g[0], E.concat(A));
     });
-    var M = r.metas.filter(function (m) { return m.extra; }).map(function (m) { return m.nome + " " + m.turnos + " de " + m.meta; });
-    h += linha(M.length ? "⚠️" : "✅", "Meta de turnos (dias úteis; férias, baixa e quem entra ou sai a meio baixam a meta)", M);
+    var M = r.metas.filter(function (m) { return m.extra; }).map(function (m) { return m.nome + " " + (m.extra > 0 ? "+" : "") + m.extra + " h"; });
+    h += linha(M.length ? "⚠️" : "✅", "Horas do mês: 40 h por semana, 8 h por turno; cada feriado em dia útil desconta 8 h", M);
     h += "</table></div><p class='rod'>❌ crítico: a app pergunta antes de gravar ou aprovar, mas pode fazê-lo na mesma. ⚠️ só aviso.</p>";
-    if (ADMIN) h += "<details><summary>Contas da meta</summary><div class='sc' style='margin-top:8px'><table><thead><tr><th class='l'>Colaborador</th><th>Turnos</th><th>Meta</th><th>Ausências (dias)</th><th>Diferença</th></tr></thead><tbody>" +
-      r.metas.map(function (m) { return "<tr><td class='l'>" + esc(m.nome) + "</td><td class='n'>" + m.turnos + "</td><td class='n'>" + m.meta + "</td><td class='n'>" + m.ausencias + "</td><td class='n'>" + (m.extra > 0 ? "+" : "") + m.extra + " h</td></tr>"; }).join("") + "</tbody></table></div></details>";
+    if (ADMIN) h += "<div class='sc' style='margin-top:8px'><table><thead><tr><th class='l'>Horas</th><th>Previstas no mês</th><th>Ausências</th><th>A realizar</th><th>Extra</th></tr></thead><tbody>" +
+      r.metas.map(function (m) { return "<tr><td class='l'>" + esc(m.nome) + "</td><td class='n'>" + r.base * 8 + " h</td><td class='n'>" + (m.ausencias ? "−" + m.ausencias * 8 + " h" : "—") + "</td><td class='n'>" + m.turnos * 8 + " h</td><td class='n'>" + (m.extra ? (m.extra > 0 ? "+" : "") + m.extra + " h" : "—") + "</td></tr>"; }).join("") +
+      "</tbody></table></div><p class='rod'>Previstas: dias úteis do mês sem feriados × 8 h (" + r.base + " dias). Ausências: férias, baixa, formação, aniversário e dias fora da equipa. A realizar: turnos marcados × 8 h. Extra = a realizar − (previstas − ausências).</p>";
     return h + "</div>";
   }
   function pintar() {
