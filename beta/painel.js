@@ -51,9 +51,12 @@
       guarda("mês anterior", pedidosMes(ant)),
       guarda("erros da app", errosPorVer(7).then(function (x) { return {data: x}; })),
       guarda("cópias", sb.from("msb_copias").select("feito").order("feito", {ascending: false}).limit(1)),
-      guarda("dívidas", (window.dividasEmAtraso ? dividasEmAtraso() : Promise.resolve([])).then(function (x) { return {data: x}; }))
+      guarda("dívidas", (window.dividasEmAtraso ? dividasEmAtraso() : Promise.resolve([])).then(function (x) { return {data: x}; })),
+      // Sinal de vida do OCTAN AI (20/11/2026). Sem a tabela ainda criada fica null, sem aviso de leitura falhada.
+      ler2(sb.from("msb_octan_sinal").select("estacao,sinal_em,cbos_ok,cbos_desde,cbos_detalhe")).catch(function () { return null; }),
+      ler2(sb.from("msb_avisos").select("criado").eq("tipo", "compras").order("criado", {ascending: false}).limit(1)).catch(function () { return null; })
     ]);
-    return {cur: (R[11] || []).concat(R[12] || []), hoje: hoje, mes: mes, ant: ant, tur: R[0], fol: R[1], sai: R[2], enc: R[3], pre: R[4], tms: R[5], vm: R[6], va: R[7], ped: R[8], doc: R[9], avi: R[10], err: R[13], cop: R[14], div: R[15], falhas: f};
+    return {cur: (R[11] || []).concat(R[12] || []), hoje: hoje, mes: mes, ant: ant, tur: R[0], fol: R[1], sai: R[2], enc: R[3], pre: R[4], tms: R[5], vm: R[6], va: R[7], ped: R[8], doc: R[9], avi: R[10], err: R[13], cop: R[14], div: R[15], sin: R[16], cmp: R[17], falhas: f};
   }
 
   function pedidosMes(m) { return sb.from("msb_pedidos").select("id,estacao,estado,de,ate,linhas,dias,familias").eq("pasta", "PAINEL").gte("de", m + "-01").lt("de", addMes(m, 1) + "-01").order("id", {ascending: false}).limit(6); }
@@ -108,7 +111,11 @@
     (X.div || []).forEach(function (d) { L.push({o: 1, t: d.n === 1 ? "Prestação em atraso: " + d.devedor : d.n + " prestações em atraso: " + d.devedor, s: loja(d.estacao) + " · " + fmt(d.valor_c) + " € · Acordos de dívida", e: d.estacao, p: "div", b: "Ver"}); });
     var cop = X.cop && PN.copiaAtrasada(X.cop.length ? X.cop[0].feito : null, Date.now());   // X.cop null = não se conseguiu ler: sem aviso falso
     if (cop) L.push({o: 0, t: cop.horas ? "Cópia de segurança com " + cop.horas + " horas" : "Nenhuma cópia de segurança registada", s: "Confirma se o PC do escritório esteve ligado esta noite", p: "avi", b: "Ver"});
-    var par = X.avi && aviParado(X.avi); if (par) L.push({o: 0, t: "O OCTAN AI não corre desde " + aviDataHora(par.criado), s: "Confirma se o PC está ligado", p: "avi", b: "Ver"});
+    var oc = X.sin ? PN.octan(X.sin, X.cmp && X.cmp[0] && X.cmp[0].criado, Date.now()) : null, par = !X.sin && X.avi && aviParado(X.avi);
+    if (oc && oc.tipo === "sinal") L.push({o: 0, t: "OCTAN AI sem sinal desde " + aviDataHora(oc.desde), s: "Confirma se o PC do escritório está ligado (ENSE às 00:30, compras à 01:00)", p: "avi", b: "Ver"});
+    else if (oc && oc.tipo === "cbos") L.push({o: 1, t: "Sessão do CBOS em baixo desde " + aviDataHora(oc.desde), s: "No PC, entra outra vez com o atalho compras ENTRAR_CBOS", p: "avi", b: "Ver"});
+    else if (oc && oc.tipo === "compras") L.push({o: 1, t: "As compras do OCTAN AI não correm desde " + aviDataHora(oc.desde), s: "Confirma se o PC está ligado à 01:00", p: "avi", b: "Ver"});
+    else if (par) L.push({o: 0, t: "O OCTAN AI não corre desde " + aviDataHora(par.criado), s: "Confirma se o PC está ligado", p: "avi", b: "Ver"});   // antes da tabela do sinal
     (X.pre || []).filter(function (x) { return x.estado === "lido" && (!x.aprovado_em || x.ense_erro); }).forEach(function (x) {
       L.push({o: 1, t: x.ense_erro ? "Preços ENSE por gravar" : "Preços ENSE por aprovar", s: loja(x.estacao) + " · em vigor a " + dmy(x.dia), e: x.estacao, p: "pre", b: "Ver"});
     });

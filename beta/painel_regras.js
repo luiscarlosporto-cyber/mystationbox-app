@@ -81,6 +81,21 @@
     if (agora - desde <= COPIA_HORAS * 3600000) return null;
     return {horas: feito ? horas : null};
   }
-  var PN = {copiaAtrasada: copiaAtrasada, ense: ense, avisoAprovado: avisoAprovado, totaisFam: totaisFam, serieFam: serieFam, diasMes: diasMes, ultimoDia: ultimoDia, serie: serie, aLer: aLer, pedir: pedir, escala: escala, ritmo: ritmo, formas: formas};
+  /* Sinal de vida do OCTAN AI (dono, 20/11/2026): uma só linha, discreta, e só quando há problema. Por ordem de gravidade:
+   * 1) sem sinal do PC há mais de 24 h (sinal = contacto com a msb-ense, anotado de hora a hora);
+   * 2) a sessão do CBOS caiu (o OCTAN AI disse que não conseguiu entrar);
+   * 3) a corrida das compras (01:00) não deixou aviso há mais de 26 h (a regra que já existia).
+   * sinais null ou sem nenhum sinal anotado = ainda não se sabe (tabela por criar ou função por atualizar): sem aviso falso. */
+  var OCTAN_SINAL_HORAS = 24, OCTAN_CORRIDA_HORAS = 26;
+  function octan(sinais, compras, agora) {
+    var t = (sinais || []).map(function (x) { return x.sinal_em ? Date.parse(x.sinal_em) : 0; }), ult = t.length ? Math.max.apply(null, t) : 0;
+    if (!ult) return null;
+    if (agora - ult > OCTAN_SINAL_HORAS * 3600000) return {tipo: "sinal", desde: new Date(ult).toISOString()};
+    var c = (sinais || []).filter(function (x) { return x.cbos_ok === false; }).sort(function (a, b) { return a.cbos_desde < b.cbos_desde ? -1 : 1; })[0];
+    if (c) return {tipo: "cbos", desde: c.cbos_desde, detalhe: c.cbos_detalhe || ""};
+    if (compras && agora - Date.parse(compras) > OCTAN_CORRIDA_HORAS * 3600000) return {tipo: "compras", desde: compras};
+    return null;
+  }
+  var PN = {octan: octan, copiaAtrasada: copiaAtrasada, ense: ense, avisoAprovado: avisoAprovado, totaisFam: totaisFam, serieFam: serieFam, diasMes: diasMes, ultimoDia: ultimoDia, serie: serie, aLer: aLer, pedir: pedir, escala: escala, ritmo: ritmo, formas: formas};
   if (typeof module !== "undefined" && module.exports) module.exports = PN; else raiz.PN = PN;
 })(this);

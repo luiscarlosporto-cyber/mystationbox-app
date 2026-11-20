@@ -31,8 +31,18 @@ async function lerMargens() {
   var r = await sb.from("msb_margens").select("chave,valor,unidade").eq("estacao", EST); if (r.error) throw r.error;
   var m = {}; (r.data || []).forEach(function (x) { m[x.chave] = Number(x.valor); }); return m;
 }
-async function lerCustos() {
+async function lerCustos() {   // custos fixos sem as taxas de Loja e Lavagem, que valem por mês (msb_custos_mes, 20/11/2026)
+  return CUSTOSMES.semTaxas(await lerCustosTodos());
+}
+async function lerCustosTodos() {
   var r = await sb.from("msb_custos").select("id,nome,valor_c").eq("estacao", EST).order("nome"); if (r.error) throw r.error; return r.data || [];
+}
+/* Taxas de Loja e Lavagem de todos os meses da estação. Sem a tabela nova (antes da migração), valem as linhas antigas de msb_custos. */
+async function lerTaxasFixas() {
+  var r = await sb.from("msb_custos_mes").select("nome,desde,valor_c,atualizado_em").eq("estacao", EST).order("desde");
+  if (!r.error) return r.data || [];
+  if (!/msb_custos_mes|does not exist|schema cache|42P01|PGRST205/i.test((r.error.message || "") + " " + (r.error.code || ""))) throw r.error;
+  return CUSTOSMES.deCustosAntigos(await lerCustosTodos());
 }
 async function familiasConhecidas(M) {
   var r = await sb.from("msb_vendas_mes").select("dados").eq("estacao", EST).order("mes", {ascending: false}).limit(3);
@@ -48,7 +58,7 @@ function lerNum(s) { s = String(s || "").trim().replace(/\s/g, "").replace(",", 
 async function carregarMargens() {
   var box = $("#mrgCorpo"); box.innerHTML = "<div class='mut'>A carregar…</div>";
   try {
-    var M = await lerMargens(), C = await lerCustos(), F = await familiasConhecidas(M);
+    var M = await lerMargens(), C = await lerCustos(), T = MRG_TAXAS = await lerTaxasFixas(), F = await familiasConhecidas(M);
     var h = "<div class='card' style='padding:14px;display:grid;gap:10px'><h2 style='margin:0'>⛽ Combustível · margem por litro (€/L)</h2>" +
       "<p class='mut' style='margin:0;font-size:13px'>Valores iniciais = política comercial 2026 sem bónus (ex.: 45 €/m³ = 0,045 €/L). Ajuste aos valores reais do seu contrato. Os bónus marcam-se no quadro seguinte (não os some aqui).</p>" +
       "<div class='sc'><table><thead><tr><th class='l'>Categoria</th><th>Simples (gasóleo, gasolina)</th><th>Premium (Diesel e+10, Efitec)</th></tr></thead><tbody>" +
@@ -70,8 +80,10 @@ async function carregarMargens() {
       linhas.map(function (l) { var k = chaveLoja(l[0], l[1]); return "<tr><td class='l'>" + esc(l[0]) + (l[1] ? " · <span class='mut'>" + esc(l[1]) + "</span>" : "") + "</td><td class='n'><input class='mg' data-k='" + esc(k) + "' data-u='pct' inputmode='decimal' value='" + num4(M[k]) + "' style='width:80px;text-align:right'> %</td></tr>"; }).join("") +
       "</tbody></table></div></div>";
     h += "<div class='card' style='padding:14px;display:grid;gap:10px'><h2 style='margin:0'>🧾 Taxas de exploração · fatura mensal da Repsol</h2>" +
-      "<p class='mut' style='margin:0;font-size:13px'>Valores sem IVA. Loja e Lavagem são fixas e contam todos os meses. A My Repsol varia: escreva o valor de cada fatura. Nesse mês, o Lucro usa este valor em vez da estimativa em €/m³ do quadro de bónus.</p>" +
-      "<b>Fixas (€ por mês)</b><div id='taxasLista' style='display:grid;gap:6px'>" + TAXAS_FIXAS.map(function (n) { var c = C.find(function (x) { return x.nome === n; }); return linhaCusto(n, c ? c.valor_c / 100 : null, true); }).join("") + "</div>" +
+      "<p class='mut' style='margin:0;font-size:13px'>Valores sem IVA. Loja e Lavagem são fixas: cada valor vale a partir do mês escolhido, e os meses anteriores ficam como estavam. A My Repsol varia: escreva o valor de cada fatura. Nesse mês, o Lucro usa este valor em vez da estimativa em €/m³ do quadro de bónus.</p>" +
+      "<b>Fixas (€ por mês)</b><div class='ff'><label>A partir de<input type='month' id='txDesde' value='" + MES + "'></label></div>" +
+      "<div id='taxasLista' style='display:grid;gap:6px'>" + TAXAS_FIXAS.map(function (n) { var c = CUSTOSMES.emVigor(T, n, MES); return linhaCusto(n, c ? c.valor_c / 100 : null, true); }).join("") + "</div>" +
+      "<div id='txHist' class='mut' style='font-size:13px'></div>" +
       "<b>My Repsol (variável)</b><div class='ff'><label>Mês<input type='month' id='txMes' value='" + addMes(MES, -1) + "'></label><label>Valor € sem IVA<input id='txMr' inputmode='decimal' autocomplete='off'></label><label>Nº da fatura<input id='txFt' autocomplete='off'></label></div><div id='txSaphety' style='display:grid;gap:8px'></div></div>";
     h += "<div class='card' style='padding:14px;display:grid;gap:10px'><h2 style='margin:0'>🧾 Custos fixos por mês</h2>" +
       "<p class='mut' style='margin:0;font-size:13px'>Valor por mês; valores aproximados chegam. Os que deixar em branco não contam. Para outros (manutenção, combustível próprio, limpeza…), use «+ Acrescentar custo».</p>" +
@@ -80,13 +92,24 @@ async function carregarMargens() {
       "<div class='bar'><button class='btn' id='custoMais'>+ Acrescentar custo</button></div></div>";
     h += "<div class='bar'><button class='btn p' id='mrgGravar'>Gravar margens e custos</button><span class='st' id='mrgSt'></span></div>";
     box.innerHTML = h; if (window.MSB_NAV) MSB_NAV.seccoes(box);
-    $("#txMes").onchange = function () { lerTaxaMes().catch(function (e) { $("#mrgSt").textContent = "⚠ " + falhou(e); }); }; await lerTaxaMes(); pintarTaxasSaphety(C);
+    $("#txMes").onchange = function () { lerTaxaMes().catch(function (e) { $("#mrgSt").textContent = "⚠ " + falhou(e); }); }; await lerTaxaMes(); pintarTaxasSaphety(T);
+    $("#txDesde").onchange = pintarTaxasDesde; pintarTaxasDesde();
     $("#custoMais").onclick = function () { $("#custosLista").insertAdjacentHTML("beforeend", linhaCusto("", null)); var u = $$("#custosLista .cn"); u[u.length - 1].focus(); };
     $("#mrgGravar").onclick = gravarMargens;
   } catch (e) { box.innerHTML = "<div class='bad'>" + esc(falhouLucro(e)) + "</div>"; }
 }
 /* custos fixos sempre à vista (02/11/2026, pedido do utilizador); os que ficarem sem valor não contam. Outros acrescentam-se com "+ Acrescentar custo". */
-var TAXAS_FIXAS = ["Taxa de exploração · Loja", "Taxa de exploração · Lavagem"];
+var TAXAS_FIXAS = CUSTOSMES.TAXAS, MRG_TAXAS = [];
+/* Valores em vigor no mês «A partir de» e o histórico de cada taxa (20/11/2026) */
+function pintarTaxasDesde() {
+  var m = $("#txDesde").value || MES, T = MRG_TAXAS;
+  $$("#taxasLista .custo").forEach(function (d, i) { var c = CUSTOSMES.emVigor(T, TAXAS_FIXAS[i], m); d.querySelector(".cv").value = c ? String(c.valor_c / 100).replace(".", ",") : ""; });
+  var mesTxt = function (x) { return x === "0000-01" ? "sempre" : x.slice(5) + "/" + x.slice(0, 4); };
+  $("#txHist").innerHTML = TAXAS_FIXAS.map(function (n) {
+    var H = CUSTOSMES.historico(T, n); if (!H.length) return "";
+    return esc(n.replace("Taxa de exploração · ", "")) + ": " + H.map(function (h) { return (h.valor_c ? fmt(h.valor_c) + " €" : "sem taxa") + " desde " + mesTxt(h.desde); }).join(" → ");
+  }).filter(Boolean).join("<br>");
+}
 async function lerTaxaMes() {   // preenche o valor My Repsol do mês escolhido
   var m = $("#txMes").value; $("#txMr").value = ""; $("#txFt").value = ""; if (!m) return;
   var r = await sb.from("msb_taxas_mes").select("myrepsol_c,fatura").eq("estacao", EST).eq("mes", m).maybeSingle();
@@ -94,7 +117,7 @@ async function lerTaxaMes() {   // preenche o valor My Repsol do mês escolhido
   if (r.data && $("#txMes").value === m) { $("#txMr").value = String(r.data.myrepsol_c / 100).replace(".", ","); $("#txFt").value = r.data.fatura || ""; }
 }
 /* Faturas de taxas recolhidas da Saphety pelo OCTAN AI: leem-se aqui e só contam depois de confirmadas. A série Z3FS também traz água: fica marcada como «outro». */
-async function pintarTaxasSaphety(C) {
+async function pintarTaxasSaphety(T) {
   var box = $("#txSaphety"), est = EST; if (!box || !ADMIN) return;
   try {
     var r = await lerTudo(function () { return sb.from("msb_saphety_docs").select("numero,data,original").eq("estacao", est).eq("estado", "recolhido").like("numero", "Z3FS%").order("data"); }, ["numero"]); if (r.error) throw r.error;
@@ -107,12 +130,13 @@ async function pintarTaxasSaphety(C) {
       L.push({d: d, t: t, erros: t.verificacoes.filter(function (v) { return v.nivel === "erro"; }).map(function (v) { return v.texto; }).concat(e && e.posto_repsol && t.posto !== e.posto_repsol ? ["o posto da fatura (" + t.posto + ") não é o desta estação"] : [])});
     }
     if (est !== EST || !$("#txSaphety")) return;
-    var fixo = function (n) { var c = C.find(function (x) { return x.nome === n; }); return c ? c.valor_c : 0; };
-    var dif = function (v, n) { return v !== fixo(n) ? " <span class='bad'>⚠ o quadro tem " + fmt(fixo(n)) + " €</span>" : ""; };
+    var mesDe = function (t) { return addMes(t.data.slice(0, 7), -1); };   // compara com a taxa em vigor no mês da fatura (o anterior ao da data, como ao confirmar)
+    var fixo = function (n, t) { var c = CUSTOSMES.emVigor(T, n, mesDe(t)); return c ? c.valor_c : 0; };
+    var dif = function (v, n, t) { return v !== fixo(n, t) ? " <span class='bad'>⚠ o quadro tem " + fmt(fixo(n, t)) + " € nesse mês</span>" : ""; };
     box.innerHTML = L.length ? "<b>Faturas recolhidas, por confirmar</b>" + L.map(function (x, i) {
       var t = x.t;
       return "<div class='aviso' style='display:grid;gap:6px'><b>" + esc(t.numero) + " · " + dmy(t.data) + "</b>" +
-        "<div style='font-size:14px'>My Repsol " + fmt(t.myrepsol_c) + " € · Combustíveis " + fmt(t.combustiveis_c) + " €<br>Loja " + fmt(t.loja_c) + " €" + dif(t.loja_c, TAXAS_FIXAS[0]) + " · Lavagem " + fmt(t.lavagem_c) + " €" + dif(t.lavagem_c, TAXAS_FIXAS[1]) + "<br>Total sem IVA " + fmt(t.total_c) + " € · IVA " + fmt(t.iva_c) + " € · A pagar com IVA " + fmt(t.pagar_c) + " €</div>" +
+        "<div style='font-size:14px'>My Repsol " + fmt(t.myrepsol_c) + " € · Combustíveis " + fmt(t.combustiveis_c) + " €<br>Loja " + fmt(t.loja_c) + " €" + dif(t.loja_c, TAXAS_FIXAS[0], t) + " · Lavagem " + fmt(t.lavagem_c) + " €" + dif(t.lavagem_c, TAXAS_FIXAS[1], t) + "<br>Total sem IVA " + fmt(t.total_c) + " € · IVA " + fmt(t.iva_c) + " € · A pagar com IVA " + fmt(t.pagar_c) + " €</div>" +
         (x.erros.length ? "<div class='bad'>❌ Não pode ser confirmada: " + esc(x.erros.join("; ")) + "</div>" : "") +
         "<div class='bar'><label style='margin:0'>Mês<input type='month' class='txCm' data-i='" + i + "' value='" + addMes(t.data.slice(0, 7), -1) + "'></label><button class='btn' data-ver='" + i + "'>Ver PDF</button>" + (x.erros.length ? "" : "<button class='btn p' data-cf='" + i + "'>Confirmar</button>") + "</div></div>";
     }).join("") : "";
@@ -123,7 +147,7 @@ async function pintarTaxasSaphety(C) {
       try {
         var a = await sb.from("msb_taxas_mes").upsert({estacao: est, mes: m, myrepsol_c: x.t.myrepsol_c, combustiveis_c: x.t.combustiveis_c, fatura: x.t.numero, dados: x.t, original: x.d.original, atualizado_em: new Date().toISOString(), atualizado_por: EU && EU.id}, {onConflict: "estacao,mes"}); if (a.error) throw a.error;
         var u2 = await sb.from("msb_saphety_docs").update({estado: "confirmado"}).eq("estacao", est).eq("numero", x.d.numero); if (u2.error) throw u2.error;
-        st.className = "st ok"; st.textContent = "✔ Fatura confirmada para " + m + "."; if ($("#txMes").value === m) await lerTaxaMes(); pintarTaxasSaphety(C);
+        st.className = "st ok"; st.textContent = "✔ Fatura confirmada para " + m + "."; if ($("#txMes").value === m) await lerTaxaMes(); pintarTaxasSaphety(T);
       } catch (e2) { b.disabled = false; st.className = "st bad"; st.textContent = "⚠ " + falhou(e2); }
     }; });
   } catch (e3) { if ($("#txSaphety")) box.innerHTML = "<div class='bad'>⚠ Faturas recolhidas: " + esc(falhou(e3)) + "</div>"; }
@@ -135,7 +159,16 @@ async function gravarMargens() {
   try {
     var up = [], del = [], erro = "";
     $$("#mrgCorpo input.mg").forEach(function (i) { var v = lerNum(i.value); if (v === null) del.push(i.dataset.k); else if (isNaN(v) || v < 0 || (i.dataset.u === "pct" && v >= 1000)) erro = "Valor inválido: " + i.value; else up.push({estacao: EST, chave: i.dataset.k, valor: v, unidade: i.dataset.u, atualizado: new Date().toISOString()}); });
-    var custos = []; $$("#custosLista .custo, #taxasLista .custo").forEach(function (d) { var n = d.querySelector(".cn").value.trim(), v = lerNum(d.querySelector(".cv").value); if ((!n || d.classList.contains("base")) && v === null) return; if (!n || v === null || isNaN(v) || v < 0) erro = "Custo incompleto: " + (n || "sem nome"); else custos.push({estacao: EST, nome: n.slice(0, 80), valor_c: Math.round(v * 100)}); });
+    var custos = []; $$("#custosLista .custo").forEach(function (d) { var n = d.querySelector(".cn").value.trim(), v = lerNum(d.querySelector(".cv").value); if ((!n || d.classList.contains("base")) && v === null) return; if (!n || v === null || isNaN(v) || v < 0) erro = "Custo incompleto: " + (n || "sem nome"); else custos.push({estacao: EST, nome: n.slice(0, 80), valor_c: Math.round(v * 100)}); });
+    /* Taxas de Loja e Lavagem: só o que muda, a partir do mês escolhido (msb_custos_mes) */
+    var txDesde = $("#txDesde").value, txVal = {};
+    $$("#taxasLista .custo").forEach(function (d, i) { var v = lerNum(d.querySelector(".cv").value); if (v !== null && (isNaN(v) || v < 0)) erro = "Valor inválido na taxa: " + d.querySelector(".cv").value; else txVal[TAXAS_FIXAS[i]] = v === null ? null : Math.round(v * 100); });
+    if (!txDesde) erro = "Escolha o mês a partir do qual valem as taxas de Loja e Lavagem.";
+    var txMud = erro ? [] : CUSTOSMES.mudancas(MRG_TAXAS, EST, txDesde, txVal);
+    if (txMud.length) {
+      var rp = await sb.from("msb_periodos").select("mes,estado").eq("estacao", EST).eq("estado", "fechado"); if (rp.error) throw rp.error;
+      var fx = CUSTOSMES.mesFechado(txDesde, rp.data); if (fx) erro = "O mês " + fx.slice(5) + "/" + fx.slice(0, 4) + " está fechado: as taxas só podem mudar a partir do mês seguinte.";
+    }
     $$("#mrgCorpo .bn").forEach(function (i) { var v = i.type === "checkbox" ? (i.checked ? Number(i.dataset.v) : null) : (i.value === "" ? null : Number(i.value));
       if (v == null) del.push(i.dataset.k); else up.push({estacao: EST, chave: i.dataset.k, valor: Math.round(v * 1e7) / 1e7, unidade: "eur_litro", atualizado: new Date().toISOString()}); });
     var txM = $("#txMes").value, txV = lerNum($("#txMr").value);
@@ -147,9 +180,11 @@ async function gravarMargens() {
     else if (txM) { var r6 = await sb.from("msb_taxas_mes").delete().eq("estacao", EST).eq("mes", txM); if (r6.error) throw r6.error; }
     if (up.length) { var r1 = await sb.from("msb_margens").upsert(up, {onConflict: "estacao,chave"}); if (r1.error) throw r1.error; }
     if (del.length) { var r2 = await sb.from("msb_margens").delete().eq("estacao", EST).in("chave", del); if (r2.error) throw r2.error; }
-    var r3 = await sb.from("msb_custos").delete().eq("estacao", EST); if (r3.error) throw r3.error;
+    /* As linhas antigas das taxas ficam em msb_custos como estavam (cópia em msb_custos_backup_20261120); só se refazem os outros custos. */
+    var r3 = await sb.from("msb_custos").delete().eq("estacao", EST).not("nome", "in", "(" + TAXAS_FIXAS.map(function (n) { return '"' + n + '"'; }).join(",") + ")"); if (r3.error) throw r3.error;
     if (custos.length) { var r4 = await sb.from("msb_custos").insert(custos); if (r4.error) throw r4.error; }
-    st.className = "st ok"; st.textContent = "✔ Gravado. Fica no histórico.";
+    if (txMud.length) { var r7 = await sb.from("msb_custos_mes").upsert(txMud.map(function (x) { return Object.assign(x, {atualizado_em: new Date().toISOString(), atualizado_por: EU && EU.id}); }), {onConflict: "estacao,nome,desde"}); if (r7.error) throw r7.error; MRG_TAXAS = await lerTaxasFixas(); pintarTaxasDesde(); }
+    st.className = "st ok"; st.textContent = "✔ Gravado. Fica no histórico." + (txMud.length ? " Taxas de " + txMud.map(function (x) { return x.nome.replace("Taxa de exploração · ", ""); }).join(" e ") + " a partir de " + txDesde.slice(5) + "/" + txDesde.slice(0, 4) + "." : "");
   } catch (e) { st.className = "st bad"; st.textContent = "⚠ " + falhou(e); } finally { b.disabled = false; }
 }
 
@@ -172,7 +207,7 @@ function litros2(cl) { return FORMATOS.numero(cl / 100, 2); }
 async function dadosLucro(m) {
   var rv = await sb.from("msb_vendas_mes").select("de,ate,dados,fonte").eq("estacao", EST).eq("mes", m).maybeSingle(); if (rv.error) throw rv.error;
   if (!rv.data) return null;
-  var V = rv.data, D = V.dados, M = await lerMargens(), C = await lerCustos();
+  var V = rv.data, D = V.dados, M = await lerMargens(), C = (await lerCustos()).concat(CUSTOSMES.doMes(await lerTaxasFixas(), m));   // taxas em vigor neste mês
   var rt = await sb.from("msb_tms").select("dados").eq("estacao", EST).eq("mes", m).order("ate", {ascending: false}).limit(1);
   var DESC = descontoTMS(rt.data && rt.data[0] && rt.data[0].dados), falta = [];
   /* combustível */
