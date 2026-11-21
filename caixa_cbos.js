@@ -1,4 +1,5 @@
-/* mystationbox · Caixa pré-preenchida a partir do CBOS (dono, 21/11/2026, «siga»): funcionário, Numerário, Fornecedores e, em Penafiel, Saída TABACO.
+/* mystationbox · Caixa pré-preenchida a partir do CBOS (dono, 21/11/2026, «siga»): funcionário, Vendas, MB, Solred €, Numerário, Fornecedores e,
+ * em Penafiel, Clientes a crédito e Saída TABACO.
  * Numerário (dono, 21/11/2026) = saídas de caixa + Saídas TABACO + entrega de numerário final, tirado dos movimentos (o dinheiro que saiu da
  * gaveta). Se a folha do turno disser outro numerário, a dica mostra quanto falta; nada se corrige sozinho.
  * Lê msb_caixa_cbos (folha do turno e movimentos de caixa, guardados pelo OCTAN AI). Só preenche campos VAZIOS e grava-os como se fossem
@@ -24,6 +25,11 @@ var CAIXA_CBOS = (function () {
     if (!row) return {};
     var p = {};
     if (row.colaborador && !/[,;/]| e /.test(row.colaborador)) p.func = nome(row.colaborador);
+    // Folha do turno (correspondência do dono, 19/11/2026). SOLRED OFFLINE fica de fora: é «Ficou a dever», decide-se à mão.
+    if (row.total_c != null) p.vendas = row.total_c;
+    if (row.mb_c != null) p.mb = row.mb_c;
+    if (row.solred_c != null) p.solred = row.solred_c;
+    if (estacao === "pnf" && row.credito_c != null) p.cred = row.credito_c;
     var f = soma(row, "fornecedores");
     if (f != null) p.forn = f;
     if (estacao === "pnf") { var t = soma(row, "saida_tabaco"); if (t != null) p.tab = t; }
@@ -45,7 +51,7 @@ var CAIXA_CBOS = (function () {
     });
     return out;
   }
-  var COL = {func: "func", forn: "forn_c", tab: "tab_c", num: "num_c"};
+  var COL = {func: "func", vendas: "vendas_c", mb: "mb_c", solred: "solred_c", cred: "cred_c", forn: "forn_c", tab: "tab_c", num: "num_c"};
   return {nome: nome, soma: soma, propostas: propostas, faltaNumerario: faltaNumerario, aPreencher: aPreencher, COL: COL};
 })();
 if (typeof module !== "undefined") module.exports = CAIXA_CBOS;
@@ -56,7 +62,7 @@ if (typeof window !== "undefined") (function () {
   async function carregar() {
     if (!ADMIN) return;
     var n = ++vez, est = EST, d = DIA;
-    var r = await sb.from("msb_caixa_cbos").select("dia,fecho,tipo,colaborador,numerario_c,movimentos").eq("estacao", est).eq("dia", d);
+    var r = await sb.from("msb_caixa_cbos").select("dia,fecho,tipo,colaborador,numerario_c,total_c,mb_c,solred_c,credito_c,movimentos").eq("estacao", est).eq("dia", d);
     if (r.error || n !== vez || est !== EST || d !== DIA) return;   // sem acesso, ou o dia/estação mudou entretanto
     ROWS = {}; DIA_LIDO = d;
     (r.data || []).forEach(function (x) { if (x.tipo === "t1" || x.tipo === "t2") ROWS[x.tipo] = x; });
