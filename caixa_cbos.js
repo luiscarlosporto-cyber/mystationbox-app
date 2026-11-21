@@ -1,4 +1,6 @@
-/* mystationbox · Caixa pré-preenchida a partir do CBOS (dono, 21/11/2026, «siga»): funcionário, Fornecedores e, em Penafiel, Saída TABACO.
+/* mystationbox · Caixa pré-preenchida a partir do CBOS (dono, 21/11/2026, «siga»): funcionário, Numerário, Fornecedores e, em Penafiel, Saída TABACO.
+ * Numerário (dono, 21/11/2026) = saídas de caixa + Saídas TABACO + entrega de numerário final, tirado dos movimentos (o dinheiro que saiu da
+ * gaveta). Se a folha do turno disser outro numerário, a dica mostra quanto falta; nada se corrige sozinho.
  * Lê msb_caixa_cbos (folha do turno e movimentos de caixa, guardados pelo OCTAN AI). Só preenche campos VAZIOS e grava-os como se fossem
  * escritos à mão (histórico em msb_eventos); nunca substitui o que já está escrito. Por baixo de cada campo mostra «CBOS: …» e, se o
  * valor da Caixa for diferente, a diferença. Tudo continua editável. As saídas de caixa vêm da nuvem já com o nome (msb-ense).
@@ -17,7 +19,7 @@ var CAIXA_CBOS = (function () {
     if (!row || !Array.isArray(row.movimentos)) return null;
     return row.movimentos.reduce(function (s, x) { return s - (x.destino === destino ? x.valor_c : 0); }, 0);
   }
-  /* O que o CBOS propõe para cada campo do turno: {func, forn, tab}. Só o que se sabe. */
+  /* O que o CBOS propõe para cada campo do turno: {func, forn, tab, num}. Só o que se sabe. */
   function propostas(row, estacao) {
     if (!row) return {};
     var p = {};
@@ -25,18 +27,26 @@ var CAIXA_CBOS = (function () {
     var f = soma(row, "fornecedores");
     if (f != null) p.forn = f;
     if (estacao === "pnf") { var t = soma(row, "saida_tabaco"); if (t != null) p.tab = t; }
+    // só com a entrega final registada: sem ela o turno ainda não está fechado no CBOS e a soma ficava curta
+    if (f != null && row.movimentos.some(function (x) { return x.destino === "entrega_final"; })) p.num = soma(row, "saida") + soma(row, "saida_tabaco") + soma(row, "entrega_final");
     return p;
+  }
+  /* Numerário da folha do turno menos o dos movimentos (positivo = falta dinheiro). null = não se pode comparar. */
+  function faltaNumerario(row, num) {
+    if (!row || row.numerario_c == null || num == null) return null;
+    return row.numerario_c - num;
   }
   /* Campos a preencher: só os vazios na Caixa e com valor no CBOS (um 0 do CBOS não preenche). */
   function aPreencher(linha, prop) {
-    var COL = {func: "func", forn: "forn_c", tab: "tab_c"}, out = [];
+    var out = [];
     Object.keys(prop).forEach(function (k) {
       var atual = linha ? linha[COL[k]] : null, vazio = atual == null || atual === "";
       if (vazio && (k === "func" ? !!prop[k] : prop[k] > 0)) out.push(k);
     });
     return out;
   }
-  return {nome: nome, soma: soma, propostas: propostas, aPreencher: aPreencher};
+  var COL = {func: "func", forn: "forn_c", tab: "tab_c", num: "num_c"};
+  return {nome: nome, soma: soma, propostas: propostas, faltaNumerario: faltaNumerario, aPreencher: aPreencher, COL: COL};
 })();
 if (typeof module !== "undefined") module.exports = CAIXA_CBOS;
 
@@ -46,7 +56,7 @@ if (typeof window !== "undefined") (function () {
   async function carregar() {
     if (!ADMIN) return;
     var n = ++vez, est = EST, d = DIA;
-    var r = await sb.from("msb_caixa_cbos").select("dia,fecho,tipo,colaborador,movimentos").eq("estacao", est).eq("dia", d);
+    var r = await sb.from("msb_caixa_cbos").select("dia,fecho,tipo,colaborador,numerario_c,movimentos").eq("estacao", est).eq("dia", d);
     if (r.error || n !== vez || est !== EST || d !== DIA) return;   // sem acesso, ou o dia/estação mudou entretanto
     ROWS = {}; DIA_LIDO = d;
     (r.data || []).forEach(function (x) { if (x.tipo === "t1" || x.tipo === "t2") ROWS[x.tipo] = x; });
@@ -65,20 +75,23 @@ if (typeof window !== "undefined") (function () {
           await guardar(el);   // um de cada vez: cada gravação junta o seu campo à mesma linha do turno
         }
       }
-      dicas(t, prop);
+      dicas(t, prop, ROWS[t]);
     }
   }
 
-  function dicas(t, prop) {
+  function dicas(t, prop, row) {
     Object.keys(prop).forEach(function (k) {
       var el = document.querySelector("#turnos input[data-t='" + t + "'][data-k='" + k + "']"); if (!el) return;
       var lab = el.parentElement, d = lab.querySelector(".cbosDica");
       if (!d) { d = document.createElement("small"); d.className = "cbosDica"; d.style.cssText = "display:block;font-size:12px;margin-top:3px"; lab.appendChild(d); }
-      var r = LINHAS[t] || {}, cbos = k === "func" ? prop[k] : fmt(prop[k]) + " €";
+      var r = LINHAS[t] || {}, v = r[CAIXA_CBOS.COL[k]], cbos = k === "func" ? prop[k] : fmt(prop[k]) + " €";
       var igual = k === "func" ? String(r.func || "").trim().toLowerCase() === String(prop[k]).toLowerCase()
-        : (k === "forn" ? r.forn_c : r.tab_c) == null ? prop[k] === 0 : (k === "forn" ? r.forn_c : r.tab_c) === prop[k];
-      var dif = k === "func" || igual ? "" : " · diferença " + fmt(((k === "forn" ? r.forn_c : r.tab_c) || 0) - prop[k]) + " €";
-      d.textContent = "CBOS: " + cbos + dif;
+        : v == null ? prop[k] === 0 : v === prop[k];
+      var dif = k === "func" || igual ? "" : " · diferença " + fmt((v || 0) - prop[k]) + " €";
+      var falta = k === "num" ? CAIXA_CBOS.faltaNumerario(row, prop[k]) : null;
+      if (falta) igual = false;
+      d.textContent = (k === "num" ? "CBOS (saídas + TABACO + entrega final): " : "CBOS: ") + cbos + dif +
+        (falta ? " · ⚠️ folha do turno " + fmt(row.numerario_c) + " € (" + (falta > 0 ? "faltam " : "sobram ") + fmt(Math.abs(falta)) + " €)" : "");
       d.style.color = igual ? "var(--mut,#5B6B80)" : "#B45309";
     });
   }
