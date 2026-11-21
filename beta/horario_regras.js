@@ -4,7 +4,7 @@
 (function (raiz) {
   var TRAB = {M: 1, T: 1, MT: 1};
   /* Ausências com código próprio (dono, 19/11/2026): F férias, B baixa, FJ falta justificada, FI falta injustificada. F, B e FJ descontam nas horas previstas; a FI não (são horas que ficam por fazer) */
-  var AUS = {F: 1, B: 1, FJ: 1, FI: 1}, DESC = {F: 1, B: 1, FJ: 1};
+  var AUS = {F: 1, B: 1, FJ: 1, FI: 1, AU: 1}, DESC = {F: 1, B: 1, FJ: 1};
   function dt(y, m, d) { return new Date(Date.UTC(y, m - 1, d)); }
   function iso(x) { return x.toISOString().slice(0, 10); }
   /* semanas seg-dom cuja quinta-feira cai neste mês, só com dias deste mês */

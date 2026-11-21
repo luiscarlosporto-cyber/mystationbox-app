@@ -532,12 +532,12 @@
     var EX = mapaExtras(), ver = P.rgb(0.749, 0.902, 0.776), linhas = X.P.filter(function (l) { return Object.keys(X.G[l.colaborador_id] || {}).length; });
     linhas.forEach(function (l) {
       var c = X.C[l.colaborador_id] || {}; y -= alt;
-      X.dias.forEach(function (d) { fundo(d, y, alt); var v = (X.G[l.colaborador_id] || {})[d] || "", e = (EX[l.colaborador_id] || []).indexOf(d) >= 0; if (e) pg.drawRectangle({x: M + nome + (d - 1) * col, y: y, width: col, height: alt, color: ver}); if (v) centro(v, M + nome + (d - 1) * col, y + 9, e ? B : F, 9); });
+      X.dias.forEach(function (d) { fundo(d, y, alt); var v = (X.G[l.colaborador_id] || {})[d] || ""; if (funcionarios && /^(B|FJ|FI)$/.test(v)) v = "AU"; var e = (EX[l.colaborador_id] || []).indexOf(d) >= 0; if (e) pg.drawRectangle({x: M + nome + (d - 1) * col, y: y, width: col, height: alt, color: ver}); if (v) centro(v, M + nome + (d - 1) * col, y + 9, e ? B : F, 9); });
       pg.drawText(c.nome || "", {x: M + 3, y: y + 9, size: 9, font: B, color: tx});
       pg.drawLine({start: {x: M, y: y}, end: {x: W - M, y: y}, thickness: 0.4, color: lin});
     });
-    pg.drawText("M manhã · T tarde" + (X.mt ? " · MT turno M/T" : "") + " · FG folga · F férias · FD feriado · B baixa · FJ/FI falta just./injust.", {x: M, y: y - 16, size: 8, font: F, color: tx});
-    { var lx = M + F.widthOfTextAtSize("M manhã · T tarde" + (X.mt ? " · MT turno M/T" : "") + " · FG folga · F férias · FD feriado · B baixa · FJ/FI falta just./injust.", 8) + 14; pg.drawRectangle({x: lx, y: y - 18, width: 11, height: 11, color: ver, borderColor: P.rgb(0.08, 0.19, 0.11), borderWidth: 0.6}); pg.drawText("Turno extra", {x: lx + 15, y: y - 16, size: 8, font: B, color: tx}); }
+    pg.drawText(legendaPdf(funcionarios), {x: M, y: y - 16, size: 8, font: F, color: tx});
+    { var lx = M + F.widthOfTextAtSize(legendaPdf(funcionarios), 8) + 14; pg.drawRectangle({x: lx, y: y - 18, width: 11, height: 11, color: ver, borderColor: P.rgb(0.08, 0.19, 0.11), borderWidth: 0.6}); pg.drawText("Turno extra", {x: lx + 15, y: y - 16, size: 8, font: B, color: tx}); }
     if (!funcionarios && ADMIN) {   // horas do mês (dono, 19/11/2026): só no PDF do administrador, como na app
       var rv = verif(), cx = [M, M + 150, M + 250, M + 340, M + 430], cab = ["Horas", "Previstas no mês", "Ausências", "A realizar", "Extra"], yy = y - 44;
       var dir = function (t, i, fonte) { if (i === 0) pg.drawText(t, {x: cx[0] + 3, y: yy, size: 8.5, font: fonte, color: tx}); else pg.drawText(t, {x: cx[i] + 80 - fonte.widthOfTextAtSize(t, 8.5), y: yy, size: 8.5, font: fonte, color: tx}); };
@@ -552,18 +552,22 @@
     await marcaPdf(doc, pg, F, B, M, 18);
     return new Blob([await doc.save()], {type: "application/pdf"});
   }
+  function legendaPdf(equipa) {   // AU (ausente) em vez de baixa e faltas: no ecrã dos funcionários e no PDF enviado à equipa (dono, 21/11/2026)
+    var au = equipa || X.P.some(function (l) { var g = X.G[l.colaborador_id] || {}; return X.dias.some(function (d) { return g[d] === "AU"; }); });
+    return "M manhã · T tarde" + (X.mt ? " · MT turno M/T" : "") + " · FG folga · F férias · FD feriado" + (au ? " · AU ausente" : " · B baixa · FJ/FI falta just./injust.");
+  }
   async function abrir(M) {
     var box = $("#v-hor"); M = M || MES || hoje().slice(0, 7); MES = M; var est = EST; if (X) clearTimeout(X.tm);
     box.innerHTML = "<div class='bl ske' style='height:260px'></div>";
     try {
       var ini = addDia(M + "-01", -14), fim = addMes(M, 1) + "-01";
       var R = await Promise.all([
-        sb.from("msb_horario_dias").select("dia,colaborador_id,codigo,fixo").eq("estacao", est).gte("dia", ini).lt("dia", fim).limit(2000),
+        sb.from("msb_horario_dias_equipa").select("dia,colaborador_id,codigo,fixo").eq("estacao", est).gte("dia", ini).lt("dia", fim).limit(2000),   // vista: os funcionários veem AU (ausente) em vez de baixa e faltas (RGPD, 20/11/2026)
         sb.from("msb_colab_lojas").select("colaborador_id,codigo,ordem,nome_picaponto,escala,espelho,desde,ate").eq("estacao", est).order("ordem"),
         sb.from("msb_colaboradores").select("id,curto,nome,ativo"),
         sb.from("msb_horario_meses").select("estado,sem_mt,aprovado_em,enviado_em,atualizado_em").eq("estacao", est).eq("mes", M).maybeSingle(),
         sb.from("msb_config").select("horario").eq("estacao", est).maybeSingle(),
-        sb.from("msb_horario_inicial").select("dias").eq("estacao", est).eq("mes", M).maybeSingle()
+        sb.from("msb_horario_inicial_equipa").select("dias").eq("estacao", est).eq("mes", M).maybeSingle()
       ]);
       R.forEach(function (r) { if (r.error) throw r.error; });
       if (est !== EST || M !== MES) return;
