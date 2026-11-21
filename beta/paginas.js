@@ -23,10 +23,11 @@
       M = CMP_M || (u.data && u.data[0] && u.data[0].mes) || addMes(hojeISO(0).slice(0, 7), -1);
     }
     CMP_M = M;
-    var b = barraMes("cmp", M, comparar);
-    box.innerHTML = b.h + "<div class='bl ske' style='height:240px'></div>"; b.ligar();
+    var b = barraMes("cmp", M, comparar), v = MES_RAPIDO.comecar("cmp", M);
+    box.innerHTML = b.h + (v.antes ? MES_RAPIDO.aEspera(v.antes) : "<div class='bl ske' style='height:240px'></div>"); b.ligar();
     try {
       var r = await sb.from("msb_folha_fecho").select("estacao,dados").eq("mes", M); if (r.error) throw r.error;
+      if (!v.atual()) return;
       var F = {}; (r.data || []).forEach(function (x) { F[x.estacao] = x.dados; });
       var falta = ESTS.filter(function (e) { return !F[e.id]; }).map(nomeLoja), L = ESTS.filter(function (e) { return F[e.id]; });
       if (!L.length) { box.innerHTML = b.h + "<div class='vazio'>Ainda não há Folha de fecho de " + nomeMes(M) + ". Carrega-a em Novo, Carregar ficheiro.</div>"; b.ligar(); return; }
@@ -49,9 +50,9 @@
       var val = function (d, k, n, i) { return (d[k] || []).reduce(function (s, x) { return s + (x[0] === n ? x[i] || 0 : 0); }, 0); };
       h += "<h2>Combustível por produto</h2><div class='sc'><table><thead>" + cab + "</thead><tbody>" + nomes("comb").map(function (n) { return linha(n, function (d) { return val(d, "comb", n, 2); }, lit); }).join("") + "</tbody></table></div>";
       h += "<h2>Loja por família</h2><div class='sc'><table><thead>" + cab + "</thead><tbody>" + nomes("loja").map(function (n) { return linha(n, function (d) { return val(d, "loja", n, 6); }, eur); }).join("") + "</tbody></table></div>";
-      box.innerHTML = b.h + (falta.length ? "<div class='aviso'><p>Falta a Folha de fecho de " + esc(falta.join(", ")) + " neste mês.</p></div>" : "") + "<p class='rod'>" + nomeMes(M) + " · valores com IVA, da Folha de fecho do CBOS.</p>" + h;
-      b.ligar();
-    } catch (e) { box.innerHTML = b.h + "<div class='aviso'><p>" + esc(falhou(e)) + "</p></div>"; b.ligar(); }
+      var corpo = (falta.length ? "<div class='aviso'><p>Falta a Folha de fecho de " + esc(falta.join(", ")) + " neste mês.</p></div>" : "") + "<p class='rod'>" + nomeMes(M) + " · valores com IVA, da Folha de fecho do CBOS.</p>" + h;
+      box.innerHTML = b.h + corpo; b.ligar(); v.guardar(corpo);
+    } catch (e) { if (!v.atual()) return; box.innerHTML = b.h + "<div class='aviso'><p>" + esc(falhou(e)) + "</p></div>"; b.ligar(); }
   }
 
   /* ---- Documentos para a contabilidade ---- */
@@ -61,8 +62,8 @@
     if (!$("#docMes")) $("#v-doc").innerHTML = "<div id='docPesq'></div><div id='docMes'></div>";
     if (window.pdocMontar) pdocMontar($("#docPesq"));
     var box = $("#docMes"); M = M || DOC_M || addMes(hojeISO(0).slice(0, 7), -1); DOC_M = M;
-    var b = barraMes("doc", M, documentos), ini = M + "-01", fim = addMes(M, 1) + "-01";
-    box.innerHTML = b.h + "<div class='bl ske' style='height:240px'></div>"; b.ligar();
+    var b = barraMes("doc", M, documentos), ini = M + "-01", fim = addMes(M, 1) + "-01", v = MES_RAPIDO.comecar("doc", M);
+    box.innerHTML = b.h + (v.antes ? MES_RAPIDO.aEspera(v.antes) : "<div class='bl ske' style='height:240px'></div>"); b.ligar();
     try {
       var q = function (p) { return p.then(function (r) { if (r.error) throw r.error; return r.data || []; }); };
       var R = await Promise.all([
@@ -73,6 +74,7 @@
         q(sb.from("msb_precos").select("estacao,dia,original").gte("dia", ini).lt("dia", fim).order("dia")),
         q(sb.from("msb_faturas_dig").select("estacao,fornecedor,numero,dia,original").gte("dia", ini).lt("dia", fim).order("dia"))
       ]);
+      if (!v.atual()) return;
       var cam = function (f) { var i = String(f || "").lastIndexOf(" · "); return i >= 0 ? f.slice(i + 3) : ""; };
       var L = [];
       R[0].forEach(function (x) { L.push({e: x.estacao, t: "Repsol", n: x.tipo + " " + x.numero, d: x.emissao, o: x.pdf}); });
@@ -88,10 +90,10 @@
         }).join("") + "</tbody></table></div>" : "<div class='vazio'>Sem documentos guardados neste mês.</div>");
       }).join("");
       var feitos = "<div class='bar'><span class='mut' style='font-size:13px'>Gerados na app:</span><button class='btn' data-p='kms'>Mapa de kms</button><button class='btn' data-p='ense'>Reporte ENSE</button><button class='btn' data-p='rep'>Créditos MB</button></div>";
-      box.innerHTML = b.h + feitos + G; b.ligar();
+      box.innerHTML = b.h + feitos + G; b.ligar(); v.guardar(feitos + G);
       box.querySelectorAll("[data-o]").forEach(function (x) { x.onclick = function () { abrirOriginal(x.dataset.o); }; });
       box.querySelectorAll("[data-p]").forEach(function (x) { x.onclick = function () { ir(x.dataset.p); }; });
-    } catch (e) { box.innerHTML = b.h + "<div class='aviso'><p>" + esc(falhou(e)) + "</p></div>"; b.ligar(); }
+    } catch (e) { if (!v.atual()) return; box.innerHTML = b.h + "<div class='aviso'><p>" + esc(falhou(e)) + "</p></div>"; b.ligar(); }
   }
 
   /* ---- formulários longos: cada cartão fica uma secção; os campos continuam todos na página, para o Gravar os encontrar ---- */
@@ -188,7 +190,8 @@
       box.querySelectorAll("[data-ce]").forEach(function (x) { x.onclick = function () {
         var e = x.dataset.ce, pg = x.dataset.cp; if (e !== EST) { var sl = $("#selEst"); sl.value = e; PAGINA = pg; sl.onchange(); } else ir(pg); }; });
     };
-    box.innerHTML = zona + "<h2>O que já está carregado</h2>" + b.h + "<div class='bl ske' style='height:240px'></div>"; liga();
+    var v = MES_RAPIDO.comecar("car", M);
+    box.innerHTML = zona + "<h2>O que já está carregado</h2>" + b.h + (v.antes ? MES_RAPIDO.aEspera(v.antes) : "<div class='bl ske' style='height:240px'></div>"); liga();
     try {
       var q = function (p) { return p.then(function (r) { if (r.error) throw r.error; return r.data || []; }); };
       var R = await Promise.all([
@@ -202,6 +205,7 @@
         q(sb.from("msb_docs").select("estacao,emissao").gte("emissao", ini).lt("emissao", fim).limit(5000)),
         q(sb.from("msb_comb_entradas").select("estacao,dia").gte("dia", ini).lt("dia", fim).limit(5000))
       ]);
+      if (!v.atual()) return;
       var de = function (i, e) { return R[i].filter(function (x) { return x.estacao === e; }); };
       var ult = function (L, k) { return L.map(function (x) { return x[k]; }).sort().pop(); };
       var um = function (i, pg) { return function (e) { var L = de(i, e); return L.length ? ["Carregado" + (L[0].ate ? " até " + dmy(L[0].ate).slice(0, 5) : ""), pg] : null; }; };
@@ -221,9 +225,9 @@
         return "<tr><td class='l'>" + l[0] + "</td>" + ESTS.map(function (e) { var r = l[2](e.id);
           return "<td class='l'><button class='mini' data-ce='" + e.id + "' data-cp='" + (r ? r[1] : l[1]) + "'>" + (r ? "✔ " + esc(r[0]) : (passado ? "⚠ Em falta" : "Ainda não carregado")) + "</button></td>"; }).join("") + "</tr>";
       }).join("") + "</tbody></table></div>";
-      box.innerHTML = zona + "<h2>O que já está carregado</h2>" + b.h + "<p class='rod'>" + nomeMes(M) + " · carregar numa linha abre a página desse documento, já na estação certa. Um documento que não bate certo é recusado e não fica gravado.</p>" + h;
-      liga();
-    } catch (e) { box.innerHTML = zona + b.h + "<div class='aviso'><p>" + esc(falhou(e)) + "</p></div>"; liga(); }
+      var corpo = "<p class='rod'>" + nomeMes(M) + " · carregar numa linha abre a página desse documento, já na estação certa. Um documento que não bate certo é recusado e não fica gravado.</p>" + h;
+      box.innerHTML = zona + "<h2>O que já está carregado</h2>" + b.h + corpo; liga(); v.guardar(corpo);
+    } catch (e) { if (!v.atual()) return; box.innerHTML = zona + b.h + "<div class='aviso'><p>" + esc(falhou(e)) + "</p></div>"; liga(); }
   }
 
   var ABRIR = {cmp: function () { comparar(); }, doc: function () { documentos(); }, forn: function () { fornecedores(); }, car: function () { carregarDocs(); }, hor: function () { MSB_NAV.horario(); }};

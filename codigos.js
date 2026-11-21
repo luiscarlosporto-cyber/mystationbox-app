@@ -1,7 +1,7 @@
 "use strict";
 /* Códigos novos dos fornecedores (dono, 18/11/2026): a fatura da Logista traz um código que o OCTAN AI ainda não liga a um artigo
    Repsol. Confirma-se aqui (Painel → OCTAN AI) em vez do painel local do PC. Para cada código mostram-se os artigos do catálogo
-   mais parecidos; o dono escolhe um (ou escreve o código de 8 algarismos) e confirma. O OCTAN AI aplica no PC dentro de minutos
+   mais parecidos; o dono escolhe um (ou escreve o código de 8 algarismos) e confirma. O OCTAN AI aplica no PC na volta seguinte (de 2 em 2 horas)
    e a fatura grava-se na corrida seguinte. Uma confirmação fica registada (quem e quando) e não se muda aqui. */
 var COD_PRODUTOS = null;
 
@@ -131,7 +131,7 @@ async function codigosNovos(recarregar) {
         b.disabled = true;
         var x = await sb.rpc("msb_confirmar_codigo", {p_id: id, p_codigo_repsol: cod, p_nome: nome});
         if (x.error) { b.disabled = false; return status(false, "⚠ " + falhou(x.error)); }
-        status(true, "✅ Confirmado: " + cod + " " + nome + ". O OCTAN AI aplica dentro de minutos; a fatura grava-se na corrida seguinte.");
+        status(true, "✅ Confirmado: " + cod + " " + nome + ". O OCTAN AI aplica na próxima volta (de 2 em 2 horas); a fatura grava-se na corrida seguinte.");
         if (recarregar) recarregar();
       };
     });

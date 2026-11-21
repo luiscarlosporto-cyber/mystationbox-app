@@ -358,6 +358,7 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
 <script src="config.js"></script>
 <script src="formatos.js"></script>
 <script src="ler_tudo.js"></script>
+<script src="mes_rapido.js"></script>
 <script src="erros.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="motor.js"></script>
@@ -425,7 +426,7 @@ $("#selEst").onchange=async function(){var N=window.MSB_NAV,nova=this.value;if(N
 $("#fLogin").onsubmit=async function(ev){ev.preventDefault();$("#lErro").textContent="";$("#lBtn").disabled=true;
   try{var r=await sb.auth.signInWithPassword({email:$("#lEmail").value.trim(),password:$("#lPass").value});if(r.error)throw r.error;await entrar()}
   catch(e){$("#lErro").textContent=/Invalid login/i.test(e.message)?"Email ou palavra-passe errados.":falhou(e)}finally{$("#lBtn").disabled=false}};
-$("#bSair").onclick=async function(){await sb.auth.signOut();LINHAS={};SAIDAS=[];$("#vApp").hidden=true;$("#vLogin").hidden=false};
+$("#bSair").onclick=async function(){await sb.auth.signOut();MES_RAPIDO.limpar();LINHAS={};SAIDAS=[];$("#vApp").hidden=true;$("#vLogin").hidden=false};
 
 /* ---------------- navegação ---------------- */
 var VISTA="reg";
@@ -579,11 +580,11 @@ entrar().catch(function(e){$("#vLogin").hidden=false;$("#lErro").textContent=fal
 <script src="caixa_pnf.js"></script>
 <script src="beta/beta.js?v=ab58b016"></script>
 <script src="beta/painel_regras.js?v=ee621378"></script>
-<script src="beta/painel.js?v=86587fe8"></script>
-<script src="beta/paginas.js?v=a5c22158"></script>
+<script src="beta/painel.js?v=19ca41b0"></script>
+<script src="beta/paginas.js?v=7e13fd90"></script>
 <script src="beta/horario_regras.js?v=870cde57"></script>
 <script src="beta/horario_gerar.js?v=cb8777a1"></script>
-<script src="beta/horario.js?v=3f966c8a"></script>
+<script src="beta/horario.js?v=063b8ee6"></script>
 <script src="areas.js"></script>
 <script>$$("#tabSub button").forEach(function(b){b.onclick=function(){tabaco(b.dataset.t)}});$("#eqBtnNovo").onclick=formNovo;</script>
 </body>

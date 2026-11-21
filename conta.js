@@ -23,14 +23,19 @@ async function cdmPorFechar(m, L) {
 
 async function carregarConta() {
   var box = $("#cdmCorpo"); if (!box) return; box.innerHTML = "<div class='mut'>A carregar…</div>";
+  var v = null;
   try {
     if (!CDM.mes) { var ul = await sb.from("msb_vendas_mes").select("mes").eq("estacao", EST).order("mes", {ascending: false}).limit(1); CDM.mes = (ul.data && ul.data[0] && ul.data[0].mes) || MES; }
     var m = CDM.mes; $("#cdmMes").value = m;
+    v = MES_RAPIDO.comecar("cdm", EST + "|" + m);
+    if (v.antes) box.innerHTML = MES_RAPIDO.aEspera(v.antes);
     var L = await dadosLucro(m);
+    if (!v.atual()) return;
     if (!L) { box.innerHTML = "<div class='vazio'>Sem relatório de vendas deste mês, por isso ainda não há receitas. Carregue-o em Resultados → Lucro.</div>"; return; }
     var rec = L.mC * 100 + L.mL, desp = L.custos * 100, extra = [];
     if (L.TMR) { extra.push({nome: "My Repsol", valor_c: L.TMR.myrepsol_c, origem: "real"}); if (L.TMR.combustiveis_c) extra.push({nome: "Taxa combustíveis", valor_c: L.TMR.combustiveis_c, origem: "real"}); }
     var parcial = Math.min(1, L.dias / L.diasMes), F = DESPESAS.porFamilia(L.CM.linhas.concat(extra)), res = L.res * 100, falta = await cdmPorFechar(m, L);
+    if (!v.atual()) return;
     var topD = Math.max.apply(null, F.map(function (f) { return Math.abs(f.valor_c); }).concat([1])), topR = Math.max(L.mC * 100, L.mL, 1);
     var etiqueta = function (l) { return l.origem === "fixo" ? " <span class='tag t-at'>fixo</span>" : l.origem === "estimada" ? " <span class='tag t-at'>estimada</span>" : l.valor_c < 0 ? " <span class='tag t-ok'>crédito</span>" : ""; };
     var h = "<div class='cdmKs'>" +
@@ -48,9 +53,9 @@ async function carregarConta() {
     }).join("") + (parcial < 1 ? "<p class='mut' style='font-size:12.5px;margin:6px 0 0'>No resultado entram " + L.dias + " de " + L.diasMes + " dias destas despesas.</p>" : "") + "</section></div>";
     h += "<section class='card cdmB'><h2>Por fechar neste mês</h2>" + (falta.length ? "<ul class='cdmFalta'>" + falta.map(function (t) { return "<li>⚠️ " + esc(t) + "</li>"; }).join("") + "</ul>" : "<p>✅ Nada por fechar.</p>") +
       "<p class='mut' style='font-size:12.5px;margin:6px 0 0'>Sem IVA, como no Lucro. Tocar numa família abre o detalhe. A Segurança Social conta só a parte da empresa; o IRS das guias não é custo (já está no salário, na renda e nas faturas).</p></section>";
-    box.innerHTML = h;
+    box.innerHTML = h; v.guardar(h);
     $$("#cdmCorpo [data-ir]").forEach(function (b) { b.onclick = function () { if (b.dataset.ir === "luc") $("#lMes").value = m; ir(b.dataset.ir); }; });
-  } catch (e) { box.innerHTML = "<div class='bad'>" + esc(typeof falhouLucro === "function" ? falhouLucro(e) : falhou(e)) + "</div>"; }
+  } catch (e) { if (v && !v.atual()) return; box.innerHTML = "<div class='bad'>" + esc(typeof falhouLucro === "function" ? falhouLucro(e) : falhou(e)) + "</div>"; }
 }
 $("#cdmMes").onchange = function () { CDM.mes = this.value; carregarConta(); };
 $("#cdmAnt").onclick = function () { CDM.mes = addMes(CDM.mes || MES, -1); carregarConta(); };

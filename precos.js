@@ -90,11 +90,11 @@ function quadroENSE(x, L) {
     (ADMIN ? octanEstado(x) + "<div class='bar' style='margin-top:8px'>" + octanBotao(x) + "<button class='btn' data-com='" + x.dia + "'>✔ Já gravei na ENSE</button></div>" : "") + "</div>";
 }
 
-/* OCTAN AI: a aprovação aqui autoriza UMA gravação na ENSE; o PC grava logo (6h-23h59, de 2 em 2 min) ou às 00:30 (16/11/2026). */
+/* OCTAN AI: a aprovação aqui autoriza UMA gravação na ENSE; o PC grava na volta seguinte (6h-23h59, de 2 em 2 horas desde 21/11/2026) ou às 00:30 (16/11/2026). */
 function octanEstado(x) {
   if (x.ense_erro) return "<div class='bad' style='margin-top:6px'>❌ O OCTAN AI não confirmou a gravação: " + esc(x.ense_erro) + "<br>Vê na ENSE se ficou gravado antes de tentar outra vez.</div>";
   if (x.ense_tentado_em) return "<div class='aviso' style='margin-top:6px'>⏳ O OCTAN AI está a gravar na ENSE.</div>";
-  if (x.aprovado_em) return "<div class='aviso' style='margin-top:6px'>⏳ Aprovado por " + esc(x.aprovado_por || "") + ". O OCTAN AI grava na ENSE dentro de minutos (de dia; à noite às 00:30), com o PC ligado.</div>";
+  if (x.aprovado_em) return "<div class='aviso' style='margin-top:6px'>⏳ Aprovado por " + esc(x.aprovado_por || "") + ". O OCTAN AI grava na ENSE na próxima volta (de dia, de 2 em 2 horas; à noite às 00:30), com o PC ligado.</div>";
   return "";
 }
 function octanBotao(x) {

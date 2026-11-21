@@ -448,7 +448,7 @@
     X.ultEnv = (u.data || [])[0] || null; X.envio = true; pintar();
   }
   function cartaoEnvio() {
-    var u = X.ultEnv, E = {pendente: "Na fila: sai dentro de minutos, com o PC ligado.", a_enviar: "A enviar.", enviado: "Enviado.", erro: "Falhou: "};
+    var u = X.ultEnv, E = {pendente: "Na fila: sai na próxima volta (de 2 em 2 horas), com o PC ligado.", a_enviar: "A enviar.", enviado: "Enviado.", erro: "Falhou: "};
     return "<div class='aviso' style='display:grid;gap:8px'><b>Enviar o horário de " + esc(nomeMes(X.M)) + "</b><div class='mut' style='font-size:13px'>O PDF leva os turnos extra assinalados. Quem tem conta também vê o horário na app.</div>" +
       linhasEnvio().map(function (l) { var c = X.C[l.colaborador_id] || {}, m = X.MAIL[l.colaborador_id] || ""; return "<label style='display:grid;grid-template-columns:24px minmax(90px,150px) minmax(0,1fr);gap:8px;align-items:center;margin:0'><input type='checkbox' class='envSim' data-c='" + l.colaborador_id + "'" + (m ? " checked" : "") + " aria-label='Enviar a " + esc(c.curto || "") + "'><span>" + esc(c.curto || "") + "</span><input type='email' class='envMail' data-c='" + l.colaborador_id + "' value='" + esc(m) + "' placeholder='email' autocomplete='off' title='" + ((X.CONTA || {})[l.colaborador_id] ? "Email da conta da app" : "") + "'></label>"; }).join("") +
       "<div class='bar'><button class='btn p' id='envMail'>Enviar por email</button><button class='btn' id='envPdf'>Partilhar PDF</button><button class='btn' id='envFim'>Fechar</button></div>" +
@@ -474,7 +474,7 @@
       if (C.length) { var r0 = await sb.from("msb_colab_contactos").upsert(C, {onConflict: "colaborador_id"}); if (r0.error) throw r0.error; }
       var cam = EST + "/horarios/" + X.M + "_" + Date.now() + ".pdf", r1 = await sb.storage.from("msb-originais").upload(cam, await gerarPdf(true), {contentType: "application/pdf", upsert: false}); if (r1.error) throw r1.error;
       var r2 = await sb.from("msb_horario_envios").insert({estacao: EST, mes: X.M, para: T.ok, assunto: "Horário de " + nomeMes(X.M) + " · " + nomeLoja(), original: cam, pedido_por: quemSou()}); if (r2.error) throw r2.error;
-      await marcarEnviado(); X.envio = false; pintar(); msbAviso("Na fila: o OCTAN AI envia dentro de minutos, com o PC ligado.");
+      await marcarEnviado(); X.envio = false; pintar(); msbAviso("Na fila: o OCTAN AI envia na próxima volta (de 2 em 2 horas), com o PC ligado.");
     } catch (e) { b.disabled = false; msbAviso("Erro: " + falhou(e)); }
   }
   async function partilhar() {
