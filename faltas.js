@@ -10,7 +10,8 @@ var FALTAS_REGRAS = (function () {
     var func = {};
     (turnos || []).forEach(function (t) { func[t.dia + "|" + t.turno] = t.func || ""; });
     return (L || []).filter(function (s) { return !s.recebido; }).map(function (s) {
-      return {id: s.id, dia: s.dia, turno: s.turno, valor_c: s.valor_c, nota: s.nota || "", func: func[s.dia + "|" + s.turno] || ""};
+      // o nome do CBOS (saída criada a partir do CBOS) manda; senão, o funcionário escrito no turno da Caixa
+      return {id: s.id, dia: s.dia, turno: s.turno, valor_c: s.valor_c, nota: s.nota || "", func: s.colaborador || func[s.dia + "|" + s.turno] || ""};
     }).sort(function (a, b) { return a.dia < b.dia ? -1 : a.dia > b.dia ? 1 : a.turno < b.turno ? -1 : a.turno > b.turno ? 1 : 0; });
   }
   function total(L) { return (L || []).reduce(function (s, x) { return s + x.valor_c; }, 0); }
@@ -43,7 +44,7 @@ if (typeof window !== "undefined") (function () {
       "<div style='display:flex;justify-content:space-between;margin-top:12px'><b>Saídas de caixa por entregar</b><b>" + eur(FALTAS_REGRAS.total(S)) + "</b></div>";
     h += S.length ? S.map(function (x) {
       return "<div style='border:1px solid var(--bd);border-radius:12px;padding:10px 12px;margin-top:8px;display:flex;justify-content:space-between;align-items:center;gap:10px'>" +
-        "<div><b>" + eur(x.valor_c) + "</b><div class='mut' style='font-size:12px'>" + dmy(x.dia).slice(0, 5) + " · " + turno(x.turno) + (x.func ? " · " + esc(x.func) : "") + (x.nota ? " · " + esc(x.nota) : "") + "</div></div>" +
+        "<div><b>" + eur(x.valor_c) + "</b><div class='mut' style='font-size:12px'>" + dmy(x.dia).slice(0, 5) + " · " + turno(x.turno) + (x.func ? " · " + esc(window.CAIXA_CBOS ? CAIXA_CBOS.nome(x.func) : x.func) : "") + (x.nota ? " · " + esc(x.nota) : "") + "</div></div>" +
         "<button class='mini' data-frec='" + esc(x.id) + "' style='background:var(--okb);min-height:40px;white-space:nowrap'>✔ Recebido</button></div>";
     }).join("") : "<div class='ok' style='margin-top:8px'>✔ Nenhuma saída por entregar.</div>";
     if (C) {

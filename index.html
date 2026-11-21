@@ -483,7 +483,7 @@ async function guardar(el){var t=el.dataset.t,k=el.dataset.k,val=el.value.trim()
   try{var res=await sb.from("msb_turnos").upsert(linha,{onConflict:"estacao,dia,turno"}).select().single();if(res.error)throw res.error;
     LINHAS[t]=res.data;totais();status(true,"Guardado ✓")}catch(e){status(false,"⚠ "+falhou(e))}}
 function desenharSaidas(t){var box=$("#sai-"+t);if(!box)return;var L=SAIDAS.filter(function(s){return s.turno===t}),h="<div class='lin'><b>📦 Saídas de caixa</b><span class='mut'>"+(L.filter(function(s){return !s.recebido}).length||"nenhuma")+" por entregar</span></div>";
-  L.forEach(function(s){h+="<div class='lin'><span>"+eur(s.valor_c)+" <span class='mut'>"+esc(s.nota)+"</span></span>"+(s.recebido?"<span class='ok'>✔ entregue "+dmy(s.recebido)+(ADMIN?" <button class='mini' data-sr='"+s.id+"' data-x='1'>desfazer</button>":"")+"</span>":(ADMIN?"<button class='mini' data-sr='"+s.id+"'>Marcar entregue</button>":"<span class='wn'>por entregar</span>"))+"</div>"});
+  L.forEach(function(s){var q=[s.colaborador&&window.CAIXA_CBOS?CAIXA_CBOS.nome(s.colaborador):s.colaborador,s.nota].filter(Boolean).join(" · ");h+="<div class='lin'><span>"+eur(s.valor_c)+" <span class='mut'>"+esc(q)+"</span>"+(s.cbos_id?" <span class='mut' style='font-size:11px'>CBOS</span>":"")+"</span>"+(s.recebido?"<span class='ok'>✔ entregue "+dmy(s.recebido)+(ADMIN?" <button class='mini' data-sr='"+s.id+"' data-x='1'>desfazer</button>":"")+"</span>":(ADMIN?"<button class='mini' data-sr='"+s.id+"'>Marcar entregue</button>":"<span class='wn'>por entregar</span>"))+"</div>"});
   if(ADMIN)h+="<form data-t='"+t+"'><input class='v' inputmode='decimal' placeholder='Valor €' required><input class='n' placeholder='Nota (opcional)'><button class='mini' style='background:var(--okb)'>+ Registar</button></form>";
   box.innerHTML=h;if(window.pnfDeposito&&EST==="pnf")pnfDeposito();
   var f=box.querySelector("form");if(f)f.onsubmit=async function(ev){ev.preventDefault();var v=cent(f.querySelector(".v").value);if(!v||v<=0){status(false,"Valor inválido");return}
@@ -585,6 +585,7 @@ entrar().catch(function(e){$("#vLogin").hidden=false;$("#lErro").textContent=fal
 <script src="caixa_pnf_regras.js"></script>
 <script src="caixa_pnf.js"></script>
 <script src="faltas.js"></script>
+<script src="caixa_cbos.js"></script>
 <script src="beta/beta.js?v=ab58b016"></script>
 <script src="beta/painel_regras.js?v=ee621378"></script>
 <script src="beta/painel.js?v=86587fe8"></script>
