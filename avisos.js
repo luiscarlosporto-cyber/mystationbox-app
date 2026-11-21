@@ -72,7 +72,7 @@ function aviForm() {
 function aviPedidos(L) {
   return L.map(function (p) {
     var t = "<b>" + esc(aviLoja(p.estacao)) + " · " + esc((AVI_PASTAS.find(function (x) { return x[0] === p.pasta; }) || [0, p.pasta])[1]) + (p.artigo ? " · " + esc(p.artigo) : "") + "</b><div class='mut'>" + dmy(p.de) + " a " + dmy(p.ate) + "</div>";
-    if (p.estado === "pendente" || p.estado === "a_ler") return "<div class='aviso'>⏳ " + t + "O OCTAN AI responde na próxima volta (de 2 em 2 horas), com o PC ligado.</div>";
+    if (p.estado === "pendente" || p.estado === "a_ler") return "<div class='aviso'>⏳ " + t + "O OCTAN AI responde nos próximos minutos, com o PC ligado.</div>";
     var vi = p.visto_em ? "" : "<div style='margin-top:8px'><button class='btn' data-pv='" + p.id + "'>✔ Visto</button></div>";
     if (p.estado === "erro") return "<div class='card' style='padding:12px 14px'>❌ " + t + "<div class='bad'>" + esc(p.erro) + "</div>" + vi + "</div>";
     var L2 = p.linhas || [], q = L2.reduce(function (s, x) { return s + x[2]; }, 0), v = L2.reduce(function (s, x) { return s + x[3]; }, 0);

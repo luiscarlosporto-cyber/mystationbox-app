@@ -184,7 +184,7 @@
       "<div class='pnKp'><div><small>" + esc(tituloMes(X)) + "</small><b>" + fv(sa) + "</b></div><div><small>" + esc(Maius(nomeMes(A))) + "</small><b>" + fv(sb2) + "</b></div><div><small>Por dia, face a " + esc(nomeMes(A)) + "</small><b class='" + (r == null ? "" : r >= 0 ? "pnSobe" : "pnDesce") + "'>" + (r == null ? "—" : (r >= 0 ? "▲ " : "▼ ") + num(Math.abs(r), 1) + " %") + "</b></div></div>";
     GR = null;
     if (FAM_V === "TODAS" && Object.keys(TF).length) return h.replace(/<div class='pnKp'>[\s\S]*$/, "") + quadros(X, M, A, ids, TF) + "</section>";
-    if (!a && !b) return h + "<div class='pnVaz'>" + (PN.aLer(X.cur, M, ids) || PN.aLer(X.cur, A, ids) ? "<b>A ler as vendas por dia no CBOS</b>Aparecem aqui na próxima volta (de 2 em 2 horas), com o PC ligado." : "<b>Sem vendas por dia para mostrar</b>O OCTAN AI ainda não leu este mês no CBOS. Volto a pedir quando abrires o Painel.") + "</div></section>";
+    if (!a && !b) return h + "<div class='pnVaz'>" + (PN.aLer(X.cur, M, ids) || PN.aLer(X.cur, A, ids) ? "<b>A ler as vendas por dia no CBOS</b>Aparecem aqui daqui a uns minutos, com o PC ligado." : "<b>Sem vendas por dia para mostrar</b>O OCTAN AI ainda não leu este mês no CBOS. Volto a pedir quando abrires o Painel.") + "</div></section>";
     var N = Math.max(PN.diasMes(M), PN.diasMes(A)), S = function (l) { var r = (l || []).slice(); while (r.length < N) r.push(null); return r; };
     var A1 = S(a), B1 = S(b), top = PN.escala(Math.max.apply(null, A1.concat(B1).map(function (x) { return x || 0; })));
     GR = {a: A1, b: B1, top: top, n: N, ma: nomeMes(M), mb: nomeMes(A), lit: lit};
@@ -245,7 +245,7 @@
   function tabelaFam(X) {
     var M = MES_V || X.mes, A = addMes(M, -1), ids = idsVer(), FN = PN.totaisFam(X.cur, M, ids), FO = PN.totaisFam(X.cur, A, ids);
     var h = "<section class='bl pnC12'><h3>Vendas por família</h3><p class='pnSub'>Quantidade e dinheiro com IVA. Litros nos combustíveis, unidades nas outras famílias. «Por dia» compara a média diária.</p>";
-    if (!FN && !FO) return h + "<p class='vz'>" + (PN.aLer(X.cur, M, ids) || PN.aLer(X.cur, A, ids) ? "A ler as famílias no CBOS: aparecem na próxima volta (de 2 em 2 horas), com o PC ligado." : "Ainda não há vendas por família deste mês.") + "</p></section>";
+    if (!FN && !FO) return h + "<p class='vz'>" + (PN.aLer(X.cur, M, ids) || PN.aLer(X.cur, A, ids) ? "A ler as famílias no CBOS: aparecem daqui a uns minutos, com o PC ligado." : "Ainda não há vendas por família deste mês.") + "</p></section>";
     FN = FN || {}; FO = FO || {};
     var d = diasVistos(X, M), d0 = PN.diasMes(A), ks = Object.keys(FO).concat(Object.keys(FN).filter(function (k) { return !FO[k]; })).sort(function (x, y) { return (FO[y] || [0, 0])[1] - (FO[x] || [0, 0])[1] || (FN[y] || [0, 0])[1] - (FN[x] || [0, 0])[1]; });
     return h + "<div class='sc'><table class='pnFam'><thead><tr><th class='l'>Família</th><th>" + esc(Maius(nomeMes(M))) + " €</th><th>" + esc(Maius(nomeMes(A))) + " €</th><th>" + esc(Maius(nomeMes(M))) + " qtd.</th><th>" + esc(Maius(nomeMes(A))) + " qtd.</th><th>Por dia</th></tr></thead><tbody>" +
@@ -407,7 +407,7 @@
     var falta = ESTS.some(function (e) { var D = dadosLoja(X, e); return !D.c && !D.f; }), M = MES_V || X.mes;
     box.innerHTML = (X.falhas.length ? "<div class='aviso'><p>Não consegui ler: " + esc(X.falhas.join(", ")) + ". O que está em baixo pode estar incompleto.</p></div>" : "") + entrada(X) + topo(X) + faixaEnse(X) + cartoes(X) +
       "<div class='pnGrade'>" + grafico(X) + pintarDecidir(X) + barras(X) + recebido_(X) + porFechar(X) + tabelaFam(X) + "</div>" +
-      "<p class='rod'>" + (falta ? "A ler no CBOS pelo OCTAN AI: os valores aparecem na próxima volta (de 2 em 2 horas), com o PC ligado." : M === X.mes ? "Vendas com IVA, lidas no CBOS pelo OCTAN AI, até ontem. O ritmo por dia e a estimativa do mês são contas simples, não são valores do CBOS." : "Vendas com IVA, do mês inteiro.") + "</p>";
+      "<p class='rod'>" + (falta ? "A ler no CBOS pelo OCTAN AI: os valores aparecem daqui a uns minutos, com o PC ligado." : M === X.mes ? "Vendas com IVA, lidas no CBOS pelo OCTAN AI, até ontem. O ritmo por dia e a estimativa do mês são contas simples, não são valores do CBOS." : "Vendas com IVA, do mês inteiro.") + "</p>";
     box.querySelectorAll("[data-p]").forEach(function (b) { b.onclick = function () { irLoja(b.dataset.e, b.dataset.p); }; });
     box.querySelectorAll("[data-arq]").forEach(function (b) { b.onclick = function () { b.disabled = true; arquivar(X, b.dataset.arq.split(",")); }; });
     box.querySelectorAll("[data-ver]").forEach(function (b) { b.onclick = function () { LOJA_V = b.dataset.ver; desenhar(X); }; });

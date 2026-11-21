@@ -124,7 +124,7 @@ async function pdocRepetir() {
   try {
     var r = await sb.from("msb_pedidos").insert(ests.map(function (e) { return {estacao: e, de: iso(de), ate: iso(hoje), pasta: "SAPHETY", pedido_por: (PERFIL && PERFIL.display_name) || "app"}; }));
     if (r.error) throw r.error;
-    msg.textContent = "✔ Pedido enviado ao OCTAN AI. O PC vê os pedidos de 2 em 2 horas; a recolha leva mais 5 a 10 minutos. Depois carregue em ↻ e volte a procurar.";
+    msg.textContent = "✔ Pedido enviado ao OCTAN AI. O PC vê os pedidos de 2 em 2 minutos; a recolha leva 5 a 10 minutos. Depois carregue em ↻ e volte a procurar.";
   } catch (e) { b.disabled = false; msg.textContent = "⚠ " + falhou(e); }
 }
 /* monta a pesquisa no topo da página Documentos; a lista do mês fica em #docMes */
