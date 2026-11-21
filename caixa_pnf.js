@@ -165,15 +165,16 @@ function pnfDever(t) {
     };
   });
 }
-function pnfPagar(t) {
-  var L = CAIXA_PNF.porPagar(PNF.div, DIA, t), sel = null, meio = "Numerário";
+function pnfPagar(t, sel0) {   // sel0: dívida já escolhida (quadro das Faltas, faltas.js)
+  var L = CAIXA_PNF.porPagar(PNF.div, DIA, t), sel = L.some(function (x) { return x.id === sel0; }) ? sel0 : null, meio = "Numerário";
   var corpo = function (pv) {
     return "<h3>Pagou dívida · " + (t === "t1" ? "Turno 1" : "Turno 2") + "</h3><div class='mut'>Escolha o que está a pagar:</div>" +
       L.map(function (x) { return "<div class='opt" + (sel === x.id ? " on" : "") + "' data-s='" + x.id + "'><span><b>" + esc(x.cliente) + "</b> · " + dmy(x.dia).slice(0, 5) + " " + x.turno.toUpperCase() + (x.doc ? " · " + esc(x.doc) : "") + "</span><b>" + eur(x.valor_c) + "</b></div>"; }).join("") +
       (sel ? "<div class='fl'><label>Valor pago<input id='pnfPv' inputmode='decimal' value='" + esc(pv) + "'></label><label>Pagou com<span class='chips'>" + CAIXA_PNF.MEIOS.map(function (m) { return "<button class='mini" + (m === meio ? " on" : "") + "' data-m='" + m + "'>" + m + "</button>"; }).join("") + "</span></label></div>" : "") +
       "<p class='bad' id='pnfErr'></p><div class='bts'><button class='mini' data-x>Cancelar</button><button class='mini p' data-ok" + (sel ? "" : " disabled") + ">✔ Pago</button></div>";
   };
-  pnfJanela(corpo(""), function liga(bg, fechar) {
+  var x0 = sel && L.find(function (y) { return y.id === sel; });
+  pnfJanela(corpo(x0 ? fmt(x0.valor_c) : ""), function liga(bg, fechar) {
     var pv = function () { var i = bg.querySelector("#pnfPv"); return i ? i.value : ""; };
     bg.querySelectorAll("[data-s]").forEach(function (b) { b.onclick = function () { sel = +b.dataset.s; var x = L.find(function (y) { return y.id === sel; }); bg.firstChild.innerHTML = corpo(fmt(x.valor_c)); liga(bg, fechar); }; });
     bg.querySelectorAll("[data-m]").forEach(function (b) { b.onclick = function () { var v = pv(); meio = b.dataset.m; bg.firstChild.innerHTML = corpo(v); liga(bg, fechar); }; });

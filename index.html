@@ -301,10 +301,16 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
   <!-- REGISTO -->
   <div id="v-reg" class="v">
     <div class="bar"><button class="btn" id="dAnt" aria-label="Dia anterior">‹</button><input type="date" id="dDia"><button class="btn" id="dSeg" aria-label="Dia seguinte">›</button><button class="btn" id="dHoje">Hoje</button><button class="btn az adm" id="bXls">📥 Importar do sistema</button><input type="file" id="fXls" accept=".xls" hidden><button class="btn p adm" id="bFecho">📷 Digitalizar fecho</button><input type="file" id="fFecho" accept="image/*" capture="environment" hidden><span class="st" id="st"></span></div>
+    <!-- Quadro das Faltas à direita (dono, 21/11/2026, faltas.js); em ecrã estreito fica por baixo -->
+    <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
+    <div style="flex:999 1 640px;min-width:0">
     <div id="painel" class="card" hidden style="border:2px solid var(--laranja)"></div>
     <div id="fechosDia"></div>
     <div class="g2" id="turnos"></div>
     <div class="card"><div class="cb"><div class="res"><span>Total do dia · recebido <b id="dRec">—</b> · vendas <b id="dVen">—</b></span><span>Diferença <b id="dDif">—</b></span></div></div></div>
+    </div>
+    <aside id="faltas" class="card adm" aria-label="Faltas" style="flex:1 1 300px;max-width:420px;padding:16px 18px;box-sizing:border-box"></aside>
+    </div>
   </div>
 
   <!-- MÊS -->
@@ -578,6 +584,7 @@ entrar().catch(function(e){$("#vLogin").hidden=false;$("#lErro").textContent=fal
 <script src="adelaide.js"></script>
 <script src="caixa_pnf_regras.js"></script>
 <script src="caixa_pnf.js"></script>
+<script src="faltas.js"></script>
 <script src="beta/beta.js?v=ab58b016"></script>
 <script src="beta/painel_regras.js?v=ee621378"></script>
 <script src="beta/painel.js?v=86587fe8"></script>
