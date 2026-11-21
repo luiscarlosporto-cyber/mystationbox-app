@@ -60,7 +60,18 @@ var CAIXA_PNF = (function () {
     var tab = (t1 && t1.tab_c || 0) + (t2.tab_c || 0);
     return {num_c: num, saidas_c: sai, tab_c: tab, valor_c: num - sai - tab};
   }
+  /* Dívidas antigas pagas num turno, por meio (dono, 21/11/2026): descontam nas contas do turno; os totais de MB e Solred ficam inteiros.
+     O CBOS não regista estes pagamentos: o numerário já está na entrega final, o MB e o Solred não estão na folha do turno. */
+  function pagas(L, dia, turno) {
+    var o = {"Numerário": 0, MB: 0, Solred: 0, total: 0};
+    (L || []).forEach(function (x) {
+      if (x.anulado_em || x.pago_dia !== dia || x.pago_turno !== turno) return;
+      var m = o[x.pago_meio] === undefined ? "Numerário" : x.pago_meio;
+      o[m] += x.valor_c || 0; o.total += x.valor_c || 0;
+    });
+    return o;
+  }
   var CLIENTES = ["Penachama", "Lateral", "Obragenial", "Granitec"];
-  return {deposito: deposito, anterior: anterior, recebido: recebido, diferenca: diferenca, cofre: cofre, alerta: alerta, porPagar: porPagar, pagar: pagar, CLIENTES: CLIENTES, MEIOS: MEIOS, RECEBIDO: RECEBIDO};
+  return {pagas: pagas, deposito: deposito, anterior: anterior, recebido: recebido, diferenca: diferenca, cofre: cofre, alerta: alerta, porPagar: porPagar, pagar: pagar, CLIENTES: CLIENTES, MEIOS: MEIOS, RECEBIDO: RECEBIDO};
 })();
 if (typeof module !== "undefined") module.exports = CAIXA_PNF;

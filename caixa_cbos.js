@@ -21,14 +21,16 @@ var CAIXA_CBOS = (function () {
     return row.movimentos.reduce(function (s, x) { return s - (x.destino === destino ? x.valor_c : 0); }, 0);
   }
   /* O que o CBOS propõe para cada campo do turno: {func, forn, tab, num}. Só o que se sabe. */
-  function propostas(row, estacao) {
+  /* pagas = dívidas antigas pagas no turno por meio (CAIXA_PNF.pagas): o MB e o Solred não estão na folha do CBOS e somam-se,
+     para o campo ficar igual ao TPA (dono, 21/11/2026); o numerário já vem na entrega final. */
+  function propostas(row, estacao, pagas) {
     if (!row) return {};
     var p = {};
     if (row.colaborador && !/[,;/]| e /.test(row.colaborador)) p.func = nome(row.colaborador);
     // Folha do turno (correspondência do dono, 19/11/2026). SOLRED OFFLINE fica de fora: é «Ficou a dever», decide-se à mão.
     if (row.total_c != null) p.vendas = row.total_c;
-    if (row.mb_c != null) p.mb = row.mb_c;
-    if (row.solred_c != null) p.solred = row.solred_c;
+    if (row.mb_c != null) p.mb = row.mb_c + (pagas && pagas.MB || 0);
+    if (row.solred_c != null) p.solred = row.solred_c + (pagas && pagas.Solred || 0);
     if (estacao === "pnf" && row.credito_c != null) p.cred = row.credito_c;
     var f = soma(row, "fornecedores");
     if (f != null) p.forn = f;
@@ -57,13 +59,16 @@ var CAIXA_CBOS = (function () {
 if (typeof module !== "undefined") module.exports = CAIXA_CBOS;
 
 if (typeof window !== "undefined") (function () {
-  var ROWS = {}, DIA_LIDO = null, vez = 0;
+  var ROWS = {}, DIA_LIDO = null, vez = 0, PAGAS = [];
 
   async function carregar() {
     if (!ADMIN) return;
     var n = ++vez, est = EST, d = DIA;
     var r = await sb.from("msb_caixa_cbos").select("dia,fecho,tipo,colaborador,numerario_c,total_c,mb_c,solred_c,credito_c,movimentos").eq("estacao", est).eq("dia", d);
     if (r.error || n !== vez || est !== EST || d !== DIA) return;   // sem acesso, ou o dia/estação mudou entretanto
+    PAGAS = [];
+    if (est === "pnf") { var q = await sb.from("msb_clientes_dever").select("pago_dia,pago_turno,pago_meio,valor_c,anulado_em").eq("estacao", "pnf").eq("pago_dia", d); if (!q.error) PAGAS = q.data || []; }
+    if (n !== vez || est !== EST || d !== DIA) return;
     ROWS = {}; DIA_LIDO = d;
     (r.data || []).forEach(function (x) { if (x.tipo === "t1" || x.tipo === "t2") ROWS[x.tipo] = x; });
     await aplicar(true);
@@ -72,7 +77,8 @@ if (typeof window !== "undefined") (function () {
   async function aplicar(preencher) {
     if (DIA_LIDO !== DIA) return;
     for (var t of ["t1", "t2"]) {
-      var prop = CAIXA_CBOS.propostas(ROWS[t], EST);
+      var pg = EST === "pnf" && window.CAIXA_PNF ? CAIXA_PNF.pagas(typeof PNF !== "undefined" && PNF.dia === DIA ? PNF.div : PAGAS, DIA, t) : null;
+      var prop = CAIXA_CBOS.propostas(ROWS[t], EST, pg);
       if (preencher) {
         for (var k of CAIXA_CBOS.aPreencher(LINHAS[t], prop)) {
           var el = document.querySelector("#turnos input[data-t='" + t + "'][data-k='" + k + "']");
@@ -81,11 +87,11 @@ if (typeof window !== "undefined") (function () {
           await guardar(el);   // um de cada vez: cada gravação junta o seu campo à mesma linha do turno
         }
       }
-      dicas(t, prop, ROWS[t]);
+      dicas(t, prop, ROWS[t], pg);
     }
   }
 
-  function dicas(t, prop, row) {
+  function dicas(t, prop, row, pg) {
     Object.keys(prop).forEach(function (k) {
       var el = document.querySelector("#turnos input[data-t='" + t + "'][data-k='" + k + "']"); if (!el) return;
       var lab = el.parentElement, d = lab.querySelector(".cbosDica");
@@ -96,13 +102,15 @@ if (typeof window !== "undefined") (function () {
       var dif = k === "func" || igual ? "" : " · diferença " + fmt((v || 0) - prop[k]) + " €";
       var falta = k === "num" ? CAIXA_CBOS.faltaNumerario(row, prop[k]) : null;
       if (falta) igual = false;
-      d.textContent = (k === "num" ? "CBOS (saídas + TABACO + entrega final): " : "CBOS: ") + cbos + dif +
+      var mais = pg && (k === "mb" ? pg.MB : k === "solred" ? pg.Solred : 0);
+      d.textContent = (k === "num" ? "CBOS (saídas + TABACO + entrega final): " : "CBOS: ") + cbos + (mais ? " (com " + fmt(mais) + " € de dívidas pagas)" : "") + dif +
         (falta ? " · ⚠️ folha do turno " + fmt(row.numerario_c) + " € (" + (falta > 0 ? "faltam " : "sobram ") + fmt(Math.abs(falta)) + " €)" : "");
       d.style.color = igual ? "var(--mut,#5B6B80)" : "#B45309";
     });
   }
 
   // Ao abrir um dia lê o CBOS; quando a Caixa se redesenha, repõe as dicas (sem voltar a gravar).
+  window.cbosDicas = function () { aplicar(false); };   // depois de um pagamento de dívida (caixa_pnf.js)
   var irDia0 = irDia;
   irDia = async function (d) { var r = await irDia0(d); try { await carregar(); } catch (e) { /* a Caixa funciona sem isto */ } return r; };
   var des0 = desenharDia;

@@ -78,6 +78,9 @@ function pnfDesenhar() {
         "<span><span class='tg " + (pago ? "tp" : "tf") + "'>" + (pago ? "pagamento" : "ficou a dever") + "</span> <b>" + eur(x.valor_c) + "</b>" +
         (ADMIN && !an ? (pago ? " <button class='mini' data-pdes='" + x.id + "'>desfazer</button>" : (!x.pago_dia ? " <button class='mini' data-pan='" + x.id + "'>anular</button>" : " <span class='mut'>paga " + dmy(x.pago_dia).slice(0, 5) + "</span>")) : "") + "</span></div>";
     });
+    var pg = CAIXA_PNF.pagas(PNF.div, DIA, t);
+    if (pg.total) h += "<div class='lin mut' style='font-size:13px'><span>Dívidas antigas pagas neste turno: " + CAIXA_PNF.MEIOS.filter(function (m) { return pg[m]; }).map(function (m) { return m + " " + eur(pg[m]); }).join(" · ") +
+      "</span><b>descontam " + eur(pg.total) + " nas contas do turno</b></div>";
     box.innerHTML = h;
   });
   pnfDeposito();
@@ -113,6 +116,7 @@ async function pnfRecarregarTurnos() {
   var r = await sb.from("msb_turnos").select("*").eq("estacao", EST).eq("dia", DIA); if (r.error) throw r.error;
   (r.data || []).forEach(function (x) { LINHAS[x.turno] = x; });
   await pnfCarregar(DIA); totais();
+  if (window.cbosDicas) window.cbosDicas();
 }
 
 /* ——— janelas ——— */
