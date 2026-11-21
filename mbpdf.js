@@ -61,7 +61,18 @@ async function fazerPdfMB(M, C, ent, inst) {
   if (O) {
     if (y > H - 45) novaPagina(false, true);
     txt("MB do terminal automático · POS " + O.pos + " · pagamento na bomba (só MB e Solred)", 14, y, {b: 1, t: 10, c: azul}); y += 6;
-    if (O.linhas.length) {
+    if (O.conf && O.conf.linhas.length) {   // com o CBOS lido: registado × creditado por dia (21/11/2026)
+      var cabC = function () { ret(14, y - 4.5, W - 28, 7, claro); txt("Dia", 16, y, {b: 1, t: 7.5, c: cinz}); txt("Registado (CBOS)", 66, y, {b: 1, t: 7.5, c: cinz, dir: 1});
+        txt("Creditado", 92, y, {b: 1, t: 7.5, c: cinz, dir: 1}); txt("Diferença", 114, y, {b: 1, t: 7.5, c: cinz, dir: 1}); txt("Documento", 118, y, {b: 1, t: 7.5, c: cinz}); txt("Estado", 168, y, {b: 1, t: 7.5, c: cinz}); y += 6.5; };
+      cabC();
+      O.conf.linhas.forEach(function (l) { if (y > H - 20) { novaPagina(false, true); cabC(); }
+        txt(dmy(l.dia), 16, y); txt(l.reg === null ? "-" : fmt(l.reg), 66, y, {dir: 1}); txt(l.cred === null ? "-" : fmt(l.cred), 92, y, {dir: 1});
+        txt(l.dif === null ? "-" : sinalPdf(l.dif), 114, y, {dir: 1}); txt(l.creditos.map(function (c) { return c.doc; }).join(", ").slice(0, 34) || "-", 118, y, {t: 7});
+        txt({creditado: "creditado", por_creditar: "por creditar", diferenca: "diferença", sem_leitura: "sem leitura CBOS"}[l.est], 168, y, {t: 7.5, c: l.est === "creditado" ? verde : lar2}); y += 5.2; });
+      pg.drawLine({start: {x: mm(14), y: mm(H - y + 3.5)}, end: {x: mm(W - 14), y: mm(H - y + 3.5)}, thickness: 0.6, color: cinz});
+      y += 1.5; txt("Total do terminal automático", 16, y, {b: 1}); txt(fmt(O.conf.T.reg), 66, y, {b: 1, dir: 1}); txt(fmt(O.conf.T.cred), 92, y, {b: 1, dir: 1}); txt(sinalPdf(O.conf.T.dif), 114, y, {b: 1, dir: 1}); y += 5;
+      txt("Registado = OPT dentro dos turnos 1 e 2 + fecho 3 (noite), no dia do turno; uma venda depois da meia-noite pode ser creditada no dia seguinte.", 16, y, {t: 6.8, c: cinz}); y += 6;
+    } else if (O.linhas.length) {
       var cabOpt = function () { ret(14, y - 4.5, W - 28, 7, claro); txt("Dia da operação", 16, y, {b: 1, t: 7.5, c: cinz}); txt("Creditado", 76, y, {b: 1, t: 7.5, c: cinz, dir: 1});
         txt("Documento", 82, y, {b: 1, t: 7.5, c: cinz}); txt("Liquidação de", 150, y, {b: 1, t: 7.5, c: cinz}); y += 6.5; };
       cabOpt();
@@ -74,7 +85,13 @@ async function fazerPdfMB(M, C, ent, inst) {
     if (y > H - 20) novaPagina(false, true);
     ret(14, y - 4.5, W - 28, 8, verdeF);
     txt("Total MB creditado: loja " + fmt(C.T.c) + " € + terminal automático " + fmt(O.total) + " € = " + fmt(C.T.c + O.total) + " €", 16, y + 0.5, {b: 1, t: 9, c: verde});
-    y += 12;
+    y += 9;
+    if (O.reg != null) {
+      ret(14, y - 4.5, W - 28, 8, claro);
+      txt("Total MB registado: loja " + fmt(C.T.r) + " € + terminal automático " + fmt(O.reg) + " € = " + fmt(C.T.r + O.reg) + " €", 16, y + 0.5, {b: 1, t: 9, c: azul});
+      y += 9;
+    }
+    y += 3;
   }
   /* resumo por documento de crédito */
   var porDoc = {}, ord = [];

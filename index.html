@@ -547,6 +547,7 @@ function verAtualizacao(){if(document.hidden||!VERSAO_APP)return;versaoPublicada
 document.addEventListener("visibilitychange",verAtualizacao);window.addEventListener("focus",verAtualizacao);setInterval(verAtualizacao,10*60*1000);
 entrar().catch(function(e){$("#vLogin").hidden=false;$("#lErro").textContent=falhou(e)});
 </script>
+<script src="mb_opt_regras.js"></script>
 <script src="leitores.js"></script>
 <script src="stock.js"></script>
 <script src="equipa.js"></script>

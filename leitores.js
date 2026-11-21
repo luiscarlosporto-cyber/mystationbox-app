@@ -306,6 +306,10 @@ async function carregarRepsol() {
     var trs = (rx.data || []).map(function (t) { return {chave: "TR|" + t.chave, doc: t.chave, numdoc: t.chave, data: t.dia, valor_c: t.valor_c, pos: "", fecho: "", transf: true, ttipo: t.tipo}; });
     var datas = cred.map(function (c) { return c.data; }).concat(trs.map(function (t) { return addDia(t.data, -11); })).concat(docs.map(function (d) { return d.emissao; }).filter(Boolean)).concat([M + "-01", addMes(M, 1) + "-01"]).sort();
     var ini = addDia(datas[0], -2), fim = addDia(datas[datas.length - 1], 2);
+    // MB do OPT registado no CBOS (dono, 21/11/2026): OPT dentro dos turnos + fecho 3; sem acesso ou sem leituras fica como antes
+    var ro = await sb.from("msb_caixa_cbos").select("dia,tipo,mb_c,opt_mb_c,opt_em").eq("estacao", EST).gte("dia", M + "-01").lt("dia", addMes(M, 1) + "-01");
+    OPT_REG = ro.error ? null : MB_OPT.registado(ro.data);
+    if (OPT_REG && !OPT_REG.primeiro) OPT_REG = null;
     var rt = await lerTudo(function () { return sb.from("msb_turnos").select("dia,turno,func,mb_c,solred_c,lit_cl").eq("estacao", EST).gte("dia", ini).lte("dia", fim); }, ["dia", "turno"]); if (rt.error) throw rt.error;
     var turnos = rt.data || [], dias = {};
     turnos.forEach(function (t) { var o = (dias[t.dia] = dias[t.dia] || {t1: {}, t2: {}})[t.turno]; if (t.lit_cl != null) o.lit = (t.lit_cl / 100).toFixed(2).replace(".", ","); if (t.solred_c != null) o.solred = (t.solred_c / 100).toFixed(2).replace(".", ","); });
@@ -407,15 +411,33 @@ function conferenciaMB(nm, tm, ligTurno, primeira, ultima, soltos) {
 }
 /* MB do terminal automático no mês (pela data da operação): não tem turno na caixa, por isso não entra na conferência MB × turnos */
 var MBOPT = null;   // para o PDF da contabilidade (mbpdf.js)
+var OPT_REG = null;   // MB do OPT registado no CBOS no mês (MB_OPT.registado), lido em carregarRepsol
 function seccaoOpt(M, nm, docs) {
   var L = creditosOpt(docs).filter(function (c) { return (c.data || "").slice(0, 7) === M; });
   MBOPT = posOpt() ? {pos: posOpt(), linhas: L, total: L.reduce(function (s, c) { return s + c.valor_c; }, 0)} : null;
   if (!MBOPT) return "";
+  if (OPT_REG) return seccaoOptConf(M, nm, L);
   var cm = 0, cs = 0; L.forEach(function (c) { if ((c.emissao || "").slice(0, 7) > M) cs += c.valor_c; else cm += c.valor_c; });
   return "<div class='liq'><h3>⛽ MB do terminal automático · " + esc(nm) + "<span class='mut' style='font-weight:400;font-size:13px'>POS " + esc(MBOPT.pos) + " · pagamento na bomba (só MB e Solred) · " + L.length + " créditos · " + fmt(MBOPT.total) + " € · liquidado no mês " + fmt(cm) + " € · no mês seguinte " + fmt(cs) + " €</span></h3>" +
     (L.length ? "<div class='sc'><table><thead><tr><th>Dia da operação</th><th>Creditado</th><th class='l'>Documento</th><th>Liquidação de</th></tr></thead><tbody>" + L.map(function (c) {
       return "<tr><td>" + dmy(c.data) + "</td><td class='n'>" + fmt(c.valor_c) + "</td><td class='l'>Liq. " + esc(c.doc) + " · fecho " + esc(c.fecho) + "</td><td>" + (c.emissao ? dmy(c.emissao) : "—") + ((c.emissao || "").slice(0, 7) > M ? " <span class='b wn'>mês seguinte</span>" : "") + "</td></tr>"; }).join("") +
       "</tbody><tfoot><tr><th class='l'>Total</th><th class='n'>" + fmt(MBOPT.total) + "</th><th colspan='2'></th></tr></tfoot></table></div>"
       : "<p class='mut' style='margin:0;font-size:13px'>Sem créditos do terminal automático com operações em " + esc(nm) + " nos documentos carregados.</p>") + "</div>";
+}
+/* Com o CBOS lido (21/11/2026): por dia, MB do OPT registado no CBOS × creditado nas liquidações */
+function seccaoOptConf(M, nm, L) {
+  var C = MB_OPT.conferir(OPT_REG, L), T = C.T;
+  MBOPT.conf = C; MBOPT.reg = T.reg; MBOPT.primeiro = OPT_REG.primeiro;
+  var est = function (e) { return "<b" + (e === "creditado" ? "" : " style='color:var(--wn,#B45309)'") + ">" + MB_OPT.ESTADOS[e] + "</b>"; };
+  return "<div class='liq'><h3>⛽ MB do terminal automático (OPT) · " + esc(nm) + "<span class='mut' style='font-weight:400;font-size:13px'>POS " + esc(MBOPT.pos) +
+    " · registado no CBOS " + fmt(T.reg) + " € · creditado " + fmt(T.cred) + " € · por creditar " + fmt(T.porCreditar) + " €" +
+    (T.semRegisto ? " · " + fmt(T.semRegisto) + " € antes da primeira leitura do CBOS (" + dmy(OPT_REG.primeiro).slice(0, 5) + ")" : "") + "</span></h3>" +
+    "<p class='mut' style='margin:0 0 6px;font-size:12.5px'>Registado = o OPT que o CBOS meteu nos turnos 1 e 2 + o fecho 3 (noite), no dia do turno. Uma venda depois da meia-noite pode vir creditada no dia seguinte: o total do mês é o que vale.</p>" +
+    (C.linhas.length ? "<div class='sc'><table><thead><tr><th>Dia</th><th>MB registado (CBOS)</th><th>MB creditado</th><th>Diferença</th><th class='l'>Documento</th><th class='l'>Estado</th></tr></thead><tbody>" + C.linhas.map(function (l) {
+      return "<tr class='" + (l.est === "creditado" ? "lin-ok" : "lin-wn") + "'><td>" + dmy(l.dia).slice(0, 5) + "</td><td class='n'>" + (l.reg === null ? "—" : fmt(l.reg)) + "</td><td class='n'>" + (l.cred === null ? "—" : fmt(l.cred)) +
+        "</td><td class='n'>" + (l.dif === null ? "—" : sinal(l.dif)) + "</td><td class='l'>" + (l.creditos.map(function (c) { return "Liq. " + esc(c.doc) + " · fecho " + esc(c.fecho) + ((c.emissao || "").slice(0, 7) > M ? " <span class='b wn'>mês seguinte</span>" : ""); }).join("<br>") || "—") +
+        "</td><td class='l'>" + est(l.est) + "</td></tr>"; }).join("") +
+      "</tbody><tfoot><tr><th class='l'>Total</th><th class='n'>" + fmt(T.reg) + "</th><th class='n'>" + fmt(T.cred) + "</th><th class='n'>" + sinal(T.dif) + "</th><th colspan='2'></th></tr></tfoot></table></div>"
+      : "<p class='mut' style='margin:0;font-size:13px'>Sem MB do terminal automático em " + esc(nm) + ".</p>") + "</div>";
 }
 function chipDoc(x) { var d = x.dados; return "<span class='chip'>" + (NOMES_DOC[x.tipo] || x.tipo) + " <b>" + esc(x.numero) + "</b> · " + dmy(x.emissao).slice(0, 5) + (d.total != null ? " · " + MOTOR.pt(d.total) + " €" : "") + (x.pdf ? " <a href='#' data-pdf='" + esc(x.pdf) + "'>PDF</a>" : "") + "</span>"; }
