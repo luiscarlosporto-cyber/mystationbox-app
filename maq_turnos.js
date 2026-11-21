@@ -84,7 +84,7 @@ async function maqTurnos(w) {
       if (ins.error) throw ins.error;
       pend = pend.concat(falta);
     }
-    var tr = await sb.from("msb_turnos").select("dia,turno,func").eq("estacao", est).gte("dia", mes + "-01").lte("dia", fim);
+    var tr = await sb.from("msb_turnos").select("dia,turno,func,tab_c,selado_em").eq("estacao", est).gte("dia", mes + "-01").lte("dia", fim);
     var func = {}; (tr.data || []).forEach(function (t) { func[t.dia + t.turno] = t.func || ""; });
     var T = MAQT.tabela(mes, lidos, cods), n = function (v, c) { return FORMATOS.numero(v, c); }, eur = function (c) { return n(c / 100, 2); };
     var nm = new Date(mes + "-15").toLocaleDateString("pt-PT", {month: "long", year: "numeric"}), erro = P.filter(function (p) { return p.estado === "erro"; }).pop();
@@ -108,7 +108,7 @@ async function maqTurnos(w) {
       (T.linhas.length ? "<div style='overflow-x:auto'><table style='width:100%;border-collapse:collapse;font-size:14px'><thead><tr><th style='text-align:left;padding:6px 4px'>Dia</th><th style='text-align:right;padding:6px 4px'>☀️ M</th><th style='text-align:right;padding:6px 4px'>🌙 T</th><th style='text-align:right;padding:6px 4px'>Dia</th></tr></thead><tbody>" +
         T.linhas.map(function (x) { return "<tr style='border-top:1px solid #e3e8ec'><td style='padding:5px 4px'>" + x.dia.slice(8) + "/" + x.dia.slice(5, 7) + "</td>" + cel(x.t1, func[x.dia + "t1"]) + cel(x.t2, func[x.dia + "t2"]) + "<td style='text-align:right;padding:5px 4px;white-space:nowrap'>" + eur(x.valor_c) + " €</td></tr>"; }).join("") +
         "</tbody><tfoot><tr style='border-top:2px solid #c9d1d8;font-weight:700'><td style='padding:6px 4px'>Total</td>" + cel(T.total.t1) + cel(T.total.t2) + "<td style='text-align:right;padding:6px 4px'>" + eur(T.valor_c) + " €<br><small style='color:#6b7680'>" + n(T.qtd, 0) + " maços</small></td></tr></tfoot></table></div>"
-        : (pend.length ? "" : "<div class='notice'>Sem turnos lidos neste mês.</div>")) + (ADMIN ? "<div id='mqtEnvio' style='margin-top:18px'></div>" : "");
+        : (pend.length ? "" : "<div class='notice'>Sem turnos lidos neste mês.</div>")) + (est === "pnf" ? maqSaidasTabaco(tr.data, mes) : "") + (ADMIN ? "<div id='mqtEnvio' style='margin-top:18px'></div>" : "");
     if (ADMIN) maqEnvio(w, est);
     var bp = w.document.getElementById("mqtPdf"); if (bp) bp.onclick = function () { maqPdfFolha(MAQT.pdf).catch(function (e) { status(false, "⚠ PDF: " + falhou(e)); }); };
     w.document.getElementById("mqtAnt").onclick = function () { MAQT_MES = MAQT.addDia(mes + "-01", -1).slice(0, 7); maqTurnos(w); };
@@ -116,6 +116,20 @@ async function maqTurnos(w) {
     clearTimeout(maqTurnos.t);
     if (pend.length) maqTurnos.t = setTimeout(function () { if (PAGINA === "maq" && est === EST) maqTurnos(w); }, 60000);
   } catch (e) { box.innerHTML = "<div class='notice'>⚠ Máquina por turno: " + esc(falhou(e)) + "</div>"; }
+}
+/* Saídas TABACO do mês (dono, 21/11/2026): o dinheiro que saiu da caixa para a máquina, por turno, como ficou validado na Caixa
+   (campo Saída TABACO = soma das saídas do turno, editadas no Registo diário). Aqui só se consulta. 🔒 = turno selado. */
+function maqSaidasTabaco(turnos, mes) {
+  var D = {}, tot = 0, n = function (c) { return FORMATOS.numero(c / 100, 2) + " €"; };
+  (turnos || []).forEach(function (x) { if (!x.tab_c) return; (D[x.dia] = D[x.dia] || {})[x.turno] = x; tot += x.tab_c; });
+  var dias = Object.keys(D).sort();
+  var cel = function (x) { return "<td style='text-align:right;padding:5px 4px;white-space:nowrap'>" + (x ? n(x.tab_c) + (x.selado_em ? " 🔒" : "") : "<span style='color:#6b7680'>—</span>") + "</td>"; };
+  return "<div style='margin-top:18px'><b style='font-size:17px'>Saídas para a máquina (Saída TABACO)</b>" +
+    "<p style='color:#6b7680;font-size:13px;margin:4px 0 8px'>Dinheiro que saiu da caixa para a máquina do tabaco, como ficou na Caixa (corrige-se no Registo diário, no turno). 🔒 = turno selado.</p>" +
+    (dias.length ? "<div style='overflow-x:auto'><table style='width:100%;border-collapse:collapse;font-size:14px'><thead><tr><th style='text-align:left;padding:6px 4px'>Dia</th><th style='text-align:right;padding:6px 4px'>☀️ M</th><th style='text-align:right;padding:6px 4px'>🌙 T</th><th style='text-align:right;padding:6px 4px'>Dia</th></tr></thead><tbody>" +
+      dias.map(function (d) { var a = D[d].t1, b = D[d].t2; return "<tr style='border-top:1px solid #e3e8ec'><td style='padding:5px 4px'>" + d.slice(8) + "/" + d.slice(5, 7) + "</td>" + cel(a) + cel(b) + "<td style='text-align:right;padding:5px 4px;font-weight:600'>" + n((a ? a.tab_c : 0) + (b ? b.tab_c : 0)) + "</td></tr>"; }).join("") +
+      "</tbody><tfoot><tr style='border-top:2px solid #c9d1d8;font-weight:700'><td style='padding:6px 4px' colspan='3'>Total do mês</td><td style='text-align:right;padding:6px 4px'>" + n(tot) + "</td></tr></tfoot></table></div>"
+      : "<div class='notice'>Sem saídas TABACO registadas neste mês.</div>") + "</div>";
 }
 async function maqTurnosAuto() {
   var est = EST;
