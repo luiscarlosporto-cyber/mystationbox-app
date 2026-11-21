@@ -40,15 +40,17 @@ if (typeof window !== "undefined") (function () {
 
   function desenhar(box, S, C) {
     var turno = function (t) { return t === "t1" ? "Turno 1" : t === "t2" ? "Turno 2" : t; };
-    var h = "<div style='display:flex;justify-content:space-between;align-items:baseline'><h2 style='margin:0'>Faltas</h2><span class='mut' style='font-size:12px'>todas as datas</span></div>" +
-      "<div style='display:flex;justify-content:space-between;margin-top:12px'><b>Saídas de caixa por entregar</b><b>" + eur(FALTAS_REGRAS.total(S)) + "</b></div>";
-    h += S.length ? S.map(function (x) {
+    // Penafiel (21/11/2026, decisão do dono): as saídas de caixa vão para o cofre e entram no depósito; o quadro mostra só os clientes.
+    var soClientes = !!C;
+    var h = "<div style='display:flex;justify-content:space-between;align-items:baseline'><h2 style='margin:0'>Faltas</h2><span class='mut' style='font-size:12px'>todas as datas</span></div>";
+    if (!soClientes) h += "<div style='display:flex;justify-content:space-between;margin-top:12px'><b>Saídas de caixa por entregar</b><b>" + eur(FALTAS_REGRAS.total(S)) + "</b></div>";
+    if (!soClientes) h += S.length ? S.map(function (x) {
       return "<div style='border:1px solid var(--bd);border-radius:12px;padding:10px 12px;margin-top:8px;display:flex;justify-content:space-between;align-items:center;gap:10px'>" +
         "<div><b>" + eur(x.valor_c) + "</b><div class='mut' style='font-size:12px'>" + dmy(x.dia).slice(0, 5) + " · " + turno(x.turno) + (x.func ? " · " + esc(window.CAIXA_CBOS ? CAIXA_CBOS.nome(x.func) : x.func) : "") + (x.nota ? " · " + esc(x.nota) : "") + "</div></div>" +
         "<button class='mini' data-frec='" + esc(x.id) + "' style='background:var(--okb);min-height:40px;white-space:nowrap'>✔ Recebido</button></div>";
     }).join("") : "<div class='ok' style='margin-top:8px'>✔ Nenhuma saída por entregar.</div>";
     if (C) {
-      h += "<div style='display:flex;justify-content:space-between;margin-top:16px;padding-top:12px;border-top:1px solid var(--bd)'><b>Clientes a dever</b><b>" + eur(FALTAS_REGRAS.total(C)) + "</b></div>";
+      h += "<div style='display:flex;justify-content:space-between;margin-top:12px'><b>Clientes a dever</b><b>" + eur(FALTAS_REGRAS.total(C)) + "</b></div>";
       h += C.length ? C.map(function (x) {
         return "<div style='border:1px solid var(--bd);border-radius:12px;padding:10px 12px;margin-top:8px'><div style='display:flex;justify-content:space-between;gap:8px'><b>" + esc(x.cliente) + "</b><b>" + eur(x.valor_c) + "</b></div>" +
           "<div class='mut' style='font-size:12px'>" + dmy(x.dia).slice(0, 5) + " · " + turno(x.turno) + (x.doc ? " · " + esc(x.doc) : "") + "</div>" +

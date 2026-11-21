@@ -464,7 +464,7 @@ function desenharDia(pronto){var h="";if(pronto)carregarFuncionarios();
     h+="<div class='card'><div class='ch "+t+"'><span>"+(t==="t1"?"☀️ Turno 1":"🌙 Turno 2")+"</span><span class='dif' id='df-"+t+"'>—</span></div><div class='cb'><div class='fl'>";
     h+="<label class='w'>👤 Funcionário<input data-t='"+t+"' data-k='func' list='lFunc' autocomplete='off' value='"+esc(r.func||"")+"' placeholder='Escolher ou escrever o nome'"+(ADMIN&&pronto?"":" disabled")+"></label>";
     camposCaixa(EST).forEach(function(c){var v=r[c[1]];h+="<label"+(CAMPOS.indexOf(c)<0?" class='novo'":"")+">"+c[2]+"<input inputmode='decimal' data-t='"+t+"' data-k='"+c[0]+"' value='"+(v==null?"":fmt(v))+"' placeholder='0,00'"+(txt[c[0]]&&/[-+]/.test(String(txt[c[0]]).slice(1))?" title='Escrito como "+esc(txt[c[0]])+"'":"")+(ADMIN&&pronto?"":" disabled")+"></label>"});
-    h+="</div><div class='sai' id='sai-"+t+"'></div>"+(EST==="pnf"?"<div class='pnf' id='pnf-"+t+"'></div>":"")+"<div class='res'><span>Recebido <b id='rc-"+t+"'>—</b></span><span>Diferença <b id='dd-"+t+"'>—</b></span></div></div></div>"});
+    h+="</div>"+(EST==="pnf"?"":"<div class='sai' id='sai-"+t+"'></div>")+(EST==="pnf"?"<div class='pnf' id='pnf-"+t+"'></div>":"")+"<div class='res'><span>Recebido <b id='rc-"+t+"'>—</b></span><span>Diferença <b id='dd-"+t+"'>—</b></span></div></div></div>"});
   $("#turnos").innerHTML=h;
   $$("#turnos input[data-k]").forEach(function(el){el.onchange=function(){guardar(el)};el.onfocus=function(){var r=LINHAS[el.dataset.t]||{},o=(r.txt||{})[el.dataset.k];if(o&&/[-+]/.test(String(o).slice(1)))el.value=o}});
   ["t1","t2"].forEach(desenharSaidas);totais()}
