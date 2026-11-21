@@ -103,7 +103,7 @@ if (typeof window !== "undefined") (function () {
       var falta = k === "num" ? CAIXA_CBOS.faltaNumerario(row, prop[k]) : null;
       if (falta) igual = false;
       var mais = pg && (k === "mb" ? pg.MB : k === "solred" ? pg.Solred : 0);
-      d.textContent = (k === "num" ? "CBOS (saídas + TABACO + entrega final): " : "CBOS: ") + cbos + (mais ? " (com " + fmt(mais) + " € de dívidas pagas)" : "") + dif +
+      d.textContent = (k === "num" ? (EST === "pnf" ? "CBOS (saídas + TABACO + entrega final): " : "CBOS (saídas + entrega final): ") : "CBOS: ") + cbos + (mais ? " (com " + fmt(mais) + " € de dívidas pagas)" : "") + dif +
         (falta ? " · ⚠️ folha do turno " + fmt(row.numerario_c) + " € (" + (falta > 0 ? "faltam " : "sobram ") + fmt(Math.abs(falta)) + " €)" : "");
       d.style.color = igual ? "var(--mut,#5B6B80)" : "#B45309";
     });
