@@ -155,11 +155,16 @@ async function carregarAvisos() {
     h += P.map(aviQuadro).join("") + AVI_PRECOS.filter(function (x) { return x.estado === "lido" && x.aprovado_em && !x.ense_erro; }).map(aviEspera).join("");
     if (p) h += "<div class='bad'>⚠️ O OCTAN AI não corre desde " + aviDataHora(p.criado) + ". Confirma se o portátil do OCTAN AI está ligado.</div>";
     var porLer = L.filter(function (a) { return !a.lido_em && a.nivel !== "info"; });
-    if (porLer.length) h += "<div class='bar'><button class='btn' id='aviTudo'>✔ Marcar tudo como visto (" + porLer.length + ")</button></div>";
+    /* Escolher avisos e dar «Visto» só a esses (dono, 24/11/2026: «selecionar, selecionar todos, e visto») */
+    if (porLer.length) h += "<div class='bar' style='align-items:center;gap:10px;flex-wrap:wrap'>" +
+      "<label style='display:flex;align-items:center;gap:8px;min-height:40px;cursor:pointer'><input type='checkbox' id='aviTodos' style='width:20px;height:20px'> Selecionar todos</label>" +
+      "<button class='btn p' id='aviSel' disabled>✔ Visto nos selecionados (0)</button>" +
+      "<button class='btn' id='aviTudo'>✔ Marcar tudo como visto (" + porLer.length + ")</button></div>";
     if (!L.length) h += "<div class='mut'>Ainda não há avisos.</div>";
     var cartaoAviso = function (a) {
       var n = AVI_NIVEL[a.nivel] || ["", a.nivel], novo = !a.lido_em && a.nivel !== "info";
-      return "<div class='card' style='padding:12px 14px" + (novo ? "" : ";opacity:.72") + "'><b>" + n[0] + " " + esc(a.titulo) + "</b>" +
+      return "<div class='card' style='padding:12px 14px" + (novo ? "" : ";opacity:.72") + "'>" +
+        (novo ? "<label style='display:flex;gap:10px;align-items:flex-start;cursor:pointer'><input type='checkbox' data-avs='" + a.id + "' style='width:20px;height:20px;margin-top:2px;flex:none'><b>" : "<b>") + n[0] + " " + esc(a.titulo) + "</b>" + (novo ? "</label>" : "") +
         "<div class='mut'>" + esc(aviLoja(a.estacao)) + " · " + n[1] + " · " + aviDataHora(a.criado) + (a.lido_em ? " · visto por " + esc(a.lido_por || "") : "") + "</div>" +
         (a.detalhe ? "<div style='white-space:pre-wrap;margin-top:6px'>" + esc(a.detalhe) + "</div>" : "") +
         (novo ? "<div style='margin-top:8px'><button class='btn' data-avi='" + a.id + "'>✔ Visto</button></div>" : "") + "</div>";
@@ -187,6 +192,16 @@ async function carregarAvisos() {
     $$("#aviCorpo [data-pv]").forEach(function (b) { b.onclick = async function (ev) { ev.preventDefault(); var r = await sb.from("msb_pedidos").update({visto_em: new Date().toISOString()}).eq("id", Number(b.dataset.pv)); if (r.error) return status(false, "⚠ " + falhou(r.error)); carregarAvisos(); }; });
     $$("#aviCorpo [data-erv]").forEach(function (b) { b.onclick = function () { aviErroVisto(b.dataset.erv === "todos" ? er.ids : [Number(b.dataset.erv)]); }; });
     var t = $("#aviTudo"); if (t) t.onclick = function () { aviVisto(porLer.map(function (a) { return a.id; })); };
+    var caixas = $$("#aviCorpo [data-avs]"), todos = $("#aviTodos"), bSel = $("#aviSel");
+    var escolhidos = function () { return caixas.filter(function (c) { return c.checked; }).map(function (c) { return Number(c.dataset.avs); }); };
+    var contar = function () {
+      var n = escolhidos().length;
+      if (bSel) { bSel.disabled = !n; bSel.textContent = "✔ Visto nos selecionados (" + n + ")"; }
+      if (todos) { todos.checked = n > 0 && n === caixas.length; todos.indeterminate = n > 0 && n < caixas.length; }
+    };
+    caixas.forEach(function (c) { c.onchange = contar; });
+    if (todos) todos.onchange = function () { caixas.forEach(function (c) { c.checked = todos.checked; }); contar(); };
+    if (bSel) bSel.onclick = function () { var ids = escolhidos(); if (ids.length) aviVisto(ids); };
   } catch (e) { box.innerHTML = "<div class='bad'>" + esc(falhou(e)) + "</div>"; }
 }
 /* erros da app nos telemóveis e computadores (msb_erros, 13/11/2026): os por ver dos últimos 30 dias */
