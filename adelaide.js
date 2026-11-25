@@ -241,7 +241,7 @@ function fadCatalogo() {
 }
 function desenharFad() {
   var h = "<div class='bar'><button class='btn p' id='fadPdf'>🧾 Carregar fatura da Adelaide (PDF)</button><input type='file' id='fadFPdf' accept='application/pdf' hidden>" +
-    "<button class='btn' id='fadCat'>📒 Carregar catálogo do CBOS (Excel)</button><input type='file' id='fadFCat' accept='.xlsx' hidden><span id='fadSt' class='st'></span></div>";
+    "<button class='btn' id='fadCat'>📒 Carregar catálogo do CBOS (Excel)</button><input type='file' id='fadFCat' hidden><span id='fadSt' class='st'></span></div>";
   if (!FAD.faturas.length) h += "<div class='card' style='padding:14px'><b>Ainda não há faturas da Adelaide nesta estação.</b><p class='mut' style='margin:6px 0 0'>As faturas que chegam por email entram sozinhas. Também pode carregar aqui o PDF.</p></div>";
   else {
     if (!FAD.faturas.some(function (f) { return f.id === FAD.sel; })) FAD.sel = FAD.faturas[0].id;
@@ -254,6 +254,7 @@ function desenharFad() {
   $("#fadPdf").onclick = function () { $("#fadFPdf").click(); };
   $("#fadFPdf").onchange = function () { var f = this.files && this.files[0]; this.value = ""; if (f) importarFaturaAdelaide(f); };
   $("#fadCat").onclick = function () { $("#fadFCat").click(); };
+  /* sem filtro de tipo (25/11/2026): no telemóvel o .xlsx aparecia a cinzento; o leitor recusa o que não for um catálogo */
   $("#fadFCat").onchange = function () { var f = this.files && this.files[0]; this.value = ""; if (f) importarCatalogo(f); };
   $$("#fadCorpo [data-fat]").forEach(function (t) { t.onclick = function () { FAD.sel = +t.dataset.fat; desenharFad(); }; });
   var se = $("#fadEnc"); if (se) se.onchange = function () { if (se.value) fadMudarEnc(se.value); };
