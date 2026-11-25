@@ -14,7 +14,7 @@ var AREAS = [   // reorganização de 10/11/2026 (dono, «avança com tudo»): c
   {id: "res", n: "💰 Resultados", adm: 1, p: [["cdm", "Conta do mês", {g: "O mês"}], ["luc", "Lucro (margens)", {g: "O mês"}], ["mes", "Resultado mensal", {g: "O mês"}], ["ven", "Vendas e margens", {g: "Vendas"}], ["va", "Relatório de vendas", {g: "Vendas"}], ["maq", "Máquina de tabaco", {g: "Vendas"}], ["fun", "Por funcionário", {g: "Análise"}]]},
   {id: "fra", n: "🔎 Fraude", adm: 1, p: [["fra", "Desvios por colaborador"]]},   // 12/11/2026, aprovado pelo dono: app/fraude.js
   {id: "dcs", n: "📋 Documentos", adm: 1, p: [["kms", "Mapa de kms do gerente"]]},   // «Documentos» acrescentado em beta/paginas.js
-  {id: "eqp", n: "👥 Equipa", b: "Gestão", p: [["eq", "Equipa e acessos", {adm: 1}], ["div", "Acordos de dívida", {adm: 1}]]},   // «Acordos de dívida» 16/11/2026: app/dividas.js   // «Horário» (também do funcionário) acrescentado em beta/paginas.js
+  {id: "eqp", n: "👥 Equipa", b: "Gestão", p: [["eq", "Equipa e acessos", {adm: 1}], ["div", "Acordos de dívida", {adm: 1}], ["pto", "Ponto Digital", {adm: 1}]]},   // «Acordos de dívida» 16/11/2026: app/dividas.js   // «Horário» (também do funcionário) acrescentado em beta/paginas.js
   {id: "def", n: "⚙️ Definições", adm: 1, p: [["mrg", "Margens e custos"], ["prod", "Produtos e códigos"], ["cfg", "Configuração do stock"]]}
 ];
 /* páginas do módulo de stock: separador e cartões (pelo título, ou "#id" do cartão) a mostrar ou esconder.
@@ -29,7 +29,7 @@ var NEXP = {
   prod: {tab: "settings", only: ["Gestão de produtos"]},
   cfg: {tab: "settings", only: ["Configuração da base de dados central", "Importante"]}
 };
-var VISTA_DA = {avi: "avi", ini: "ini", reg: "reg", sai: "sai", his: "his", ven: "tab", comh: "tab", mov: "tab", rep: "rep", tms: "tms", mes: "mes", fun: "fun", eq: "ges", luc: "luc", cdm: "cdm", mrg: "mrg", comb: "comb", ense: "ense", va: "va", kms: "kms", pre: "pre", dig: "dig", dsp: "dsp", ban: "ban", liv: "liv", fra: "fra", div: "div", red: "red", fad: "fad", cdv: "cdv"};
+var VISTA_DA = {avi: "avi", ini: "ini", reg: "reg", sai: "sai", his: "his", ven: "tab", comh: "tab", mov: "tab", rep: "rep", tms: "tms", mes: "mes", fun: "fun", eq: "ges", luc: "luc", cdm: "cdm", mrg: "mrg", comb: "comb", ense: "ense", va: "va", kms: "kms", pre: "pre", dig: "dig", dsp: "dsp", ban: "ban", liv: "liv", fra: "fra", div: "div", pto: "pto", red: "red", fad: "fad", cdv: "cdv"};
 var PAGINA = "ini";
 /* confirmação: na beta é uma janela da app; na versão atual continua a do navegador */
 function msbConfirma(t, acao) { return window.MSB_NAV ? MSB_NAV.confirma(t, acao) : Promise.resolve(confirm(t)); }
@@ -98,6 +98,7 @@ window.depoisVista = function (v) {
   if (v === "red") carregarReducao();
   if (v === "fad") carregarFad();
   if (v === "cdv") carregarClientesDever();
+  if (v === "pto") carregarPonto();
 };
 
 /* ---------------- módulo de stock embutido ---------------- */

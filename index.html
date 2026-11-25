@@ -182,6 +182,27 @@ details.grp{background:var(--card);border:1px solid var(--bd);border-radius:10px
 details.grp summary{cursor:pointer;font-weight:700}
 details.grp div{font-size:14px;margin:4px 0}
 textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px;background:var(--in);font:12px monospace;color:var(--fg)}
+/* Ponto Digital (25/11/2026): ecrã do colaborador segundo a sugestão do dono */
+.pto{padding:22px 18px;text-align:center;display:grid;gap:12px;max-width:520px;margin:0 auto;width:100%;box-sizing:border-box}
+.pto-rot{font-size:13px;letter-spacing:.08em;color:var(--mut)}
+.pto-nome{font-size:28px;font-weight:700;color:#1B3A63}
+.pto-turno{color:var(--mut);font-size:15px}
+.pto-relogio{background:#EEF5FF;border-radius:16px;padding:14px}
+.pto-hora{font-size:44px;font-weight:700;color:#1B3A63;line-height:1.1;font-variant-numeric:tabular-nums}
+.pto-data{color:var(--mut);font-size:14px;margin-top:4px}
+.pto-faixa{background:var(--soft);border-radius:14px;padding:11px 12px;font-size:15px}
+.pto-faixa.ok{background:var(--okb);color:var(--ok);font-weight:600}
+.pto-faixa.bad{background:var(--badb);color:var(--bad);font-weight:600}
+.pto-btn{display:grid;gap:4px;justify-items:center;width:100%;border:0;border-radius:18px;padding:20px 14px;background:#1B3E6B;color:#fff;cursor:pointer;min-height:110px}
+.pto-btn.sai{background:#9A3412}
+.pto-btn b{font-size:22px;letter-spacing:.02em}.pto-btn small{font-size:14px;opacity:.9}.pto-ic{font-size:18px;font-weight:700}
+.pto-btn:disabled{opacity:.6;cursor:wait}
+.pto-nota{color:var(--mut);font-size:13px}
+.pto-teste{background:var(--wnb);color:var(--wn);border-radius:10px;padding:7px 10px;font-size:13px;font-weight:600}
+.pto-lista{list-style:none;margin:0;padding:0;display:grid;gap:6px}.pto-lista li.bad{color:var(--bad)}
+.pto-grelha{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.pto-cp{display:grid;gap:3px;font-size:13px;color:var(--mut)}.pto-cp input{font-size:16px;padding:8px;border:1px solid var(--bd);border-radius:8px;color:var(--fg)}
+#ptoHoras input{font-size:15px;padding:5px;border:1px solid var(--bd);border-radius:6px}
 </style>
 <link rel="stylesheet" href="beta/beta.css?v=d1f0028e">
 </head>
@@ -284,6 +305,8 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
   <div id="v-red" class="v" hidden><div id="redCorpo" style="display:grid;gap:14px"></div></div>
   <div id="v-fad" class="v" hidden><div id="fadCorpo" style="display:grid;gap:14px"></div></div>
   <div id="v-cdv" class="v" hidden><div id="cdvCorpo" style="display:grid;gap:14px"></div></div>
+  <!-- EQUIPA: PONTO DIGITAL (25/11/2026) -->
+  <div id="v-pto" class="v" hidden><div id="ptoCorpo" style="display:grid;gap:14px"></div></div>
   <!-- RELATÓRIOS: ENSE MENSAL -->
   <div id="v-ense" class="v" hidden>
     <div class="bar"><button class="btn" id="eAnt">‹</button><input type="month" id="eMes"><button class="btn" id="eSeg">›</button><button class="btn p" id="bEnsePdf">📄 Gerar PDF para a ENSE</button></div>
@@ -590,6 +613,8 @@ entrar().catch(function(e){$("#vLogin").hidden=false;$("#lErro").textContent=fal
 <script src="caixa_cbos.js"></script>
 <script src="selar.js"></script>
 <script src="saidas_tabaco.js"></script>
+<script src="ponto_regras.js"></script>
+<script src="ponto.js"></script>
 <script src="beta/beta.js?v=ab58b016"></script>
 <script src="beta/painel_regras.js?v=ee621378"></script>
 <script src="beta/painel.js?v=86587fe8"></script>
