@@ -61,10 +61,30 @@ async function importarCatalogo(f) {
       rel.push({est: est, m: c.mudou, primeiro: !(a.data || []).length});
     }
     FAD.relCat = rel;
+    var barras = "";
+    try { barras = await fadGravarBarras(d, ests, eu, quando); } catch (e) { barras = " Códigos de barras não gravados: " + falhouBarras(e); }
     try { FAD.relCods = await fadVerificarCodigos(); } catch (e) { FAD.relCods = {erro: falhou(e)}; }
-    fadMsg("Catálogo do CBOS atualizado (" + d.artigos.length + " artigos).", true);
+    fadMsg("Catálogo do CBOS atualizado (" + d.artigos.length + " artigos)." + barras, true);
     carregarFad();
   } catch (e) { fadMsg(falhouFad(e)); }
+}
+
+/* Códigos de barras do catálogo (25/11/2026): msb_catalogo_barras, por estação. Os que deixam de vir no export ficam
+   inativos (não se apagam); os ensinados à mão (origem manual) não se mexem. Devolve o texto para a mensagem. */
+function falhouBarras(e) { var m = falhou(e); return /msb_catalogo_barras|does not exist|schema cache|42P01|PGRST205/i.test(m + " " + (e && e.code || "")) ? "a tabela ainda não está ativa na base de dados." : m; }
+async function fadGravarBarras(d, ests, eu, quando) {
+  if (!d.barras.length && !d.avisos_barras.length) return "";
+  var n = 0;
+  for (var i = 0; i < ests.length; i++) {
+    var est = ests[i].id, novos = {};
+    d.barras.forEach(function (b) { novos[b.cod_barras] = 1; });
+    var a = await lerTudo(function () { return sb.from("msb_catalogo_barras").select("cod_barras,poscode,quantidade,origem,ativo").eq("estacao", est).order("cod_barras"); }, ["cod_barras"]); if (a.error) throw a.error;
+    var L = d.barras.map(function (b) { return {estacao: est, cod_barras: b.cod_barras, poscode: b.poscode, quantidade: b.quantidade, origem: "cbos", ativo: true, importado_em: quando, importado_por: eu}; });
+    (a.data || []).forEach(function (x) { if (x.origem === "cbos" && x.ativo && !novos[x.cod_barras]) L.push({estacao: est, cod_barras: x.cod_barras, poscode: x.poscode, quantidade: x.quantidade, origem: "cbos", ativo: false, importado_em: quando, importado_por: eu}); });
+    for (var k = 0; k < L.length; k += 500) { var g = await sb.from("msb_catalogo_barras").upsert(L.slice(k, k + 500), {onConflict: "estacao,cod_barras"}); if (g.error) throw g.error; }
+    n = d.barras.length;
+  }
+  return " " + n + " códigos de barras gravados." + (d.avisos_barras.length ? " ⚠️ " + d.avisos_barras.length + " ficaram de fora: " + d.avisos_barras.slice(0, 3).join("; ") + (d.avisos_barras.length > 3 ? "…" : "") : "");
 }
 
 /* Depois de cada catálogo novo (dono, 19/11/2026): os códigos novos dos fornecedores por confirmar (Painel → OCTAN AI)
@@ -86,7 +106,7 @@ function fadCodigos(v) {
     L.map(function (x) { var c = x.c;
       return "<tr><td class='l'>" + esc(nomeEstFad(c.estacao)) + "</td><td class='l'>" + esc(c.codigo + " · " + (c.descricao || "")) + "</td><td class='n'>" + (c.pvp_fatura_c > 0 ? fmt(c.pvp_fatura_c) : "—") + "</td><td class='l'>" +
         (x.artigo ? esc(x.artigo.repsol_code + " · " + x.artigo.name) + (x.pvp_c ? " · " + fmt(x.pvp_c) + " €" : "") : "—") + "</td><td class='l'>" + EST[x.estado] + "</td></tr>"; }).join("") +
-    "</tbody></table></div><p class='mut' style='margin:4px 0'>Confirme cada código em 🏠 Painel → OCTAN AI. Os que não estão no catálogo: crie-os no CBOS e carregue um catálogo novo. Atenção: o catálogo só traz as famílias que exportou no CBOS (este traz só tabaco); um artigo de outra família (ex.: bolachas) aparece sempre como «não está no catálogo».</p>";
+    "</tbody></table></div><p class='mut' style='margin:4px 0'>Confirme cada código em 🏠 Painel → OCTAN AI. Os que não estão no catálogo: crie-os no CBOS e carregue um catálogo novo. Atenção: o catálogo só traz as famílias que exportou no CBOS; um artigo de uma família que não exportou aparece sempre como «não está no catálogo».</p>";
 }
 
 /* ---------- ler e conferir ---------- */
