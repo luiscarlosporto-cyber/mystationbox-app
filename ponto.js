@@ -29,10 +29,11 @@ async function carregarPonto() {
     var q = await Promise.all([
       sb.rpc("msb_ponto_meu_dia", {p_estacao: est}),
       sb.from("msb_ponto_registos").select("*").eq("user_id", EU.id).eq("dia", hoje).order("hora").order("id"),   // as minhas, nas duas estações
-      sb.from("msb_ponto_avisos").select("versao").eq("user_id", EU.id).eq("versao", PTO_AVISO_VERSAO).maybeSingle()
+      sb.from("msb_ponto_avisos").select("versao").eq("user_id", EU.id).eq("versao", PTO_AVISO_VERSAO).maybeSingle(),
+      sb.from("msb_ponto_push").select("id,endpoint").eq("user_id", EU.id)
     ]);
     q.forEach(function (r) { if (r.error) throw r.error; });
-    var X = {est: est, hoje: hoje, adm: adm, meu: q[0].data || {}, meus: q[1].data || [], aviso: !!q[2].data, reg: [], local: null, horas: [], nomes: {}, legenda: [], contas: [], contasEst: [], perfis: []};
+    var X = {est: est, hoje: hoje, adm: adm, meu: q[0].data || {}, meus: q[1].data || [], aviso: !!q[2].data, push: q[3].data || [], pushAqui: await ptoSubAtual(), reg: [], local: null, horas: [], nomes: {}, legenda: [], contas: [], contasEst: [], perfis: []};
     if (adm) {
       var w = await Promise.all([
         sb.from("msb_ponto_locais").select("*").eq("estacao", est).maybeSingle(),
@@ -92,9 +93,13 @@ function desenharPonto() {
     return "<li class='" + (x.estado === "aceite" && !x.anulado_por ? "ok" : "bad") + "'><b>" + ptoHora(x.hora) + "</b> " + (x.tipo === "entrada" ? "Entrada" : "Saída") + (x.estacao !== X.est ? " (" + esc(ptoNomeEst(x.estacao)) + ")" : "") +
       (x.estado === "aceite" ? (x.anulado_por ? " · anulada" : " · ✅ a " + (x.distancia_m == null ? "—" : x.distancia_m + " m")) : " · ❌ " + esc(PONTO.MOTIVOS[x.motivo] || x.motivo)) + "</li>"; }).join("") + "</ul>" : "<p class='mut' style='margin:0'>Ainda não há registos hoje.</p>") + "</div>";
 
+  if (M.pode_picar || X.adm) h += ptoLembretesHtml();
   if (X.adm) h += ptoAdminHtml();
   box.innerHTML = h;
   if ($("#ptoBtn")) $("#ptoBtn").onclick = function () { ptoPicar(prox); };
+  if ($("#ptoLembAtivar")) $("#ptoLembAtivar").onclick = ptoLembretesAtivar;
+  if ($("#ptoLembDesativar")) $("#ptoLembDesativar").onclick = ptoLembretesDesativar;
+  if ($("#ptoLembTeste")) $("#ptoLembTeste").onclick = ptoLembretesTeste;
   if (X.adm) ptoAdminLigar();
   if (!PTO.relogio) PTO.relogio = setInterval(function () { var el = $("#ptoRelogio"); if (!el) { clearInterval(PTO.relogio); PTO.relogio = null; return; } el.textContent = new Date().toLocaleTimeString("pt-PT", {timeZone: "Europe/Lisbon", hour: "2-digit", minute: "2-digit"}); }, 5000);
 }
@@ -155,7 +160,9 @@ function ptoAdminHtml() {
     campo("ptoRaio", "Raio aceite (m)", L.raio_m || 100) + campo("ptoPrec", "Precisão máxima do sinal (m)", L.precisao_max_m || 75) +
     campo("ptoTolE", "Tolerância de atraso (min)", L.tol_entrada_min == null ? 5 : L.tol_entrada_min) + campo("ptoTolS", "Tolerância de saída antecipada (min)", L.tol_saida_min == null ? 5 : L.tol_saida_min) +
     campo("ptoAnt", "Pode entrar até (min antes do turno)", L.antecedencia_max_min == null ? 60 : L.antecedencia_max_min) + campo("ptoExtra", "Tempo a mais conta a partir de (min)", L.extra_min == null ? 15 : L.extra_min) +
-    campo("ptoEsq", "Aviso de saída esquecida (horas após o fim)", L.saida_esquecida_h || 2) + "</div>" +
+    campo("ptoEsq", "Aviso de saída esquecida (horas após o fim)", L.saida_esquecida_h || 2) +
+    campo("ptoLembMin", "Lembrete no telemóvel (min antes)", L.lembrete_min || 5) + "</div>" +
+    "<label style='display:flex;gap:8px;align-items:center;margin:10px 0 0'><input type='checkbox' id='ptoLemb'" + (L.lembretes === false ? "" : " checked") + "> <span>🔔 Enviar lembretes de entrada e de saída aos colaboradores que os aceitaram</span></label>" +
     "<label style='display:flex;gap:8px;align-items:center;margin:10px 0'><input type='checkbox' id='ptoAtivo'" + (L.ativo ? " checked" : "") + "> <span><b>Ponto Digital ativo para os colaboradores</b> (desligado = modo de teste, só o administrador)</span></label>" +
     "<button class='btn p' id='ptoGuardar'>Guardar definições</button> <span id='ptoGuardarRes'></span>" +
     "<h4 style='margin:16px 0 6px'>Horas dos turnos</h4><p class='mut' style='margin:0 0 6px'>Turno partido: uma linha por parte (ex.: MT 1 e MT 2). Nenhum turno passa da meia-noite.</p>" +
@@ -217,10 +224,10 @@ function ptoAdminLigar() {
     var lat = n("ptoLat"), lon = n("ptoLon");
     if (!lat || !lon || Math.abs(lat) > 90 || Math.abs(lon) > 180) { o.innerHTML = "<span class='msgErr'>✖ Indique a latitude e a longitude da estação.</span>"; return; }
     var reg = {estacao: PTO.X.est, lat: +lat.toFixed(6), lon: +lon.toFixed(6), raio_m: i("ptoRaio"), precisao_max_m: i("ptoPrec"), tol_entrada_min: i("ptoTolE"), tol_saida_min: i("ptoTolS"),
-      antecedencia_max_min: i("ptoAnt"), extra_min: i("ptoExtra"), saida_esquecida_h: i("ptoEsq"), ativo: $("#ptoAtivo").checked, atualizado_em: new Date().toISOString(), atualizado_por: EU.id};
+      antecedencia_max_min: i("ptoAnt"), extra_min: i("ptoExtra"), saida_esquecida_h: i("ptoEsq"), lembrete_min: i("ptoLembMin"), lembretes: $("#ptoLemb").checked, ativo: $("#ptoAtivo").checked, atualizado_em: new Date().toISOString(), atualizado_por: EU.id};
     if (reg.ativo && !(PTO.X.local && PTO.X.local.ativo) && !await msbConfirma("Ativar o Ponto Digital para os colaboradores de " + ptoNomeEst(PTO.X.est) + "? A partir daí só picam colaboradores com conta ligada.")) return;
     var r = await sb.from("msb_ponto_locais").upsert(reg, {onConflict: "estacao"});
-    if (r.error) { o.innerHTML = "<span class='msgErr'>✖ " + esc(r.error.code === "23514" ? "Há um valor fora dos limites (raio 20 a 500 m, precisão 10 a 500 m, tolerâncias até 120 min)." : falhouPto(r.error)) + "</span>"; return; }
+    if (r.error) { o.innerHTML = "<span class='msgErr'>✖ " + esc(r.error.code === "23514" ? "Há um valor fora dos limites (raio 20 a 500 m, precisão 10 a 500 m, tolerâncias até 120 min, lembrete de 1 a 30 min)." : falhouPto(r.error)) + "</span>"; return; }
     o.textContent = "✅ Guardado"; await carregarPonto();
   };
   $("#ptoGuardarHoras").onclick = async function () {
@@ -241,3 +248,68 @@ function ptoAdminLigar() {
     o.textContent = "✅ Guardado"; await carregarPonto();
   };
 }
+
+/* ---------- lembretes no telemóvel (25/11/2026) ----------
+ * A notificação só lembra: não regista a picagem nem lê a localização. Chave pública VAPID (a privada está no Vault). */
+var PTO_VAPID = "BNbX_vJagtNkCYmi3G42Wf_bPP2AN41jxrGIDcOd4c287hewVa35leClr2-K2iEohQxebpYOCrQ6F07KmkWOfcU";
+function ptoPushSuportado() { return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window; }
+function ptoIOS() { return /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1); }
+function ptoInstalada() { return (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true; }
+async function ptoSubAtual() {
+  try { if (!ptoPushSuportado()) return null; var r = await navigator.serviceWorker.getRegistration(); return r ? await r.pushManager.getSubscription() : null; } catch (e) { return null; }
+}
+function ptoLembretesHtml() {
+  var X = PTO.X, aqui = X.pushAqui && X.push.some(function (p) { return p.endpoint === X.pushAqui.endpoint; }), msg = "", btn = "";
+  if (!ptoPushSuportado()) msg = ptoIOS() && !ptoInstalada()
+    ? "No iPhone, os lembretes só funcionam com a app instalada: no Safari toque em <b>Partilhar</b> → <b>Adicionar ao ecrã principal</b> e abra a app pelo ícone."
+    : "Este navegador não recebe notificações. Use o Chrome no Android ou a app instalada no iPhone.";
+  else if (Notification.permission === "denied") msg = "As notificações estão bloqueadas para esta app. Autorize-as nas definições do telemóvel (notificações do navegador ou da app) e volte aqui.";
+  else if (aqui) { msg = X.meu.lembretes === false ? "ℹ️ Este telemóvel está inscrito, mas os lembretes estão desligados nesta estação." : "✅ Este telemóvel recebe os lembretes " + (X.meu.lembrete_min || 5) + " minutos antes de entrar e de sair."; btn = "<button class='btn' id='ptoLembTeste'>Enviar notificação de teste</button><button class='btn' id='ptoLembDesativar'>Desligar neste telemóvel</button>"; }
+  else { msg = "Receba um aviso no telemóvel uns minutos antes de começar e de acabar o turno, para não se esquecer de registar."; btn = "<button class='btn p' id='ptoLembAtivar'>🔔 Ativar lembretes</button>"; }
+  return "<div class='card' style='padding:14px'><h3 style='margin:0 0 6px'>🔔 Lembretes no telemóvel</h3><p style='margin:0 0 8px'>" + msg + "</p>" +
+    "<p class='mut' style='margin:0 0 8px'>O lembrete não regista nada: tem sempre de tocar em «Registar». A localização continua a ser pedida só nesse momento.</p>" +
+    (btn ? "<div class='bar'>" + btn + "</div>" : "") + "<div id='ptoLembRes' class='mut' style='margin-top:6px'></div></div>";
+}
+function ptoChaveBytes(b) { var s = atob(b.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((b.length + 3) % 4)); return Uint8Array.from(s, function (c) { return c.charCodeAt(0); }); }
+async function ptoLembretesAtivar() {
+  var o = $("#ptoLembRes"); o.textContent = "A pedir autorização…";
+  try {
+    var perm = await Notification.requestPermission();
+    if (perm !== "granted") { o.textContent = "❌ Sem autorização não é possível enviar lembretes."; return; }
+    var reg = await navigator.serviceWorker.ready;
+    var sub = await reg.pushManager.getSubscription() || await reg.pushManager.subscribe({userVisibleOnly: true, applicationServerKey: ptoChaveBytes(PTO_VAPID)});
+    var j = sub.toJSON();
+    var r = await sb.from("msb_ponto_push").upsert({user_id: EU.id, endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, aparelho: navigator.userAgent.slice(0, 160)}, {onConflict: "endpoint"});
+    if (r.error) { o.textContent = "❌ " + (r.error.code === "42501" ? "Este telemóvel já está inscrito com outra conta. Desligue-o nessa conta primeiro." : falhouPto(r.error)); return; }
+    await carregarPonto();
+  } catch (e) { o.textContent = "❌ Não foi possível ativar: " + (e && e.message || e); }
+}
+async function ptoLembretesDesativar() {
+  var o = $("#ptoLembRes"), sub = PTO.X.pushAqui;
+  try { if (sub) { await sb.from("msb_ponto_push").delete().eq("endpoint", sub.endpoint); await sub.unsubscribe(); } await carregarPonto(); }
+  catch (e) { o.textContent = "❌ " + (e && e.message || e); }
+}
+async function ptoLembretesTeste() {
+  var o = $("#ptoLembRes"); o.textContent = "A enviar…";
+  var r = await sb.functions.invoke("msb-ponto-lembretes", {body: {teste: true}});
+  if (r.error) { o.textContent = "❌ " + falhouPto(r.error); return; }
+  var est = (r.data && r.data.estados) || [];
+  o.textContent = est.some(function (x) { return x >= 200 && x < 300; }) ? "✅ Enviada. Deve aparecer daqui a uns segundos." : "❌ O serviço de notificações recusou (" + (est.join(", ") || "sem telemóveis") + "). Desligue e volte a ativar.";
+}
+
+/* Tocar na notificação abre a app no Ponto Digital (na estação do turno) */
+(function () {
+  function abrir(est) {
+    var n = 0, t = setInterval(function () {
+      if (!window.APP_ARRANCOU || !window.msbIr) { if (++n > 60) clearInterval(t); return; }
+      clearInterval(t);
+      try { history.replaceState(null, "", location.pathname); } catch (x) { /* fica o endereço como está */ }
+      if (est && est !== EST && (ESTS || []).some(function (x) { return x.id === est; })) { var s = $("#selEst"); PAGINA = "pto"; s.value = est; s.onchange(); return; }
+      msbIr("pto"); if (window.MSB_NAV && MSB_NAV.abrirPagina) MSB_NAV.abrirPagina("pto");
+    }, 500);
+  }
+  try { var q = new URLSearchParams(location.search); if (q.get("ponto")) abrir(q.get("est")); } catch (e) { /* sem parâmetros */ }
+  if (navigator.serviceWorker) navigator.serviceWorker.addEventListener("message", function (ev) {
+    if (ev.data && ev.data.msb === "ponto") { try { abrir(new URL(ev.data.url).searchParams.get("est")); } catch (e) { abrir(null); } }
+  });
+})();
