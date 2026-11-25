@@ -5,7 +5,7 @@
  * Câmara: Android/Chrome usa o leitor do próprio navegador (BarcodeDetector); iPhone usa ZXing, carregado só ao tocar
  * na câmara (aprovado pelo dono, 25/11/2026). A imagem não sai do telemóvel. Um leitor USB escreve na caixa e dá Enter. */
 "use strict";
-var ART = {t: "", res: null, msg: "", pedido: 0, temp: null, cam: null};
+var ART = {t: "", res: null, msg: "", pedido: 0, temp: null};
 var ART_ZXING = "https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js", ART_ZX = null;
 
 function carregarArtigos() {
@@ -17,7 +17,7 @@ function carregarArtigos() {
   var i = $("#artTxt"); i.value = ART.t;
   i.oninput = function () { clearTimeout(ART.temp); var v = i.value; ART.temp = setTimeout(function () { artPesquisar(v); }, 300); };
   i.onkeydown = function (e) { if (e.key === "Enter") { e.preventDefault(); clearTimeout(ART.temp); artPesquisar(i.value); } };   // leitor USB: escreve e dá Enter
-  $("#artCam").onclick = function () { ART.cam ? artCamParar() : artCamAbrir(); };
+  $("#artCam").onclick = function () { CAM ? camParar() : artCamAbrir(); };
   artDesenhar();
   if (matchMedia("(pointer:fine)").matches) i.focus();
 }
@@ -59,54 +59,64 @@ function artCartao(a) {
     "</div></div>";
 }
 
-/* ---------- câmara ---------- */
+/* ---------- câmara (também usada nas Faltas: camAbrir(caixa, botão, achou)) ---------- */
+var CAM = null;
 function artZXing() {
   if (window.ZXing) return Promise.resolve();
   if (ART_ZX) return ART_ZX;
   ART_ZX = new Promise(function (ok, ko) { var s = document.createElement("script"); s.src = ART_ZXING; s.onload = ok; s.onerror = function () { ART_ZX = null; ko(new Error("Não consegui carregar o leitor de códigos de barras. Verifique a internet.")); }; document.head.appendChild(s); });
   return ART_ZX;
 }
-async function artCamAbrir() {
-  var cb = $("#artCamBox"); if (!cb) return;
+function artCamAbrir() { camAbrir("#artCamBox", "#artCam", function (txt) { $("#artTxt").value = txt; artPesquisar(txt); }); }
+function artCamParar() { camParar(); }
+async function camAbrir(caixa, botao, achou) {
+  camParar();
+  var cb = $(caixa); if (!cb) return;
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { cb.innerHTML = "<div class='bad' style='margin-top:10px'>Este navegador não deixa usar a câmara. Escreva o código à mão.</div>"; return; }
   cb.innerHTML = "<div style='margin-top:10px;position:relative;border-radius:14px;overflow:hidden;background:#000'>" +
-    "<video id='artVid' playsinline muted style='width:100%;max-height:50vh;display:block;object-fit:cover'></video>" +
+    "<video playsinline muted style='width:100%;max-height:50vh;display:block;object-fit:cover'></video>" +
     "<div style='position:absolute;left:10%;right:10%;top:45%;height:2px;background:#1A63E8;box-shadow:0 0 8px #1A63E8'></div></div>" +
-    "<div class='mut' id='artCamMsg' style='margin-top:6px'>Aponte para o código de barras…</div>";
-  $("#artCam").textContent = "✕"; $("#artCam").setAttribute("aria-label", "Fechar a câmara");
-  var vid = $("#artVid"), achou = function (txt) { artCamParar(); $("#artTxt").value = txt; artPesquisar(txt); if (navigator.vibrate) navigator.vibrate(60); };
+    "<div class='mut' style='margin-top:6px'>Aponte para o código de barras…</div>";
+  var b = $(botao); if (b) { b.dataset.ic = b.textContent; b.textContent = "✕"; b.setAttribute("aria-label", "Fechar a câmara"); }
+  CAM = {caixa: caixa, botao: botao, vivo: true, parar: function () {}};
+  var eu = CAM, vid = cb.querySelector("video"), fim = function (txt) { if (CAM !== eu) return; camParar(); if (navigator.vibrate) navigator.vibrate(60); achou(String(txt).trim()); };
   try {
     var nativo = false;
     if ("BarcodeDetector" in window) { try { var fm = await BarcodeDetector.getSupportedFormats(); nativo = fm.indexOf("ean_13") >= 0; } catch (e) { nativo = false; } }
     if (nativo) {
       var st = await navigator.mediaDevices.getUserMedia({video: {facingMode: "environment"}, audio: false});
+      if (CAM !== eu) { st.getTracks().forEach(function (t) { t.stop(); }); return; }
       var det = new BarcodeDetector({formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39", "itf"]});
-      ART.cam = {parar: function () { st.getTracks().forEach(function (t) { t.stop(); }); }, vivo: true};
+      eu.parar = function () { st.getTracks().forEach(function (t) { t.stop(); }); };
       vid.srcObject = st; await vid.play();
       var ciclo = async function () {
-        if (!ART.cam || !ART.cam.vivo) return;
-        try { var r = await det.detect(vid); if (r && r.length && ART.cam) return achou(r[0].rawValue); } catch (e) { /* imagem ainda sem dados */ }
+        if (CAM !== eu || !eu.vivo) return;
+        try { var r = await det.detect(vid); if (r && r.length) return fim(r[0].rawValue); } catch (e) { /* imagem ainda sem dados */ }
         setTimeout(ciclo, 200);
       };
       ciclo();
     } else {
       await artZXing();
+      if (CAM !== eu) return;
       var Z = window.ZXing, h = new Map();
       h.set(Z.DecodeHintType.POSSIBLE_FORMATS, [Z.BarcodeFormat.EAN_13, Z.BarcodeFormat.EAN_8, Z.BarcodeFormat.UPC_A, Z.BarcodeFormat.UPC_E, Z.BarcodeFormat.CODE_128, Z.BarcodeFormat.CODE_39, Z.BarcodeFormat.ITF]);
       var leitor = new Z.BrowserMultiFormatReader(h, 300);
-      ART.cam = {parar: function () { try { leitor.reset(); } catch (e) { /* já parado */ } }, vivo: true};
-      leitor.decodeFromVideoDevice(undefined, vid, function (r) { if (r && ART.cam) achou(r.getText()); });
+      eu.parar = function () { try { leitor.reset(); } catch (e) { /* já parado */ } };
+      leitor.decodeFromVideoDevice(undefined, vid, function (r) { if (r) fim(r.getText()); });
     }
   } catch (e) {
-    artCamParar();
+    if (CAM !== eu) return;
+    camParar();
     var nome = e && e.name, m = nome === "NotAllowedError" ? "Sem autorização para a câmara. Autorize nas definições do navegador e tente outra vez." : nome === "NotFoundError" ? "Não encontrei câmara neste aparelho." : falhou(e);
-    var cbx = $("#artCamBox"); if (cbx) cbx.innerHTML = "<div class='bad' style='margin-top:10px'>" + esc(m) + "</div>";
+    var cbx = $(caixa); if (cbx) cbx.innerHTML = "<div class='bad' style='margin-top:10px'>" + esc(m) + "</div>";
   }
 }
-function artCamParar() {
-  if (ART.cam) { ART.cam.vivo = false; try { ART.cam.parar(); } catch (e) { /* já parado */ } ART.cam = null; }
-  var cb = $("#artCamBox"); if (cb) cb.innerHTML = "";
-  var b = $("#artCam"); if (b) { b.textContent = "📷"; b.setAttribute("aria-label", "Ler código de barras com a câmara"); }
+function camParar() {
+  if (!CAM) return;
+  var c = CAM; CAM = null; c.vivo = false;
+  try { c.parar(); } catch (e) { /* já parado */ }
+  var cb = $(c.caixa); if (cb) cb.innerHTML = "";
+  var b = $(c.botao); if (b) { b.textContent = b.dataset.ic || "📷"; b.setAttribute("aria-label", "Ler código de barras com a câmara"); }
 }
 /* ao sair da página a câmara desliga-se */
-document.addEventListener("visibilitychange", function () { if (document.hidden) artCamParar(); });
+document.addEventListener("visibilitychange", function () { if (document.hidden) camParar(); });

@@ -7,8 +7,8 @@ var AREAS = [   // reorganização de 10/11/2026 (dono, «avança com tudo»): c
   {id: "ini", n: "🏠 Painel", b: "Dia a dia", adm: 1, p: [["ini", "Painel de Gestão"], ["avi", "OCTAN AI"]]},
   {id: "cx", n: "💶 Caixa", adm: 1, p: [["reg", "Registo diário"], ["sai", "Saídas de caixa"], ["cdv", "Clientes a dever"], ["his", "Histórico"]]},   // «Clientes a dever» 19/11/2026 (só Penafiel): app/caixa_pnf.js,
   {id: "cmb", n: "⛽ Combustível", adm: 1, p: [["comb", "Entradas de combustível"], ["pre", "Preços ENSE", {g: "ENSE"}], ["ense", "Reporte mensal ENSE", {g: "ENSE"}], ["red", "Redução Repsol", {g: "Preços"}]]},   // «Redução Repsol» 16/11/2026: app/reducao.js
-  {id: "stk", n: "📦 Stock", p: [["contar", "Contar"], ["art", "Artigos"], ["ler", "Ler código"], ["stock", "Stock atual"], ["inv", "Inventário"], ["mov", "Movimentos"]]},
-  {id: "cpr", n: "🛒 Compras", adm: 1, p: [["enc", "Por aprovar"], ["nova", "Nova encomenda"], ["comh", "Encomendas feitas"], ["ent", "Entrada de mercadoria", {g: "Receções"}], ["dig", "Digitalizar fatura", {g: "Receções"}], ["fad", "Faturas da Adelaide", {g: "Receções"}]]},
+  {id: "stk", n: "📦 Stock", p: [["contar", "Contar"], ["art", "Artigos"], ["fal", "Em falta"], ["ler", "Ler código"], ["stock", "Stock atual"], ["inv", "Inventário"], ["mov", "Movimentos"]]},
+  {id: "cpr", n: "🛒 Compras", adm: 1, p: [["enc", "Por aprovar"], ["nova", "Nova encomenda"], ["comh", "Encomendas feitas"], ["sug", "Sugeridas pelos funcionários"], ["ent", "Entrada de mercadoria", {g: "Receções"}], ["dig", "Digitalizar fatura", {g: "Receções"}], ["fad", "Faturas da Adelaide", {g: "Receções"}]]},
   {id: "cnf", n: "🏦 Conferências", b: "Controlo", adm: 1, p: [["rep", "Repsol e Multibanco"], ["tms", "Fecho mensal TMS"], ["ban", "Banco"], ["liv", "Livro de movimentos"]]},
   {id: "frn", n: "🧾 Fornecedores", adm: 1, p: [["dsp", "Despesas"]]},   // «Por fornecedor» acrescentado em beta/paginas.js
   {id: "res", n: "💰 Resultados", adm: 1, p: [["cdm", "Conta do mês", {g: "O mês"}], ["luc", "Lucro (margens)", {g: "O mês"}], ["mes", "Resultado mensal", {g: "O mês"}], ["ven", "Vendas e margens", {g: "Vendas"}], ["va", "Relatório de vendas", {g: "Vendas"}], ["maq", "Máquina de tabaco", {g: "Vendas"}], ["fun", "Por funcionário", {g: "Análise"}]]},
@@ -29,7 +29,7 @@ var NEXP = {
   prod: {tab: "settings", only: ["Gestão de produtos"]},
   cfg: {tab: "settings", only: ["Configuração da base de dados central", "Importante"]}
 };
-var VISTA_DA = {avi: "avi", ini: "ini", reg: "reg", sai: "sai", his: "his", ven: "tab", comh: "tab", mov: "tab", rep: "rep", tms: "tms", mes: "mes", fun: "fun", eq: "ges", luc: "luc", cdm: "cdm", mrg: "mrg", comb: "comb", ense: "ense", va: "va", kms: "kms", pre: "pre", dig: "dig", dsp: "dsp", ban: "ban", liv: "liv", fra: "fra", div: "div", pto: "pto", art: "art", red: "red", fad: "fad", cdv: "cdv"};
+var VISTA_DA = {avi: "avi", ini: "ini", reg: "reg", sai: "sai", his: "his", ven: "tab", comh: "tab", mov: "tab", rep: "rep", tms: "tms", mes: "mes", fun: "fun", eq: "ges", luc: "luc", cdm: "cdm", mrg: "mrg", comb: "comb", ense: "ense", va: "va", kms: "kms", pre: "pre", dig: "dig", dsp: "dsp", ban: "ban", liv: "liv", fra: "fra", div: "div", pto: "pto", art: "art", fal: "fal", sug: "sug", red: "red", fad: "fad", cdv: "cdv"};
 var PAGINA = "ini";
 /* confirmação: na beta é uma janela da app; na versão atual continua a do navegador */
 function msbConfirma(t, acao) { return window.MSB_NAV ? MSB_NAV.confirma(t, acao) : Promise.resolve(confirm(t)); }
@@ -99,7 +99,10 @@ window.depoisVista = function (v) {
   if (v === "fad") carregarFad();
   if (v === "cdv") carregarClientesDever();
   if (v === "pto") carregarPonto();
-  if (v === "art") carregarArtigos(); else if (window.artCamParar) artCamParar();   // Artigos (25/11/2026): a câmara desliga-se ao mudar de página
+  if (window.camParar) camParar();   // Artigos e Artigos em falta (25/11/2026): a câmara desliga-se ao mudar de página
+  if (v === "art") carregarArtigos();
+  if (v === "fal") carregarArtigosFalta();
+  if (v === "sug") carregarSugeridas();
 };
 
 /* ---------------- módulo de stock embutido ---------------- */
