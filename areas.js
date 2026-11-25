@@ -14,7 +14,7 @@ var AREAS = [   // reorganização de 10/11/2026 (dono, «avança com tudo»): c
   {id: "res", n: "💰 Resultados", adm: 1, p: [["cdm", "Conta do mês", {g: "O mês"}], ["luc", "Lucro (margens)", {g: "O mês"}], ["mes", "Resultado mensal", {g: "O mês"}], ["ven", "Vendas e margens", {g: "Vendas"}], ["va", "Relatório de vendas", {g: "Vendas"}], ["maq", "Máquina de tabaco", {g: "Vendas"}], ["fun", "Por funcionário", {g: "Análise"}]]},
   {id: "fra", n: "🔎 Fraude", adm: 1, p: [["fra", "Desvios por colaborador"]]},   // 12/11/2026, aprovado pelo dono: app/fraude.js
   {id: "dcs", n: "📋 Documentos", adm: 1, p: [["kms", "Mapa de kms do gerente"]]},   // «Documentos» acrescentado em beta/paginas.js
-  {id: "eqp", n: "👥 Equipa", b: "Gestão", p: [["eq", "Equipa e acessos", {adm: 1}], ["div", "Acordos de dívida", {adm: 1}], ["pto", "Ponto Digital", {adm: 1}]]},   // «Acordos de dívida» 16/11/2026: app/dividas.js   // «Horário» (também do funcionário) acrescentado em beta/paginas.js
+  {id: "eqp", n: "👥 Equipa", b: "Gestão", p: [["eq", "Equipa e acessos", {adm: 1}], ["div", "Acordos de dívida", {adm: 1}], ["pto", "Ponto Digital"]]},   // «Acordos de dívida» 16/11/2026: app/dividas.js   // «Horário» (também do funcionário) acrescentado em beta/paginas.js
   {id: "def", n: "⚙️ Definições", adm: 1, p: [["mrg", "Margens e custos"], ["prod", "Produtos e códigos"], ["cfg", "Configuração do stock"]]}
 ];
 /* páginas do módulo de stock: separador e cartões (pelo título, ou "#id" do cartão) a mostrar ou esconder.
@@ -45,7 +45,7 @@ function areaDe(pg) { return AREAS.find(function (a) { return a.p.some(function 
 function montarMenu() {
   if (!$("#equipa").parentElement.matches("#v-ges")) $("#v-ges").appendChild($("#equipa"));
   AREAS_TEL = window.GESTOR ? ["cx", "res", "cnf"] : ADMIN ? ["ini", "cx", "dcs", "cpr"] : ["stk", "eqp"];
-  if (!ADMIN) AREAS.find(function (x) { return x.id === "eqp"; }).n = "👥 Horário";   // o funcionário só tem o Horário nesta área
+  if (!ADMIN) AREAS.find(function (x) { return x.id === "eqp"; }).n = "👥 Horário e ponto";   // o funcionário tem o Horário e o Ponto Digital (25/11/2026) nesta área
   if (window.MSB_NAV) { MSB_NAV.montar(); ir(inicio()); if (ADMIN && window.tmsEmail) setTimeout(tmsEmail, 1500); if (window.pdocLink) pdocLink(); return; }   // navegação da beta; #doc=… abre um documento
   var vis = areasVisiveis(), mais = vis.some(function (a) { return AREAS_TEL.indexOf(a.id) < 0; });
   $("#areas").innerHTML = vis.map(function (a) { var i = a.n.indexOf(" "); return "<button data-a='" + a.id + "'" + (AREAS_TEL.indexOf(a.id) < 0 ? " class='extra'" : "") + "><i>" + a.n.slice(0, i) + "</i><span>" + (a.c ? "<em class='lg'>" + a.n.slice(i + 1) + "</em><em class='cu'>" + a.c + "</em>" : a.n.slice(i + 1)) + "</span></button>"; }).join("") +

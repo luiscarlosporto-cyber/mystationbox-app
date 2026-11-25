@@ -25,65 +25,77 @@ async function carregarPonto() {
   var box = $("#ptoCorpo"); if (!box) return;
   box.innerHTML = "<div class='mut'>A carregar…</div>";
   try {
-    var est = EST, hoje = ptoHoje();
+    var est = EST, hoje = ptoHoje(), adm = ADMIN && !window.GESTOR;
     var q = await Promise.all([
-      sb.from("msb_ponto_locais").select("*").eq("estacao", est).maybeSingle(),
-      sb.from("msb_ponto_horas").select("*").eq("estacao", est).order("codigo").order("parte"),
-      sb.from("msb_colab_contas").select("colaborador_id").eq("user_id", EU.id).maybeSingle(),
-      sb.from("msb_ponto_registos").select("*").eq("estacao", est).eq("dia", hoje).order("hora"),
+      sb.rpc("msb_ponto_meu_dia", {p_estacao: est}),
+      sb.from("msb_ponto_registos").select("*").eq("user_id", EU.id).eq("dia", hoje).order("hora").order("id"),   // as minhas, nas duas estações
       sb.from("msb_ponto_avisos").select("versao").eq("user_id", EU.id).eq("versao", PTO_AVISO_VERSAO).maybeSingle()
     ]);
     q.forEach(function (r) { if (r.error) throw r.error; });
-    var X = {est: est, hoje: hoje, local: q[0].data, horas: q[1].data || [], colab: q[2].data && q[2].data.colaborador_id, reg: q[3].data || [], aviso: !!q[4].data, nomes: {}, turno: null, legenda: []};
-    if (ADMIN) {
-      var c = await sb.from("msb_colaboradores").select("id,nome,curto"); if (!c.error) (c.data || []).forEach(function (x) { X.nomes[x.id] = x.curto || x.nome; });
-      var cf = await sb.from("msb_config").select("horario").eq("estacao", est).maybeSingle();
-      X.legenda = ((cf.data && cf.data.horario && cf.data.horario.legenda) || []).filter(function (l) { return ["FD", "FG", "F", "MDF", "B"].indexOf(l[0]) < 0; });
-    }
-    if (X.colab) {
-      var h = await sb.from("msb_horario_dias").select("codigo").eq("estacao", est).eq("dia", hoje).eq("colaborador_id", X.colab).maybeSingle();
-      if (h.data && h.data.codigo) X.turno = {codigo: h.data.codigo, partes: X.horas.filter(function (p) { return p.codigo === h.data.codigo; })};
+    var X = {est: est, hoje: hoje, adm: adm, meu: q[0].data || {}, meus: q[1].data || [], aviso: !!q[2].data, reg: [], local: null, horas: [], nomes: {}, legenda: [], contas: [], contasEst: [], perfis: []};
+    if (adm) {
+      var w = await Promise.all([
+        sb.from("msb_ponto_locais").select("*").eq("estacao", est).maybeSingle(),
+        sb.from("msb_ponto_horas").select("*").eq("estacao", est).order("codigo").order("parte"),
+        sb.from("msb_ponto_registos").select("*").eq("estacao", est).eq("dia", hoje).order("hora").order("id"),
+        sb.from("msb_colaboradores").select("id,nome,curto,ativo"),
+        sb.from("msb_config").select("horario").eq("estacao", est).maybeSingle(),
+        sb.from("msb_colab_contas").select("*"),
+        sb.from("msb_colab_lojas").select("colaborador_id,estacao,desde,ate").eq("estacao", est),
+        sb.from("profiles").select("user_id,display_name,role,company_id,other_companies").order("display_name")
+      ]);
+      w.forEach(function (r) { if (r.error) throw r.error; });
+      X.local = w[0].data; X.horas = w[1].data || []; X.reg = w[2].data || [];
+      (w[3].data || []).forEach(function (x) { X.nomes[x.id] = x.curto || x.nome; });
+      X.colabs = (w[3].data || []);
+      X.legenda = ((w[4].data && w[4].data.horario && w[4].data.horario.legenda) || []).filter(function (l) { return ["FD", "FG", "F", "MDF", "B"].indexOf(l[0]) < 0; });
+      X.contas = w[5].data || [];
+      X.contasEst = (w[6].data || []).filter(function (l) { return !l.ate || l.ate >= hoje; });
+      X.perfis = w[7].data || [];
     }
     if (est !== EST) return;   // mudou de estação entretanto
     PTO.X = X; desenharPonto();
   } catch (e) { box.innerHTML = "<div class='card msgErr' style='padding:12px'>✖ " + esc(falhouPto(e)) + "</div>"; }
 }
 
-function ptoMeus() { return PTO.X.reg.filter(function (r) { return r.user_id === EU.id; }); }
-
 function desenharPonto() {
-  var X = PTO.X, box = $("#ptoCorpo");
+  var X = PTO.X, M = X.meu, box = $("#ptoCorpo");
   if (!X.aviso) { box.innerHTML = ptoAvisoHtml(); $("#ptoAvisoOk").onclick = ptoAvisoAceitar; return; }
-  var meus = ptoMeus(), teste = !X.local || !X.local.ativo;
-  var prox = PONTO.proxima(meus.map(function (r) { return {tipo: r.tipo, estado: r.estado, anulado_por: r.anulado_por, min: ptoMin(r.hora), teste: r.teste}; }).filter(function (r, i) { return meus[i].teste === teste; }));
-  var nome = (X.colab && X.nomes[X.colab]) || (PERFIL && PERFIL.display_name) || "";
-  var semT = X.turno && PTO_SEM_TURNO[X.turno.codigo];
-  var turno = X.turno ? (X.turno.partes.length ? X.turno.partes.map(function (p) { return p.inicio.slice(0, 5) + " – " + p.fim.slice(0, 5); }).join(" e ") : "sem horas definidas") : "";
+  var real = !!M.colaborador_id && (M.estacao_ativa || M.piloto), teste = !real;   // o administrador sem colaborador ligado pica sempre em teste
+  var meus = X.meus.filter(function (x) { return x.teste === teste; });
+  var prox = PONTO.proxima(meus.map(function (r) { return {tipo: r.tipo, estado: r.estado, anulado_por: r.anulado_por, min: ptoMin(r.hora)}; }));
+  var aberta = meus.filter(function (r) { return r.estado === "aceite" && !r.anulado_por; }).pop(), noutra = prox === "saida" && aberta && aberta.estacao !== X.est;
+  var nome = M.nome || (PERFIL && PERFIL.display_name) || "";
+  var semT = M.codigo && PTO_SEM_TURNO[M.codigo];
+  var turno = M.codigo ? ((M.partes || []).length ? M.partes.map(function (p) { return p.inicio.slice(0, 5) + " – " + p.fim.slice(0, 5); }).join(" e ") : "sem horas definidas") : "";
   var data = new Date().toLocaleDateString("pt-PT", {timeZone: "Europe/Lisbon", day: "numeric", month: "long", year: "numeric"});
   var r = PTO.res, faixa;
   if (PTO.a_picar) faixa = "<div class='pto-faixa'>📍 A obter a localização…</div>";
   else if (r && r.estado === "aceite") faixa = "<div class='pto-faixa ok'>✅ " + (r.tipo === "entrada" ? "Entrada" : "Saída") + " registada às <b>" + ptoHora(r.hora) + "</b> · localização validada (a " + r.distancia_m + " m)</div>";
   else if (r && r.estado === "rejeitada") faixa = "<div class='pto-faixa bad' role='alert'>❌ " + esc(PONTO.motivo(r)) + "</div>";
   else if (r && r.erro) faixa = "<div class='pto-faixa bad' role='alert'>❌ " + esc(r.erro) + "</div>";
+  else if (noutra) faixa = "<div class='pto-faixa bad'>⚠️ Tem uma entrada aberta em " + esc(ptoNomeEst(aberta.estacao)) + ". Mude para essa estação para registar a saída.</div>";
   else faixa = "<div class='pto-faixa'>📍 A localização é pedida só no momento de registar.</div>";
 
-  var h = "<div class='card pto'>" + (teste ? "<div class='pto-teste'>🧪 MODO DE TESTE · só o administrador pica" + (X.local ? "" : " · falta a localização da estação") + "</div>" : "") +
-    "<div class='pto-rot'>COLABORADOR</div><div class='pto-nome'>" + esc(nome) + "</div>" +
-    "<div class='pto-turno'>" + esc(ptoNomeEst(X.est)) + (semT ? " · Hoje: " + esc(semT) : X.turno ? " · Turno previsto " + esc(X.turno.codigo) + " · " + esc(turno) : X.colab ? " · Sem turno previsto hoje" : "") + "</div>" +
-    "<div class='pto-relogio'><div class='pto-rot'>HORA ATUAL</div><div id='ptoRelogio' class='pto-hora'>" + new Date().toLocaleTimeString("pt-PT", {timeZone: "Europe/Lisbon", hour: "2-digit", minute: "2-digit"}) + "</div><div class='pto-data'>" + esc(data) + "</div></div>" +
-    faixa +
-    "<button id='ptoBtn' class='pto-btn" + (prox === "saida" ? " sai" : "") + "'" + (PTO.a_picar ? " disabled" : "") + "><span class='pto-ic'>" + (prox === "entrada" ? "➜]" : "[➜") + "</span><b>" + (prox === "entrada" ? "REGISTAR ENTRADA" : "REGISTAR SAÍDA") + "</b><small>Validar localização e registar ponto</small></button>" +
-    "<div class='pto-nota'>O registo utiliza a hora do servidor.</div></div>";
+  var bloqueio = !M.tem_local ? "A localização desta estação ainda não foi definida." :
+    !M.pode_picar ? (M.colaborador_id ? "O Ponto Digital ainda não está ativo para si. O administrador avisa quando começar." : "A sua conta ainda não está ligada ao seu nome no horário. Fale com o administrador.") : "";
 
-  var lista = meus.filter(function (x) { return x.teste === teste; });
-  h += "<div class='card' style='padding:14px'><h3 style='margin:0 0 8px'>Os meus registos de hoje</h3>" + (lista.length ? "<ul class='pto-lista'>" + lista.map(function (x) {
-    return "<li class='" + (x.estado === "aceite" && !x.anulado_por ? "ok" : "bad") + "'><b>" + ptoHora(x.hora) + "</b> " + (x.tipo === "entrada" ? "Entrada" : "Saída") +
+  var h = "<div class='card pto'>" + (teste && X.adm ? "<div class='pto-teste'>🧪 MODO DE TESTE · as suas picagens não contam como trabalho</div>" : M.piloto && !M.estacao_ativa ? "<div class='pto-teste'>🧭 PILOTO · as suas picagens contam; o Picaponto continua ao lado</div>" : "") +
+    "<div class='pto-rot'>COLABORADOR</div><div class='pto-nome'>" + esc(nome) + "</div>" +
+    "<div class='pto-turno'>" + esc(ptoNomeEst(X.est)) + (semT ? " · Hoje: " + esc(semT) : M.codigo ? " · Turno previsto " + esc(M.codigo) + " · " + esc(turno) : M.colaborador_id ? " · Sem turno previsto hoje" : "") + "</div>" +
+    "<div class='pto-relogio'><div class='pto-rot'>HORA ATUAL</div><div id='ptoRelogio' class='pto-hora'>" + new Date().toLocaleTimeString("pt-PT", {timeZone: "Europe/Lisbon", hour: "2-digit", minute: "2-digit"}) + "</div><div class='pto-data'>" + esc(data) + "</div></div>" +
+    (bloqueio ? "<div class='pto-faixa'>ℹ️ " + esc(bloqueio) + "</div>" : faixa +
+    "<button id='ptoBtn' class='pto-btn" + (prox === "saida" ? " sai" : "") + "'" + (PTO.a_picar || noutra ? " disabled" : "") + "><span class='pto-ic'>" + (prox === "entrada" ? "➜]" : "[➜") + "</span><b>" + (prox === "entrada" ? "REGISTAR ENTRADA" : "REGISTAR SAÍDA") + "</b><small>Validar localização e registar ponto</small></button>" +
+    "<div class='pto-nota'>O registo utiliza a hora do servidor.</div>") + "</div>";
+
+  h += "<div class='card' style='padding:14px'><h3 style='margin:0 0 8px'>Os meus registos de hoje</h3>" + (meus.length ? "<ul class='pto-lista'>" + meus.map(function (x) {
+    return "<li class='" + (x.estado === "aceite" && !x.anulado_por ? "ok" : "bad") + "'><b>" + ptoHora(x.hora) + "</b> " + (x.tipo === "entrada" ? "Entrada" : "Saída") + (x.estacao !== X.est ? " (" + esc(ptoNomeEst(x.estacao)) + ")" : "") +
       (x.estado === "aceite" ? (x.anulado_por ? " · anulada" : " · ✅ a " + (x.distancia_m == null ? "—" : x.distancia_m + " m")) : " · ❌ " + esc(PONTO.MOTIVOS[x.motivo] || x.motivo)) + "</li>"; }).join("") + "</ul>" : "<p class='mut' style='margin:0'>Ainda não há registos hoje.</p>") + "</div>";
 
-  if (ADMIN) h += ptoAdminHtml();
+  if (X.adm) h += ptoAdminHtml();
   box.innerHTML = h;
-  $("#ptoBtn").onclick = function () { ptoPicar(prox); };
-  if (ADMIN) ptoAdminLigar();
+  if ($("#ptoBtn")) $("#ptoBtn").onclick = function () { ptoPicar(prox); };
+  if (X.adm) ptoAdminLigar();
   if (!PTO.relogio) PTO.relogio = setInterval(function () { var el = $("#ptoRelogio"); if (!el) { clearInterval(PTO.relogio); PTO.relogio = null; return; } el.textContent = new Date().toLocaleTimeString("pt-PT", {timeZone: "Europe/Lisbon", hour: "2-digit", minute: "2-digit"}); }, 5000);
 }
 
@@ -134,6 +146,7 @@ function ptoAdminHtml() {
       X.reg.map(function (x) { return "<tr><td>" + ptoHora(x.hora) + "</td><td class='l'>" + tl(x) + "</td><td>" + (x.tipo === "entrada" ? "Entrada" : "Saída") + "</td><td>" +
         (x.estado === "aceite" ? (x.anulado_por ? "anulada" : "✅ aceite") + (x.origem === "correcao" ? " (correção)" : "") : "❌ " + esc(PONTO.MOTIVOS[x.motivo] || x.motivo)) + "</td><td>" + (x.distancia_m == null ? "—" : x.distancia_m + " m") + "</td><td>" + (x.precisao_m == null ? "—" : "±" + x.precisao_m + " m") + "</td><td>" + esc(x.turno_codigo || "—") + "</td></tr>"; }).join("") + "</tbody></table></div>"
       : "<p class='mut' style='margin:0'>Sem picagens hoje.</p>") + "</div>";
+  h += ptoContasHtml();
   var campo = function (id, rot, v, ex) { return "<label class='pto-cp'><span>" + rot + "</span><input id='" + id + "' inputmode='decimal' value='" + esc(v == null ? "" : v) + "'>" + (ex ? "<small>" + ex + "</small>" : "") + "</label>"; };
   h += "<div class='card' style='padding:14px'><h3 style='margin:0 0 4px'>⚙️ Definições do Ponto Digital · " + esc(ptoNomeEst(X.est)) + "</h3><p class='mut' style='margin:0 0 10px'>Só o administrador altera. Cada alteração fica no histórico.</p>" +
     "<h4 style='margin:6px 0'>Local da estação</h4><div class='pto-grelha'>" + campo("ptoLat", "Latitude", L.lat) + campo("ptoLon", "Longitude", L.lon) + "</div>" +
@@ -152,12 +165,37 @@ function ptoAdminHtml() {
     (X.legenda.length ? "<p class='mut' style='margin:6px 0 0'>Códigos do horário desta estação: " + X.legenda.map(function (l) { return "<b>" + esc(l[0]) + "</b> " + esc(l[1]); }).join(" · ") + "</p>" : "") + "</div>";
   return h;
 }
+/* contas da app ligadas a cada colaborador da estação, e quem está no piloto (fase 2, dono 25/11/2026) */
+function ptoContasHtml() {
+  var X = PTO.X, ids = {}, linhas = [];
+  X.contasEst.forEach(function (l) { if (!ids[l.colaborador_id]) { ids[l.colaborador_id] = 1; var c = X.colabs.find(function (x) { return x.id === l.colaborador_id; }); if (c && c.ativo !== false) linhas.push(c); } });
+  linhas.sort(function (a, b) { return (a.curto || a.nome).localeCompare(b.curto || b.nome, "pt"); });
+  var perfis = X.perfis.filter(function (p) { return p.role !== "admin"; });
+  return "<div class='card' style='padding:14px'><h3 style='margin:0 0 4px'>👥 Contas dos colaboradores · " + esc(ptoNomeEst(X.est)) + "</h3>" +
+    "<p class='mut' style='margin:0 0 10px'>Ligue a conta da app de cada colaborador ao seu nome no horário. <b>Piloto</b>: essa pessoa já pica a sério, mesmo com o Ponto Digital ainda desligado para os outros.</p>" +
+    (linhas.length ? "<div class='sc'><table class='t'><thead><tr><th class='l'>Colaborador</th><th class='l'>Conta da app</th><th>Piloto</th><th></th></tr></thead><tbody>" + linhas.map(function (c) {
+      var k = X.contas.find(function (x) { return x.colaborador_id === c.id; }) || {};
+      return "<tr><td class='l'>" + esc(c.curto || c.nome) + "</td><td class='l'><select data-cc='" + c.id + "'><option value=''>— sem conta —</option>" +
+        perfis.map(function (p) { return "<option value='" + esc(p.user_id) + "'" + (p.user_id === k.user_id ? " selected" : "") + ">" + esc(p.display_name || "(sem nome)") + "</option>"; }).join("") +
+        "</select></td><td><input type='checkbox' data-cp='" + c.id + "'" + (k.piloto ? " checked" : "") + " aria-label='Piloto'></td><td><button class='mini' data-cg='" + c.id + "'>Guardar</button> <span data-cr='" + c.id + "'></span></td></tr>"; }).join("") + "</tbody></table></div>"
+      : "<p class='mut' style='margin:0'>Não há colaboradores ativos nesta estação.</p>") + "</div>";
+}
+async function ptoGuardarConta(id) {
+  var u = $("[data-cc='" + id + "']").value, pil = $("[data-cp='" + id + "']").checked, o = $("[data-cr='" + id + "']"), r;
+  if (!u && pil) { o.innerHTML = "<span class='msgErr'>✖ Escolha primeiro a conta.</span>"; return; }
+  if (pil && !await msbConfirma("Pôr " + (PTO.X.nomes[id] || "este colaborador") + " no piloto? As picagens dele passam a contar a sério.")) return;
+  r = u ? await sb.from("msb_colab_contas").upsert({colaborador_id: id, user_id: u, piloto: pil, criado_por: EU.id}, {onConflict: "colaborador_id"})
+        : await sb.from("msb_colab_contas").delete().eq("colaborador_id", id);
+  if (r.error) { o.innerHTML = "<span class='msgErr'>✖ " + esc(r.error.code === "23505" ? "Essa conta já está ligada a outro colaborador." : falhouPto(r.error)) + "</span>"; return; }
+  o.textContent = "✅"; await carregarPonto();
+}
 function ptoLinhaHora(p) {
   p = p || {codigo: "", parte: 1, inicio: "", fim: ""};
   return "<tr><td><input class='pto-cod' value='" + esc(p.codigo) + "' size='4' maxlength='6'></td><td><input class='pto-parte' type='number' min='1' max='3' value='" + (p.parte || 1) + "' style='width:4em'></td>" +
     "<td><input class='pto-ini' type='time' value='" + esc((p.inicio || "").slice(0, 5)) + "'></td><td><input class='pto-fim' type='time' value='" + esc((p.fim || "").slice(0, 5)) + "'></td><td><button class='mini pto-tira' title='Tirar linha'>✕</button></td></tr>";
 }
 function ptoAdminLigar() {
+  $$("[data-cg]").forEach(function (b) { b.onclick = function () { ptoGuardarConta(+b.dataset.cg); }; });
   var ligarTira = function () { $$(".pto-tira").forEach(function (b) { b.onclick = function () { b.closest("tr").remove(); }; }); };
   ligarTira();
   $("#ptoMaisHora").onclick = function () { $("#ptoHoras tbody").insertAdjacentHTML("beforeend", ptoLinhaHora()); ligarTira(); };
