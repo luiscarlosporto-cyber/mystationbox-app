@@ -18,12 +18,13 @@
     h: '<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M3 4h2l2.5 11h11L21 7H6.5"/>',
     k: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/>',
     o: '<path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>',
+    w: '<path d="M14.7 6.3a4 4 0 0 0 5 5l-8.4 8.4a2.1 2.1 0 0 1-3-3z"/><path d="M14.7 6.3 17 4l3 3-2.3 2.3"/>',
     u: '<circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14c2.8 0 5 2.2 5 5"/>'
   };
   /* páginas que no menu são uma só, com separadores em cima */
   var GRUPOS = [{n: "Receções", p: ["ent", "dig", "fad"]}, {n: "Vendas", p: ["ven", "va", "maq"]}];
   function grupoDe(pg) { return GRUPOS.find(function (g) { return g.p.indexOf(pg) >= 0; }); }
-  var IC_AREA = {ini: "p", cx: "t", cmb: "g", stk: "c", cpr: "h", cnf: "f", frn: "k", res: "d", fra: "b", dcs: "o", eqp: "u", def: "a"};
+  var IC_AREA = {avr: "w", ini: "p", cx: "t", cmb: "g", stk: "c", cpr: "h", cnf: "f", frn: "k", res: "d", fra: "b", dcs: "o", eqp: "u", def: "a"};
   /* título de cada bloco do menu (Dia a dia · Controlo · Gestão), quando a área seguinte muda de bloco; o funcionário, com 2 áreas, não os vê */
   function blocoDe(x) { var b = ""; for (var i = 0; i < AREAS.length; i++) { if (AREAS[i].b) b = AREAS[i].b; if (AREAS[i] === x) return b; } return b; }
   function blocos(L) { var ant = ""; return function (x) { var b = blocoDe(x); if (!ADMIN || b === ant) return ""; ant = b; return "<b class='bBloco'>" + b + "</b>"; }; }
@@ -236,6 +237,7 @@
       ["Fotografar fatura", "M.Cunha e Vendeiro", function () { ir("dig"); $("#bDigFoto").click(); }],
       ["Pedir vendas", "O OCTAN AI lê no CBOS", function () { ir("avi"); esperar(function () { return $("#pvPasta"); }, function (e) { e.scrollIntoView({block: "center"}); e.focus(); }); }]
     ); else L.push(["Contar stock", "Contagem de domingo", function () { ir("contar"); }]);
+    L.push(["Comunicar avaria", "Fotografia e prioridade, em segundos", function () { ir("avn"); }]);   // 25/11/2026, todas as contas
     return L;
   }
   function esperar(teste, feito, n) { var v = teste(); if (v) return feito(v); if ((n || 0) < 60) setTimeout(function () { esperar(teste, feito, (n || 0) + 1); }, 150); }

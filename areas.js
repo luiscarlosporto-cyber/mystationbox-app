@@ -7,6 +7,7 @@ var AREAS = [   // reorganização de 10/11/2026 (dono, «avança com tudo»): c
   {id: "ini", n: "🏠 Painel", b: "Dia a dia", adm: 1, p: [["ini", "Painel de Gestão"], ["avi", "OCTAN AI"]]},
   {id: "cx", n: "💶 Caixa", adm: 1, p: [["reg", "Registo diário"], ["sai", "Saídas de caixa"], ["cdv", "Clientes a dever"], ["his", "Histórico"]]},   // «Clientes a dever» 19/11/2026 (só Penafiel): app/caixa_pnf.js,
   {id: "cmb", n: "⛽ Combustível", adm: 1, p: [["comb", "Entradas de combustível"], ["pre", "Preços ENSE", {g: "ENSE"}], ["ense", "Reporte mensal ENSE", {g: "ENSE"}], ["red", "Redução Repsol", {g: "Preços"}]]},   // «Redução Repsol» 16/11/2026: app/reducao.js
+  {id: "avr", n: "🛠️ Avarias", p: [["avn", "Comunicar avaria"], ["avg", "Gestão de avarias"]]},   // 25/11/2026, aprovado pelo dono: app/avarias.js (todos os perfis)
   {id: "stk", n: "📦 Stock", p: [["contar", "Contar"], ["art", "Artigos"], ["fal", "Em falta"], ["ler", "Ler código"], ["stock", "Stock atual"], ["inv", "Inventário"], ["mov", "Movimentos"]]},
   {id: "cpr", n: "🛒 Compras", adm: 1, p: [["enc", "Por aprovar"], ["nova", "Nova encomenda"], ["comh", "Encomendas feitas"], ["sug", "Sugeridas pelos funcionários"], ["ent", "Entrada de mercadoria", {g: "Receções"}], ["dig", "Digitalizar fatura", {g: "Receções"}], ["fad", "Faturas da Adelaide", {g: "Receções"}]]},
   {id: "cnf", n: "🏦 Conferências", b: "Controlo", adm: 1, p: [["rep", "Repsol e Multibanco"], ["tms", "Fecho mensal TMS"], ["ban", "Banco"], ["liv", "Livro de movimentos"]]},
@@ -29,12 +30,12 @@ var NEXP = {
   prod: {tab: "settings", only: ["Gestão de produtos"]},
   cfg: {tab: "settings", only: ["Configuração da base de dados central", "Importante"]}
 };
-var VISTA_DA = {avi: "avi", ini: "ini", reg: "reg", sai: "sai", his: "his", ven: "tab", comh: "tab", mov: "tab", rep: "rep", tms: "tms", mes: "mes", fun: "fun", eq: "ges", luc: "luc", cdm: "cdm", mrg: "mrg", comb: "comb", ense: "ense", va: "va", kms: "kms", pre: "pre", dig: "dig", dsp: "dsp", ban: "ban", liv: "liv", fra: "fra", div: "div", pto: "pto", art: "art", fal: "fal", sug: "sug", red: "red", fad: "fad", cdv: "cdv"};
+var VISTA_DA = {avi: "avi", ini: "ini", reg: "reg", sai: "sai", his: "his", ven: "tab", comh: "tab", mov: "tab", rep: "rep", tms: "tms", mes: "mes", fun: "fun", eq: "ges", luc: "luc", cdm: "cdm", mrg: "mrg", comb: "comb", ense: "ense", va: "va", kms: "kms", pre: "pre", dig: "dig", dsp: "dsp", ban: "ban", liv: "liv", fra: "fra", div: "div", pto: "pto", art: "art", fal: "fal", sug: "sug", red: "red", fad: "fad", cdv: "cdv", avn: "avn", avg: "avg"};
 var PAGINA = "ini";
 /* confirmação: na beta é uma janela da app; na versão atual continua a do navegador */
 function msbConfirma(t, acao) { return window.MSB_NAV ? MSB_NAV.confirma(t, acao) : Promise.resolve(confirm(t)); }
 /* Gestor de estação (dono, 19/11/2026): administrador externo de uma estação, só com estas páginas (msb_gestores; as regras de acesso estão na base de dados) */
-var GESTOR_PAGINAS = {reg: 1, sai: 1, cdv: 1, his: 1, ven: 1, va: 1, maq: 1, rep: 1, tms: 1, liv: 1};   // Livro de movimentos: sim do dono, 19/11/2026 (sem fechar o mês)
+var GESTOR_PAGINAS = {reg: 1, sai: 1, cdv: 1, his: 1, ven: 1, va: 1, maq: 1, rep: 1, tms: 1, liv: 1, avn: 1, avg: 1};   // Avarias (25/11/2026): todas as contas   // Livro de movimentos: sim do dono, 19/11/2026 (sem fechar o mês)
 function paraGestor(x) { return !window.GESTOR || GESTOR_PAGINAS[x[0]]; }
 function areasVisiveis() { return AREAS.filter(function (a) { return (ADMIN || !a.adm) && a.p.some(paraGestor); }); }
 function paginasDe(a) { return a.p.filter(function (x) { return (ADMIN || !(x[2] && x[2].adm)) && paraGestor(x); }); }
@@ -44,14 +45,15 @@ function areaDe(pg) { return AREAS.find(function (a) { return a.p.some(function 
 
 function montarMenu() {
   if (!$("#equipa").parentElement.matches("#v-ges")) $("#v-ges").appendChild($("#equipa"));
-  AREAS_TEL = window.GESTOR ? ["cx", "res", "cnf"] : ADMIN ? ["ini", "cx", "dcs", "cpr"] : ["stk", "eqp"];
+  AREAS_TEL = window.GESTOR ? ["cx", "res", "cnf"] : ADMIN ? ["ini", "cx", "dcs", "cpr"] : ["stk", "avr", "eqp"];   // colaborador: Avarias na barra do telemóvel (25/11/2026)
   if (!ADMIN) AREAS.find(function (x) { return x.id === "eqp"; }).n = "👥 Horário e ponto";   // o funcionário tem o Horário e o Ponto Digital (25/11/2026) nesta área
-  if (window.MSB_NAV) { MSB_NAV.montar(); ir(inicio()); if (ADMIN && window.tmsEmail) setTimeout(tmsEmail, 1500); if (window.pdocLink) pdocLink(); return; }   // navegação da beta; #doc=… abre um documento
+  if (window.MSB_NAV) { MSB_NAV.montar(); if (window.notifMontar) notifMontar(); ir(inicio()); if (ADMIN && window.tmsEmail) setTimeout(tmsEmail, 1500); if (window.pdocLink) pdocLink(); return; }   // navegação da beta; #doc=… abre um documento
   var vis = areasVisiveis(), mais = vis.some(function (a) { return AREAS_TEL.indexOf(a.id) < 0; });
   $("#areas").innerHTML = vis.map(function (a) { var i = a.n.indexOf(" "); return "<button data-a='" + a.id + "'" + (AREAS_TEL.indexOf(a.id) < 0 ? " class='extra'" : "") + "><i>" + a.n.slice(0, i) + "</i><span>" + (a.c ? "<em class='lg'>" + a.n.slice(i + 1) + "</em><em class='cu'>" + a.c + "</em>" : a.n.slice(i + 1)) + "</span></button>"; }).join("") +
     (mais ? "<button data-a='mais' class='so-tel'><i>☰</i><span>Mais</span></button>" : "");
   $$("#areas button").forEach(function (b) { b.onclick = function () { if (b.dataset.a === "mais") return abrirMais(); $("#maisMenu").hidden = true; var a = AREAS.find(function (x) { return x.id === b.dataset.a; }); ir(paginasDe(a)[0][0]); }; });
   ir(inicio());
+  if (window.notifMontar) notifMontar();   // sino das notificações (avarias), em todas as contas
 }
 function marcar(pg) {
   PAGINA = pg; var a = areaDe(pg) || AREAS[0];
@@ -99,6 +101,9 @@ window.depoisVista = function (v) {
   if (v === "fad") carregarFad();
   if (v === "cdv") carregarClientesDever();
   if (v === "pto") carregarPonto();
+  if ($("#avRO")) $("#avRO").hidden = ADMIN || v === "avn" || v === "avg";   // nas Avarias o colaborador também regista: o aviso «só consultar» não se aplica
+  if (v === "avn") carregarAvNova();
+  if (v === "avg") carregarAvGestao();
   if (window.camParar) camParar();   // Artigos e Artigos em falta (25/11/2026): a câmara desliga-se ao mudar de página
   if (v === "art") carregarArtigos();
   if (v === "fal") carregarArtigosFalta();
