@@ -242,6 +242,7 @@
     var L = ADMIN ? [["Registar turno", "Caixa do dia", function () { ir("reg"); }]] : [];
     if (ADMIN) L.push(
       ["Carregar documentos", "Qualquer ficheiro: turno, Repsol, TMS, vendas, banco", function () { ir("car"); }],
+      ["Atualizar catálogo do CBOS", "Artigos, preços e códigos de barras (exportCatalog)", function () { ir("art"); }],   // 26/11/2026, dono: função importante, mais visível
       ["Fotografar fatura", "M.Cunha e Vendeiro", function () { ir("dig"); $("#bDigFoto").click(); }],
       ["Pedir vendas", "O OCTAN AI lê no CBOS", function () { ir("avi"); esperar(function () { return $("#pvPasta"); }, function (e) { e.scrollIntoView({block: "center"}); e.focus(); }); }]
     ); else L.push(["Contar stock", "Contagem de domingo", function () { ir("contar"); }]);
@@ -304,6 +305,9 @@
   function abrir(x) {
     fecharTudo();
     if (x.t === "p") return ir(x.id);
+    if (soColab()) {   // o colaborador não vê o Stock atual (26/11/2026): abre Artigos com a pesquisa feita
+      ir("art"); return esperar(function () { return $("#artTxt"); }, function (c) { c.value = x.n; artPesquisar(x.n); });
+    }
     ir("stock");   // abre o Stock atual já filtrado pelo artigo; só preenche a pesquisa do módulo
     esperar(function () { var d = nexDoc(), c = d && d.getElementById("search"); return NEX_PRONTO && c && !d.getElementById("tab-stock").classList.contains("hidden") ? c : null; },
       function (c) { c.value = x.n; c.dispatchEvent(new Event("input", {bubbles: true})); });

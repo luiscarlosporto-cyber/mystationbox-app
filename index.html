@@ -225,7 +225,7 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
 <section id="vApp" hidden>
 <header><div class="wrap">
   <div class="logo"><img src="logo.svg" alt=""><div><img class="wm" src="marca_clara.png" alt="mystationbox®"><small id="hEst" hidden>—</small></div></div>
-  <div class="hd-dir"><button class="hbtn adm" id="bCarregar" title="Carregar ficheiro: folha de turno, talão, PDF Repsol, TMS ou vendas">📥 <span class="txt">Carregar</span></button><input type="file" id="fCarregar" multiple hidden accept=".xls,.xlsx,.csv,.pdf,image/*,application/pdf,text/csv"><select id="selEst" aria-label="Estação" hidden></select><span class="quem" id="hQuem"></span><button class="hbtn" id="bSair">Sair</button></div>
+  <div class="hd-dir"><button class="hbtn adm" id="bCarregar" title="Carregar ficheiro: folha de turno, talão, PDF Repsol, TMS ou vendas">📥 <span class="txt">Carregar</span></button><input type="file" id="fCarregar" multiple hidden accept=".xls,.xlsx,.csv,.pdf,image/*,application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/octet-stream"><select id="selEst" aria-label="Estação" hidden></select><span class="quem" id="hQuem"></span><button class="hbtn" id="bSair">Sair</button></div>
 </div></header>
 <nav><div class="wrap" id="areas"></div><div class="wrap sub" id="subnav"></div></nav><div id="maisMenu" hidden></div>
 <main><div class="wrap">
@@ -628,10 +628,10 @@ entrar().catch(function(e){$("#vLogin").hidden=false;$("#lErro").textContent=fal
 <script src="avarias_regras.js"></script>
 <script src="avarias.js"></script>
 <script src="notificacoes.js"></script>
-<script src="beta/beta.js?v=04679f4d"></script>
+<script src="beta/beta.js?v=8e55dbea"></script>
 <script src="beta/painel_regras.js?v=ee621378"></script>
 <script src="beta/painel.js?v=86587fe8"></script>
-<script src="beta/paginas.js?v=7e13fd90"></script>
+<script src="beta/paginas.js?v=b2ba027b"></script>
 <script src="beta/horario_regras.js?v=870cde57"></script>
 <script src="beta/horario_gerar.js?v=cb8777a1"></script>
 <script src="beta/horario.js?v=cc96fae1"></script>

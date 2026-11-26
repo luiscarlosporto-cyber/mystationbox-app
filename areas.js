@@ -10,7 +10,7 @@ var AREAS = [
   {id: "cx", n: "💶 Caixa", adm: 1, p: [["reg", "Registo diário"], ["sai", "Saídas de caixa"], ["cdv", "Clientes a dever"], ["his", "Histórico"]]},   // «Clientes a dever» 19/11/2026 (só Penafiel): app/caixa_pnf.js,
   {id: "cmb", n: "⛽ Combustível", adm: 1, p: [["comb", "Entradas de combustível"], ["pre", "Preços ENSE", {g: "ENSE"}], ["ense", "Reporte mensal ENSE", {g: "ENSE"}], ["red", "Redução Repsol", {g: "Preços"}]]},   // «Redução Repsol» 16/11/2026: app/reducao.js
   {id: "avr", n: "🛠️ Avarias", p: [["avn", "Comunicar avaria"], ["avg", "Gestão de avarias"]]},   // 25/11/2026, aprovado pelo dono: app/avarias.js (todos os perfis)
-  {id: "stk", n: "📦 Stock", p: [["contar", "Contar"], ["art", "Artigos"], ["fal", "Em falta"], ["ler", "Ler código"], ["stock", "Stock atual"], ["inv", "Inventário"], ["mov", "Movimentos"]]},
+  {id: "stk", n: "📦 Stock", p: [["contar", "Contar"], ["art", "Artigos"], ["fal", "Em falta"], ["ler", "Ler código"], ["stock", "Stock atual", {nfunc: 1}], ["inv", "Inventário"], ["mov", "Movimentos"]]},
   {id: "cpr", n: "🛒 Compras", adm: 1, p: [["enc", "Por aprovar"], ["nova", "Nova encomenda"], ["comh", "Encomendas feitas"], ["sug", "Sugeridas pelos funcionários"], ["ent", "Entrada de mercadoria", {g: "Receções"}], ["dig", "Digitalizar fatura", {g: "Receções"}], ["fad", "Faturas da Adelaide", {g: "Receções"}]]},
   {id: "cnf", n: "🏦 Conferências", b: "Controlo", adm: 1, p: [["rep", "Repsol e Multibanco"], ["tms", "Fecho mensal TMS"], ["ban", "Banco"], ["liv", "Livro de movimentos"]]},
   {id: "frn", n: "🧾 Fornecedores", adm: 1, p: [["dsp", "Despesas"]]},   // «Por fornecedor» acrescentado em beta/paginas.js
@@ -41,7 +41,7 @@ var GESTOR_PAGINAS = {reg: 1, sai: 1, cdv: 1, his: 1, ven: 1, va: 1, maq: 1, rep
 function paraGestor(x) { return !window.GESTOR || GESTOR_PAGINAS[x[0]]; }
 function soColab() { return !ADMIN && !window.GESTOR; }
 function areasVisiveis() { return AREAS.filter(function (a) { return (ADMIN || !a.adm) && (!a.func || soColab()) && a.p.some(paraGestor); }); }
-function paginasDe(a) { return a.p.filter(function (x) { return (ADMIN || !(x[2] && x[2].adm)) && paraGestor(x); }); }
+function paginasDe(a) { return a.p.filter(function (x) { return (ADMIN || !(x[2] && x[2].adm)) && !(x[2] && x[2].nfunc && soColab()) && paraGestor(x); }); }   // nfunc: o colaborador não vê (Stock atual, 26/11/2026)
 /* primeira página de quem entra: o funcionário só vê Stock e Horário (dono, 10/11/2026) */
 function inicio() { return window.GESTOR ? "reg" : ADMIN ? "ini" : "col"; }   // colaborador: Início da Área do Colaborador (26/11/2026; antes «contar»)
 function areaDe(pg) { return AREAS.find(function (a) { return a.p.some(function (x) { return x[0] === pg; }); }); }
@@ -68,7 +68,7 @@ function marcar(pg) {
 }
 /* ir para uma página (também chamado pelo módulo de stock, ex.: depois de criar uma encomenda) */
 function ir(pg) {
-  var a = areaDe(pg), ent = a && a.p.find(function (x) { return x[0] === pg; }); if (!a || (a.adm && !ADMIN) || (a.func && !soColab()) || (ent[2] && ent[2].adm && !ADMIN) || !paraGestor([pg])) { pg = inicio(); a = areaDe(pg); }
+  var a = areaDe(pg), ent = a && a.p.find(function (x) { return x[0] === pg; }); if (!a || (a.adm && !ADMIN) || (a.func && !soColab()) || (ent[2] && ent[2].adm && !ADMIN) || (ent[2] && ent[2].nfunc && soColab()) || !paraGestor([pg])) { pg = inicio(); a = areaDe(pg); }
   if (NEXP[pg]) { vistaBase("nex"); marcar(pg); nexMostrar(pg); }
   else {
     var v = VISTA_DA[pg] || pg;

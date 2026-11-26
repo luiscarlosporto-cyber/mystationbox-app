@@ -178,7 +178,7 @@
     var b = barraMes("car", M, carregarDocs), ini = M + "-01", fim = addMes(M, 1) + "-01", passado = M < hojeISO(0).slice(0, 7);
     var zona = "<div id='carZona' class='carZona' tabindex='0' role='button' aria-label='Escolher ficheiros para carregar'><strong>Largue aqui os ficheiros, ou toque para escolher</strong>" +
       "<span>Pode ser mais de um. A app reconhece cada ficheiro pelo conteúdo e a estação pelo próprio documento.</span>" +
-      "<small>Folha de turno (.xls) · fotografia de talão ou fatura · PDF da Repsol · fecho mensal TMS (.csv) · Turno por formas de cobrança e Folha de fecho (PDF do CBOS) · vendas de tabaco (.xlsx) · créditos por transferência, extrato do banco e histórico de movimentos de carburante (Excel)</small></div>";
+      "<small>Folha de turno (.xls) · fotografia de talão ou fatura · PDF da Repsol · fecho mensal TMS (.csv) · Turno por formas de cobrança e Folha de fecho (PDF do CBOS) · vendas de tabaco (.xlsx) · <b>catálogo do CBOS (Excel)</b> · créditos por transferência, extrato do banco e histórico de movimentos de carburante (Excel)</small></div>";
     var liga = function () {
       b.ligar();
       var z = $("#carZona"); if (!z) return;

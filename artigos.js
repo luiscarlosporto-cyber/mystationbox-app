@@ -10,10 +10,11 @@ var ART_ZXING = "https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.mi
 
 function carregarArtigos() {
   var box = $("#artCorpo"); if (!box) return;
-  box.innerHTML = "<section class='card'><h2 style='margin:0 0 10px'>🔎 Artigos</h2>" +
+  box.innerHTML = "<section class='card' style='padding:14px 16px'><h2 style='margin:0 0 10px'>🔎 Artigos</h2>" +
     "<div style='display:flex;gap:8px'><input id='artTxt' type='search' autocomplete='off' enterkeyhint='search' placeholder='Nome, código CBOS ou código de barras' aria-label='Pesquisar artigo' style='flex:1;min-width:0;font-size:17px;min-height:48px'>" +
     "<button id='artCam' class='btn p' style='min-width:56px;min-height:48px' aria-label='Ler código de barras com a câmara'>📷</button></div>" +
     "<div id='artCamBox'></div><div id='artRes' style='margin-top:12px'></div></section>";
+  if (ADMIN) artCatalogoInfo();
   var i = $("#artTxt"); i.value = ART.t;
   i.oninput = function () { clearTimeout(ART.temp); var v = i.value; ART.temp = setTimeout(function () { artPesquisar(v); }, 300); };
   i.onkeydown = function (e) { if (e.key === "Enter") { e.preventDefault(); clearTimeout(ART.temp); artPesquisar(i.value); } };   // leitor USB: escreve e dá Enter
@@ -41,7 +42,7 @@ async function artPesquisar(t) {
 function artDesenhar() {
   var box = $("#artRes"); if (!box) return;
   if (ART.msg) { box.innerHTML = "<div class='mut'>" + esc(ART.msg) + "</div>"; return; }
-  if (!ART.res) { box.innerHTML = "<div class='mut'>Escreva parte do nome (ex.: «agua 1,5»), o código CBOS ou leia o código de barras com 📷.</div>"; return; }
+  if (!ART.res) { box.innerHTML = "<div class='mut'>Escreva parte do nome (ex.: «agua 1,5»), o código CBOS, ou leia o código de barras com o botão da câmara.</div>"; return; }
   if (!ART.res.length) { box.innerHTML = "<div>❌ Nenhum artigo encontrado para «" + esc(ART.t) + "».</div><div class='mut' style='margin-top:4px'>Se leu um código de barras, o artigo pode não ter esse código no CBOS. Procure pelo nome.</div>"; return; }
   var porBarras = ART.res[0].cod_barras;
   box.innerHTML = (porBarras ? "<div style='margin-bottom:8px'>✅ Encontrado pelo código de barras " + esc(ART.res[0].cod_barras) + "</div>" : "") +
@@ -59,6 +60,24 @@ function artCartao(a) {
     "</div></div>";
 }
 
+/* catálogo do CBOS bem à vista para o administrador (dono, 26/11/2026): data, nº de artigos e códigos, e o botão para atualizar */
+async function artCatalogoInfo() {
+  var box = $("#artCorpo"); if (!box || !ADMIN) return;
+  var est = EST, c = await sb.from("msb_catalogo_cbos").select("importado_em", {count: "exact"}).eq("estacao", est).neq("estado", "Fora do export").order("importado_em", {ascending: false}).limit(1);
+  var b = await sb.from("msb_catalogo_barras").select("cod_barras", {count: "exact", head: true}).eq("estacao", est).eq("ativo", true);
+  if (est !== EST || !$("#artCorpo")) return;
+  var quando = c.data && c.data[0] ? new Date(c.data[0].importado_em) : null, dias = quando ? Math.floor((Date.now() - quando) / 864e5) : null;
+  var el = document.createElement("section"); el.className = "card"; el.id = "artCatCard"; el.style.padding = "14px 16px";
+  el.innerHTML = "<div style='display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between'><div><b>Catálogo do CBOS</b><div class='mut'>" +
+    (quando ? (c.count || 0) + " artigos · " + (b.count || 0) + " códigos de barras · atualizado a " + quando.toLocaleDateString("pt-PT") + (dias > 30 ? " · <span class='bad'>⚠ há " + dias + " dias</span>" : "") : "Ainda não carregado") + "</div></div>" +
+    "<button class='btn p' id='artCat' style='min-height:44px'>📒 Atualizar catálogo do CBOS</button><input type='file' id='artFCat' hidden></div>" +
+    "<p class='mut' style='margin:6px 0 0;font-size:13px'>No CBOS: exportar o catálogo com todas as famílias (exportCatalog) e escolher aqui o ficheiro Excel.</p>";
+  var old = $("#artCatCard"); if (old) old.remove();
+  box.insertBefore(el, box.firstChild);
+  $("#artCat").onclick = function () { $("#artFCat").click(); };
+  $("#artFCat").onchange = function () { var f = this.files && this.files[0]; this.value = ""; if (f && window.importarCatalogo) importarCatalogo(f); };
+}
+
 /* ---------- câmara (também usada nas Faltas: camAbrir(caixa, botão, achou)) ---------- */
 var CAM = null;
 function artZXing() {
@@ -69,29 +88,41 @@ function artZXing() {
 }
 function artCamAbrir() { camAbrir("#artCamBox", "#artCam", function (txt) { $("#artTxt").value = txt; artPesquisar(txt); }); }
 function artCamParar() { camParar(); }
-async function camAbrir(caixa, botao, achou) {
+/* continuo: a câmara fica aberta e cada código novo chama achou() (o mesmo código só volta a contar passados 3 s).
+ * iPhone (ZXing): pede vídeo em alta resolução, foco contínuo e TRY_HARDER, que ajudam com o brilho do plástico. */
+async function camAbrir(caixa, botao, achou, continuo) {
   camParar();
   var cb = $(caixa); if (!cb) return;
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { cb.innerHTML = "<div class='bad' style='margin-top:10px'>Este navegador não deixa usar a câmara. Escreva o código à mão.</div>"; return; }
   cb.innerHTML = "<div style='margin-top:10px;position:relative;border-radius:14px;overflow:hidden;background:#000'>" +
     "<video playsinline muted style='width:100%;max-height:50vh;display:block;object-fit:cover'></video>" +
     "<div style='position:absolute;left:10%;right:10%;top:45%;height:2px;background:#1A63E8;box-shadow:0 0 8px #1A63E8'></div></div>" +
-    "<div class='mut' style='margin-top:6px'>Aponte para o código de barras…</div>";
+    "<div class='mut' style='margin-top:6px'>Aponte para o código de barras a 10–15 cm. Se houver brilho no plástico, incline um pouco o telemóvel.</div>" +
+    "<div id='camLuz'></div>";
   var b = $(botao); if (b) { b.dataset.ic = b.textContent; b.textContent = "✕"; b.setAttribute("aria-label", "Fechar a câmara"); }
   CAM = {caixa: caixa, botao: botao, vivo: true, parar: function () {}};
-  var eu = CAM, vid = cb.querySelector("video"), fim = function (txt) { if (CAM !== eu) return; camParar(); if (navigator.vibrate) navigator.vibrate(60); achou(String(txt).trim()); };
+  var eu = CAM, vid = cb.querySelector("video"), ult = {c: "", t: 0}, fim = function (txt) {
+    if (CAM !== eu) return;
+    var c = String(txt).trim(), agora = Date.now();
+    if (continuo && c === ult.c && agora - ult.t < 3000) return;
+    ult = {c: c, t: agora};
+    if (!continuo) camParar();
+    if (navigator.vibrate) navigator.vibrate(60);
+    achou(c);
+  };
+  var VIDEO = {facingMode: "environment", width: {ideal: 1920}, height: {ideal: 1080}, advanced: [{focusMode: "continuous"}]};
   try {
     var nativo = false;
     if ("BarcodeDetector" in window) { try { var fm = await BarcodeDetector.getSupportedFormats(); nativo = fm.indexOf("ean_13") >= 0; } catch (e) { nativo = false; } }
     if (nativo) {
-      var st = await navigator.mediaDevices.getUserMedia({video: {facingMode: "environment"}, audio: false});
+      var st = await navigator.mediaDevices.getUserMedia({video: VIDEO, audio: false});
       if (CAM !== eu) { st.getTracks().forEach(function (t) { t.stop(); }); return; }
       var det = new BarcodeDetector({formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39", "itf"]});
       eu.parar = function () { st.getTracks().forEach(function (t) { t.stop(); }); };
-      vid.srcObject = st; await vid.play();
+      vid.srcObject = st; await vid.play(); camLuz(st);
       var ciclo = async function () {
         if (CAM !== eu || !eu.vivo) return;
-        try { var r = await det.detect(vid); if (r && r.length) return fim(r[0].rawValue); } catch (e) { /* imagem ainda sem dados */ }
+        try { var r = await det.detect(vid); if (r && r.length) { fim(r[0].rawValue); if (!continuo) return; return setTimeout(ciclo, 900); } } catch (e) { /* imagem ainda sem dados */ }
         setTimeout(ciclo, 200);
       };
       ciclo();
@@ -99,10 +130,14 @@ async function camAbrir(caixa, botao, achou) {
       await artZXing();
       if (CAM !== eu) return;
       var Z = window.ZXing, h = new Map();
+      h.set(Z.DecodeHintType.TRY_HARDER, true);
       h.set(Z.DecodeHintType.POSSIBLE_FORMATS, [Z.BarcodeFormat.EAN_13, Z.BarcodeFormat.EAN_8, Z.BarcodeFormat.UPC_A, Z.BarcodeFormat.UPC_E, Z.BarcodeFormat.CODE_128, Z.BarcodeFormat.CODE_39, Z.BarcodeFormat.ITF]);
       var leitor = new Z.BrowserMultiFormatReader(h, 300);
       eu.parar = function () { try { leitor.reset(); } catch (e) { /* já parado */ } };
-      leitor.decodeFromVideoDevice(undefined, vid, function (r) { if (r) fim(r.getText()); });
+      var cb2 = function (r) { if (r) fim(r.getText()); };
+      try { await leitor.decodeFromConstraints({video: VIDEO, audio: false}, vid, cb2); }
+      catch (e2) { if (CAM !== eu || (e2 && e2.name === "NotAllowedError")) throw e2; leitor.decodeFromVideoDevice(undefined, vid, cb2); }
+      if (CAM === eu && vid.srcObject) camLuz(vid.srcObject);
     }
   } catch (e) {
     if (CAM !== eu) return;
@@ -110,6 +145,18 @@ async function camAbrir(caixa, botao, achou) {
     var nome = e && e.name, m = nome === "NotAllowedError" ? "Sem autorização para a câmara. Autorize nas definições do navegador e tente outra vez." : nome === "NotFoundError" ? "Não encontrei câmara neste aparelho." : falhou(e);
     var cbx = $(caixa); if (cbx) cbx.innerHTML = "<div class='bad' style='margin-top:10px'>" + esc(m) + "</div>";
   }
+}
+/* Lanterna e zoom só onde o navegador deixa (Android). No iPhone o Safari não dá lanterna à página. */
+function camLuz(st) {
+  var t = st && st.getVideoTracks && st.getVideoTracks()[0], box = $("#camLuz"); if (!t || !box || !t.getCapabilities) return;
+  var cap = {}; try { cap = t.getCapabilities() || {}; } catch (e) { return; }
+  var h = "";
+  if (cap.torch) h += "<button class='btn' id='camTorch' style='min-height:44px;margin-top:6px'>🔦 Lanterna</button> ";
+  if (cap.zoom && cap.zoom.max > 1) h += "<button class='btn' id='camZoom' style='min-height:44px;margin-top:6px'>🔍 Aproximar</button>";
+  box.innerHTML = h;
+  var luz = false, zoom = false;
+  if ($("#camTorch")) $("#camTorch").onclick = function () { luz = !luz; t.applyConstraints({advanced: [{torch: luz}]}).catch(function () {}); };
+  if ($("#camZoom")) $("#camZoom").onclick = function () { zoom = !zoom; t.applyConstraints({advanced: [{zoom: zoom ? Math.min(2, cap.zoom.max) : (cap.zoom.min || 1)}]}).catch(function () {}); };
 }
 function camParar() {
   if (!CAM) return;
