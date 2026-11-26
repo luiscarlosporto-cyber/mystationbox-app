@@ -99,10 +99,25 @@ async function carregarPerfil() {
     "<button class='btn' data-ir='pto' style='min-height:44px'>🕒 Lembretes do ponto</button></section>" +
     "<section class='card' style='display:grid;gap:10px;padding:18px'><h2 style='margin:0'>Conta</h2>" +
     "<button class='btn' data-ir='pto' style='min-height:44px;text-align:left'>🔒 Aviso de privacidade do Ponto Digital</button>" +
+    "<details style='border:1px solid var(--bd);border-radius:12px;padding:10px 12px'><summary style='cursor:pointer;font-weight:600;min-height:28px'>Mudar palavra-passe</summary>" +
+    "<div style='display:grid;gap:8px;margin-top:10px'><label>Nova palavra-passe<input id='perPw1' type='password' autocomplete='new-password' minlength='8' style='width:100%;box-sizing:border-box;min-height:44px'></label>" +
+    "<label>Repetir a nova palavra-passe<input id='perPw2' type='password' autocomplete='new-password' minlength='8' style='width:100%;box-sizing:border-box;min-height:44px'></label>" +
+    "<button class='btn p' id='perPwOk' style='min-height:48px'>Guardar a nova palavra-passe</button><div id='perPwMsg' role='status'></div>" +
+    "<p class='mut' style='margin:0;font-size:13px'>Pelo menos 8 letras ou números. Não a partilhe com ninguém.</p></div></details>" +
     "<div class='mut'>Versão da app: <b id='perVersao'>" + esc(window.VERSAO_APP ? "v" + VERSAO_APP : "a verificar…") + "</b></div>" +
     "<button class='btn' id='perSair' style='min-height:52px;color:#B42318;border-color:#FCA5A5'>Terminar sessão</button></section>";
   colLigar(box);
   $("#perNotif").onclick = function () { if (window.notifPreferencias) notifPreferencias(); else ir("pto"); };
   $("#perSair").onclick = function () { var s = $("#bSair"); if (s) s.click(); };
+  /* mudar a palavra-passe (dono, 26/11/2026: cada colaborador pode mudar a inicial aqui) */
+  $("#perPwOk").onclick = async function () {
+    var a = $("#perPw1").value, b = $("#perPw2").value, m = $("#perPwMsg"), bt = this;
+    var erro = a.length < 8 ? "A palavra-passe tem de ter pelo menos 8 letras ou números." : a !== b ? "As duas palavras-passe não são iguais." : "";
+    if (erro) { m.innerHTML = "<span class='bad'>✖ " + esc(erro) + "</span>"; return; }
+    bt.disabled = true; m.textContent = "A guardar…";
+    try { var r = await sb.auth.updateUser({password: a}); if (r.error) throw r.error; $("#perPw1").value = $("#perPw2").value = ""; m.innerHTML = "<span style='color:#0B6B3A'>✔ Palavra-passe mudada. Use a nova da próxima vez que entrar.</span>"; }
+    catch (e) { m.innerHTML = "<span class='bad'>✖ " + esc(/same|different/i.test(e.message || "") ? "A nova palavra-passe tem de ser diferente da atual." : falhou(e)) + "</span>"; }
+    bt.disabled = false;
+  };
   if (!window.VERSAO_APP && window.versaoPublicada) versaoPublicada().then(function (v) { var e = $("#perVersao"); if (e) e.textContent = v ? "v" + v : "desconhecida"; });
 }
