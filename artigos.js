@@ -41,13 +41,57 @@ async function artPesquisar(t) {
 
 function artDesenhar() {
   var box = $("#artRes"); if (!box) return;
+  ART.cnt = null;
   if (ART.msg) { box.innerHTML = "<div class='mut'>" + esc(ART.msg) + "</div>"; return; }
   if (!ART.res) { box.innerHTML = "<div class='mut'>Escreva parte do nome (ex.: «agua 1,5»), o código CBOS, ou leia o código de barras com o botão da câmara.</div>"; return; }
   if (!ART.res.length) { box.innerHTML = "<div>❌ Nenhum artigo encontrado para «" + esc(ART.t) + "».</div><div class='mut' style='margin-top:4px'>Se leu um código de barras, o artigo pode não ter esse código no CBOS. Procure pelo nome.</div>"; return; }
   var porBarras = ART.res[0].cod_barras;
   box.innerHTML = (porBarras ? "<div style='margin-bottom:8px'>✅ Encontrado pelo código de barras " + esc(ART.res[0].cod_barras) + "</div>" : "") +
-    "<div style='display:grid;gap:8px'>" + ART.res.map(artCartao).join("") + "</div>" +
+    "<div style='display:grid;gap:8px'>" + ART.res.map(artCartao).join("") + "</div>" + (porBarras ? artContarHtml(ART.res[0]) : "") +
     (ART.res.length >= 40 ? "<div class='mut' style='margin-top:8px'>Mostram-se os primeiros 40. Escreva mais palavras para afinar.</div>" : "");
+  artContarLigar();
+}
+/* Juntar à contagem do stock (26/11/2026): ex. código de 10 unidades × 5 = 50 unidades.
+   Só para artigos do stock de tabaco; a contagem é a do separador Contar (mesma lista, mesma estação). */
+function artProdTabaco(cod) {
+  try { var L = JSON.parse(localStorage.getItem("stc_products") || "[]"); } catch (e) { return null; }
+  return (L || []).find(function (p) { return p.barcode === cod || p.volume_barcode === cod; }) || null;
+}
+function artContarHtml(a) {
+  var cod = a.cod_barras, p = artProdTabaco(cod); if (!p || p.maquina) return "";
+  var vol = p.volume_barcode === cod, uni = vol ? (p.volume_size || a.quantidade || 10) : 1;
+  ART.cnt = {cod: cod, uni: uni, nome: p.name, vol: vol};
+  return "<div class='card' style='margin-top:10px;padding:12px 14px'><b>Contar este artigo</b>" +
+    "<div style='display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap'>" +
+    "<button class='btn' id='artQm' aria-label='Menos' style='min-width:48px'>−</button>" +
+    "<input id='artQ' type='number' min='1' max='999' value='1' inputmode='numeric' aria-label='Quantidade' style='width:80px;text-align:center;font-size:20px;font-weight:700'>" +
+    "<button class='btn' id='artQp' aria-label='Mais' style='min-width:48px'>+</button>" +
+    "<span>" + (vol ? "volume(s) de " + uni : "maço(s) / unidade(s)") + "</span></div>" +
+    "<div id='artQtot' class='mut' style='margin-top:6px'></div>" +
+    "<button class='btn p' id='artJuntar' style='width:100%;margin-top:10px;min-height:48px'>＋ Juntar à contagem</button>" +
+    "<div id='artQmsg' style='margin-top:6px'></div></div>";
+}
+function artContarLigar() {
+  var q = $("#artQ"); if (!q || !ART.cnt) return;
+  var n = function () { var v = Math.floor(Number(q.value)); return v >= 1 && v <= 999 ? v : 1; };
+  var tot = function () { var c = ART.cnt; $("#artQtot").textContent = c.vol ? n() + " × " + c.uni + " = " + (n() * c.uni) + " unidades" : n() + (n() === 1 ? " unidade" : " unidades"); };
+  q.oninput = tot; tot();
+  $("#artQm").onclick = function () { q.value = Math.max(1, n() - 1); tot(); };
+  $("#artQp").onclick = function () { q.value = Math.min(999, n() + 1); tot(); };
+  $("#artJuntar").onclick = function () {
+    var c = ART.cnt, k = n(), feito = false;
+    /* módulo de stock já aberto nesta estação: junta lá (atualiza a lista que está à vista) */
+    try {
+      var f = $("#nexFrame"), w = f && NEX_EST === EST && f.contentWindow;
+      if (w && typeof w.cntAdd === "function") { var qi = w.document.getElementById("cntQty"); if (qi) { qi.value = k; w.cntAdd(c.cod); feito = true; } }
+    } catch (e) { feito = false; }
+    if (!feito) {   // ainda não aberto: grava na mesma lista que o Contar lê ao abrir
+      var key = EST === "sto" ? "stc_count" : "stc_count_" + EST;
+      try { var o = JSON.parse(localStorage.getItem(key) || "{}") || {}; o[c.cod] = (o[c.cod] || 0) + k; localStorage.setItem(key, JSON.stringify(o)); feito = true; } catch (e) { feito = false; }
+    }
+    $("#artQmsg").innerHTML = feito ? "✅ Juntado à contagem: " + esc(c.nome) + " · " + k + (c.vol ? " vol. (" + k * c.uni + " un.)" : " un.") + " <a href='#' id='artVerCnt'>Ver a contagem</a>" : "❌ Não foi possível juntar. Use o separador Contar.";
+    if (feito) { q.value = 1; tot(); var v = $("#artVerCnt"); if (v) v.onclick = function (e) { e.preventDefault(); ir("contar"); }; }
+  };
 }
 function artCartao(a) {
   var fam = CATALOGO_CBOS.familia(a.poscode), vol = a.quantidade > 1 ? " <span class='b'>código de " + a.quantidade + " unidades</span>" : "";
