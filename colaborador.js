@@ -48,12 +48,12 @@ function colHtml(D) {
   var data = new Date().toLocaleDateString("pt-PT", {timeZone: "Europe/Lisbon", weekday: "long", day: "2-digit", month: "2-digit", year: "numeric"});
   /* estado do ponto de hoje: pela última picagem aceite */
   var reg = D.reg || [], ult = reg[reg.length - 1], ent = reg.filter(function (r) { return r.tipo === "entrada"; });
-  var folga = M.codigo && COL_FOLGA[M.codigo], estado, botao;
-  if (!M.codigo) { estado = ""; botao = ""; }
-  else if (folga) { estado = folga; botao = ""; }
-  else if (!ult) { estado = "Por iniciar"; botao = "Registar entrada"; }
-  else if (ult.tipo === "entrada") { estado = "Turno em curso · entrou às " + colHora(ult.hora); botao = "Registar saída"; }
-  else { estado = "Saiu às " + colHora(ult.hora); botao = (M.partes || []).length > ent.length ? "Registar entrada" : ""; if (!botao) estado = "Turno concluído · " + colHora(ent[0].hora) + "–" + colHora(ult.hora); }
+  /* o ponto regista-se sempre, com ou sem turno no horário (dono, 26/11/2026: o horário pode não estar certo) */
+  var estado, botao = ult && ult.tipo === "entrada" ? "Registar saída" : "Registar entrada";
+  if (!ult) estado = M.codigo && !COL_FOLGA[M.codigo] ? "Por iniciar" : "";
+  else if (ult.tipo === "entrada") estado = "Turno em curso · entrou às " + colHora(ult.hora);
+  else estado = "Saiu às " + colHora(ult.hora) + (ent.length ? " · entrou às " + colHora(ent[0].hora) : "");
+  if (M.pode_picar === false) botao = "";
   var h1 = "<section class='card' style='display:grid;gap:12px;padding:18px'>" +
     "<div><div style='font-size:24px;font-weight:700;letter-spacing:-.3px'>" + saud + (nome ? ", " + esc(nome) : "") + "</div>" +
     "<div class='mut'>" + esc(colNomeEst(D.est)) + " · " + esc(data) + "</div></div>" +
