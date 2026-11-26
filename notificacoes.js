@@ -13,7 +13,8 @@ var NOTIF_TIPOS = [
   ["estado", "Mudança de estado", "Avarias que comunicou ou de que é responsável"],
   ["concluida", "Avaria concluída", "Quando fica resolvida"],
   ["comentario", "Comentários", "Novos comentários nas avarias que comunicou ou trata"],
-  ["ponto", "Ponto", "Picagens em falta, justificações e decisões"]
+  ["ponto", "Ponto", "Picagens em falta, justificações e decisões"],
+  ["compras", "Listas em falta", "Quando um colaborador envia uma lista de artigos em falta (administradores)"]
 ];
 function notifEsc(s) { return window.esc ? esc(s) : String(s == null ? "" : s); }
 function notifQuando(t) { return window.AVARIAS ? AVARIAS.idade(t) : new Date(t).toLocaleString("pt-PT"); }
@@ -41,7 +42,7 @@ function notifParar() {
 }
 async function notifCarregar() {
   try {
-    var r = await sb.from("msb_notificacoes").select("id,tipo,prioridade,titulo,corpo,link,criado_em,lida_em").order("criado_em", {ascending: false}).limit(60);
+    var r = await sb.from("msb_notificacoes").select("id,tipo,prioridade,titulo,corpo,link,criado_em,lida_em,estacao").order("criado_em", {ascending: false}).limit(60);
     if (r.error) throw r.error;
     var c = await sb.from("msb_notificacoes").select("id", {count: "exact", head: true}).is("lida_em", null);
     NOTIF.lista = r.data || []; NOTIF.porLer = c.count || 0; notifContador();
@@ -85,7 +86,7 @@ function notifDesenhar() {
   var L = NOTIF.lista;
   p.innerHTML = "<div class='np-cab'><b>Notificações</b>" + (NOTIF.porLer ? "<button class='lk' id='npTodas'>Marcar todas como lidas</button>" : "") + "<button class='np-x' aria-label='Fechar'>✕</button></div>" +
     "<div class='np-lista'>" + (L.length ? L.map(function (x) {
-      return "<button class='np-item" + (x.lida_em ? "" : " nova") + (x.tipo === "critica" ? " crit" : "") + "' data-id='" + x.id + "'><b>" + notifEsc(x.titulo) + "</b><span>" + notifEsc(x.corpo) + "</span><small>" + notifEsc(notifQuando(x.criado_em)) + (x.lida_em ? "" : " · por ler") + "</small></button>";
+      return "<button class='np-item" + (x.lida_em ? "" : " nova") + (x.tipo === "critica" ? " crit" : "") + "' data-id='" + x.id + "'><b>" + notifEsc(x.titulo) + "</b><span>" + notifEsc(x.corpo) + "</span><small>" + (x.estacao && (window.ESTS || []).length > 1 ? notifEsc(notifEstNome(x.estacao)) + " · " : "") + notifEsc(notifQuando(x.criado_em)) + (x.lida_em ? "" : " · por ler") + "</small></button>";
     }).join("") : "<p class='mut np-vazio'>Sem notificações.</p>") + "</div>" +
     "<div class='np-pe'><button class='btn' id='npPrefs'>⚙️ Preferências e notificações no telemóvel</button></div>";
   p.querySelector(".np-x").onclick = function () { p.remove(); };
@@ -104,14 +105,24 @@ async function notifLidas(ids) {
 function notifClicar(x) {
   if (!x) return;
   if (!x.lida_em) notifLidas([x.id]);
-  notifAbrirLink(x.link);
+  notifAbrirLink(x.link, x.estacao);
+}
+function notifEstNome(id) { var e = (window.ESTS || []).find(function (y) { return y.id === id; }); return e ? (e.short_name || e.name) : id; }
+/* cada estação no seu ambiente: antes de abrir, passa para a estação do aviso (como se a escolhesse no topo) */
+async function notifIrEst(est) {
+  var s = document.getElementById("selEst");
+  if (!est || est === window.EST || !s || ![].some.call(s.options, function (o) { return o.value === est; })) return;
+  s.value = est; if (s.onchange) await s.onchange.call(s);
 }
 /* …#avaria=PN-0007 abre a ficha da avaria */
-function notifAbrirLink(url) {
-  var hs = String(url || "").replace(/^[^#]*/, "");
-  if (/^#(ponto|ptg)\b/.test(hs) && window.ir) {   // avisos do Ponto: colaborador → Ponto; administrador → Gestão de Picagens
-    try { if (/#(ponto|ptg)/.test(location.hash)) history.replaceState(null, "", location.pathname + location.search); } catch (e) { /* fica o # */ }
-    ir(/^#ptg/.test(hs) ? "ptg" : "pto"); return true;
+async function notifAbrirLink(url, est) {
+  var hs = String(url || "").replace(/^[^#]*/, ""), m = /^#(?:sug|ptg)=(\w+)/.exec(hs);
+  if (m && !est) est = m[1];
+  var nAv = window.AVARIAS ? AVARIAS.lerNumero(hs) : null;
+  if (/^#(ponto|ptg|sug)\b/.test(hs) || nAv) await notifIrEst(est || (nAv && nAv.estacao));
+  if (/^#(ponto|ptg|sug)\b/.test(hs) && window.ir) {   // Ponto: colaborador → Ponto, administrador → Gestão de Picagens; listas em falta → Compras
+    try { if (/#(ponto|ptg|sug)/.test(location.hash)) history.replaceState(null, "", location.pathname + location.search); } catch (e) { /* fica o # */ }
+    ir(/^#ptg/.test(hs) ? "ptg" : /^#sug/.test(hs) ? "sug" : "pto"); return true;
   }
   if (!url || !window.AVARIAS) return false;
   var n = AVARIAS.lerNumero(String(url).replace(/^[^#]*/, ""));

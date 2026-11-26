@@ -144,7 +144,9 @@ var SUG = {est: "", estado: "enviada", L: null, sel: null, msg: ""};
 async function carregarSugeridas() {
   var box = $("#sugCorpo"); if (!box) return;
   if (!SUG.L) box.innerHTML = "<section class='card'><div class='mut'>A carregar…</div></section>";
-  var ests = SUG.est ? [SUG.est] : ESTS.map(function (x) { return x.id; });
+  /* cada estação no seu ambiente: só a estação escolhida no topo (26/11/2026) */
+  if (SUG.est !== EST) { SUG.est = EST; SUG.sel = null; }
+  var ests = [EST];
   try {
     var q = sb.from("msb_faltas_listas").select("id,estacao,quem,estado,nota,enviada_em,vista_em,vista_por,reenvios,primeiro_envio,msb_faltas_itens(id,poscode,texto,nome,decisao,decidido_por)")
       .in("estacao", ests).order("enviada_em", {ascending: false}).limit(60);
@@ -159,9 +161,8 @@ function sugDesenhar() {
   var box = $("#sugCorpo"); if (!box) return;
   var nomeEst = function (id) { var e = ESTS.find(function (x) { return x.id === id; }); return e ? (e.short_name || e.name) : id; };
   var bt = function (v, t, on, k) { return "<button class='btn" + (on ? " p" : "") + "' data-" + k + "='" + v + "' style='min-height:40px'>" + t + "</button>"; };
-  var h = "<section class='card'><div style='display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between'><h2 style='margin:0'>🛒 Compras sugeridas pelos funcionários</h2>" +
-    "<div style='display:flex;flex-wrap:wrap;gap:6px'>" + bt("", "Todas", !SUG.est, "est") + ESTS.map(function (e) { return bt(e.id, esc(e.short_name || e.name), SUG.est === e.id, "est"); }).join("") +
-    "<span style='width:8px'></span>" + bt("enviada", "Por ver", SUG.estado === "enviada", "estado") + bt("vista", "Vistas", SUG.estado === "vista", "estado") + "</div></div>" +
+  var h = "<section class='card'><div style='display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between'><h2 style='margin:0'>🛒 Compras sugeridas · " + esc(nomeEst(EST)) + "</h2>" +
+    "<div style='display:flex;flex-wrap:wrap;gap:6px'>" + bt("enviada", "Por ver", SUG.estado === "enviada", "estado") + bt("vista", "Vistas", SUG.estado === "vista", "estado") + "</div></div>" +
     "<p class='mut' style='margin:6px 0 0'>Listas de artigos em falta enviadas pelos colaboradores. «Encomendar» marca o artigo; a quantidade e a encomenda fazem-se em Compras como sempre.</p>" +
     (SUG.msg ? "<div class='bad' style='margin-top:8px'>" + esc(SUG.msg) + "</div>" : "") + "</section>";
   if (!SUG.msg && !SUG.L.length) h += "<section class='card'><div class='mut'>" + (SUG.estado === "enviada" ? "Não há listas por ver." : "Ainda não há listas vistas.") + "</div></section>";

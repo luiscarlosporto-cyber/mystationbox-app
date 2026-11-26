@@ -50,9 +50,9 @@ async function carregarAvNova() {
   if (!AV.pedido) AV.pedido = avUUID();
   try { await avListas(); } catch (e) { box.innerHTML = "<div class='aviso'>⚠ " + esc(falhouAv(e)) + "</div>"; return; }
   if (!(ESTS || []).length) { box.innerHTML = "<div class='aviso'>A sua conta não tem nenhuma estação. Peça ao administrador para lhe dar acesso.</div>"; return; }
-  var est = AV.estNova || EST, eq = AV.equip[est] || [];
+  var est = EST, eq = AV.equip[est] || [];
   box.innerHTML = "<div class='card avNova'>" +
-    "<div class='avNova-cab'><h2>Comunicar avaria</h2>" + ((ESTS || []).length > 1 ? "<select id='avnEst' aria-label='Estação'>" + ESTS.map(function (e) { return "<option value='" + e.id + "'" + (e.id === est ? " selected" : "") + ">" + esc(e.short_name || e.name) + "</option>"; }).join("") + "</select>" : "<span class='avChip'>" + esc(avEst(est)) + "</span>") + "</div>" +
+    "<div class='avNova-cab'><h2>Comunicar avaria</h2>" + ("<span class='avChip'>" + esc(avEst(est)) + "</span>") + "</div>" +
     "<div class='avFotosBtn'><label class='avBigBtn'><input type='file' id='avnCam' accept='image/*' capture='environment' hidden><svg class='avIc' viewBox='0 0 24 24' aria-hidden='true'><path d='M4 8h3l2-3h6l2 3h3v11H4z'/><circle cx='12' cy='13' r='3.5'/></svg><span>Tirar fotografia</span></label>" +
     "<label class='avBigBtn sec'><input type='file' id='avnGal' accept='image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif' multiple hidden><svg class='avIc' viewBox='0 0 24 24' aria-hidden='true'><rect x='3' y='4' width='18' height='16' rx='2'/><circle cx='9' cy='10' r='2'/><path d='M21 16l-5-5-9 9'/></svg><span>Galeria</span></label></div>" +
     "<div id='avnMini' class='avMini'></div>" +
@@ -69,7 +69,6 @@ async function carregarAvNova() {
   function marcarPri() { $$("#avnCorpo .avPriSel button").forEach(function (b) { var on = b.dataset.p === pri; b.classList.toggle("on", on); b.setAttribute("aria-checked", on ? "true" : "false"); }); }
   $$("#avnCorpo .avPriSel button").forEach(function (b) { b.onclick = function () { pri = AV.priNova = b.dataset.p; marcarPri(); }; });
   marcarPri();
-  if ($("#avnEst")) $("#avnEst").onchange = function () { AV.estNova = this.value; carregarAvNova(); };
   $("#avnCam").onchange = $("#avnGal").onchange = function () { avJuntarFotos(this.files); this.value = ""; };
   avMiniaturas();
   $("#avnTit").oninput = function () { avMsg(""); };
@@ -154,24 +153,24 @@ async function carregarAvGestao() {
 }
 function avDesenharGestao() {
   var box = $("#avgCorpo"); if (!box) return;
-  var F = AV.filtro, varias = (ESTS || []).length > 1;
-  var L = AVARIAS.ordenar(AVARIAS.filtrar(AV.lista, {estacao: F.estacao, prioridade: F.prioridade, de: F.de, ate: F.ate}));
+  /* cada estação no seu ambiente: só se vê a estação escolhida no topo (pedido do dono, 26/11/2026) */
+  var F = AV.filtro, varias = false, LE = AV.lista.filter(function (x) { return x.estacao === EST; });
+  var L = AVARIAS.ordenar(AVARIAS.filtrar(LE, {estacao: EST, prioridade: F.prioridade, de: F.de, ate: F.ate}));
   if (F.prest) L = L.filter(function (x) { var p = avPrest(x); return F.prest === "-" ? !p : p && p.nome === F.prest; });
-  var nomesP = []; Object.keys(AV.prest).forEach(function (k) { AV.prest[k].forEach(function (p) { if (p.ativo && nomesP.indexOf(p.nome) < 0) nomesP.push(p.nome); }); });
+  var nomesP = []; (AV.prest[EST] ? [EST] : []).forEach(function (k) { AV.prest[k].forEach(function (p) { if (p.ativo && nomesP.indexOf(p.nome) < 0) nomesP.push(p.nome); }); });
   var porEst = {}; AVARIAS.ESTADOS.forEach(function (e) { porEst[e.id] = L.filter(function (x) { return x.estado === e.id; }); });
   /* concluídas: as mais recentes primeiro e só as últimas 30, se não houver datas no filtro */
   porEst.concluida.sort(function (a, b) { return String(b.concluido_em).localeCompare(String(a.concluido_em)); });
   var maisC = !F.de && !F.ate && porEst.concluida.length > 30 ? porEst.concluida.length - 30 : 0; if (maisC) porEst.concluida = porEst.concluida.slice(0, 30);
-  var abertas = AV.lista.filter(function (x) { return x.estado !== "concluida"; }), crit = abertas.filter(function (x) { return x.prioridade === "critica"; }).length;
-  box.innerHTML = "<div class='avTopo'><div><h2>Avarias</h2><p class='mut'>" + abertas.length + (abertas.length === 1 ? " por resolver" : " por resolver") + (crit ? " · <b class='bad'>🔴 " + crit + (crit === 1 ? " crítica" : " críticas") + "</b>" : "") + "</p></div><div class='avLinha'>" + (avAdmin() && Object.keys(AV.prest).length ? "<button class='btn' id='avgPrest'>Prestadores</button>" : "") + "<button class='btn p' id='avgNova'>＋ Comunicar avaria</button></div></div>" +
+  var abertas = LE.filter(function (x) { return x.estado !== "concluida"; }), crit = abertas.filter(function (x) { return x.prioridade === "critica"; }).length;
+  box.innerHTML = "<div class='avTopo'><div><h2>Avarias · " + esc(avEst(EST)) + "</h2><p class='mut'>" + abertas.length + (abertas.length === 1 ? " por resolver" : " por resolver") + (crit ? " · <b class='bad'>🔴 " + crit + (crit === 1 ? " crítica" : " críticas") + "</b>" : "") + "</p></div><div class='avLinha'>" + (avAdmin() && Object.keys(AV.prest).length ? "<button class='btn' id='avgPrest'>Prestadores</button>" : "") + "<button class='btn p' id='avgNova'>＋ Comunicar avaria</button></div></div>" +
     "<div class='card avFiltros'>" +
-    (varias ? "<label>Estação<select id='avfEst'><option value=''>Todas</option>" + ESTS.map(function (e) { return "<option value='" + e.id + "'" + (F.estacao === e.id ? " selected" : "") + ">" + esc(e.short_name || e.name) + "</option>"; }).join("") + "</select></label>" : "") +
     "<label>Prioridade<select id='avfPri'><option value=''>Todas</option>" + AVARIAS.PRIORIDADES.slice().reverse().map(function (p) { return "<option value='" + p.id + "'" + (F.prioridade === p.id ? " selected" : "") + ">" + p.ic + " " + p.txt + "</option>"; }).join("") + "</select></label>" +
     "<label>Estado<select id='avfEstado'><option value=''>Todos</option>" + AVARIAS.ESTADOS.map(function (e) { return "<option value='" + e.id + "'" + (F.estado === e.id ? " selected" : "") + ">" + e.txt + "</option>"; }).join("") + "</select></label>" +
     (nomesP.length ? "<label>Prestador<select id='avfPrest'><option value=''>Todos</option><option value='-'" + (F.prest === "-" ? " selected" : "") + ">Por encaminhar</option>" + nomesP.map(function (n) { return "<option" + (F.prest === n ? " selected" : "") + ">" + esc(n) + "</option>"; }).join("") + "</select></label>" : "") +
     "<label>De<input type='date' id='avfDe' value='" + (F.de || "") + "'></label><label>Até<input type='date' id='avfAte' value='" + (F.ate || "") + "'></label>" +
-    (F.estacao || F.prioridade || F.estado || F.de || F.ate || F.prest ? "<button class='btn' id='avfLimpar'>Limpar</button>" : "") + "</div>" +
-    avResumoPrest() + "<div class='avAbas' role='tablist'>" + AVARIAS.ESTADOS.map(function (e) { return "<button role='tab' data-e='" + e.id + "' aria-selected='" + (AV.aba === e.id) + "'" + (AV.aba === e.id ? " class='on'" : "") + ">" + e.pl + " <i>" + porEst[e.id].length + "</i></button>"; }).join("") + "</div>" +
+    (F.prioridade || F.estado || F.de || F.ate || F.prest ? "<button class='btn' id='avfLimpar'>Limpar</button>" : "") + "</div>" +
+    avResumoPrest(LE) + "<div class='avAbas' role='tablist'>" + AVARIAS.ESTADOS.map(function (e) { return "<button role='tab' data-e='" + e.id + "' aria-selected='" + (AV.aba === e.id) + "'" + (AV.aba === e.id ? " class='on'" : "") + ">" + e.pl + " <i>" + porEst[e.id].length + "</i></button>"; }).join("") + "</div>" +
     "<div class='avQuadro'>" + AVARIAS.ESTADOS.filter(function (e) { return !F.estado || F.estado === e.id; }).map(function (e) {
       var C = porEst[e.id];
       return "<section class='avCol" + (AV.aba === e.id ? " on" : "") + "' data-e='" + e.id + "'><h3>" + e.ic + " " + e.pl + " <i>" + C.length + "</i></h3>" +
@@ -182,7 +181,7 @@ function avDesenharGestao() {
   function filtro(k, el) { if (el) el.onchange = function () { AV.filtro[k] = this.value || ""; avDesenharGestao(); }; }
   filtro("prest", $("#avfPrest"));
   if ($("#avgPrest")) $("#avgPrest").onclick = avEditarPrestadores;
-  filtro("estacao", $("#avfEst")); filtro("prioridade", $("#avfPri")); filtro("estado", $("#avfEstado")); filtro("de", $("#avfDe")); filtro("ate", $("#avfAte"));
+  filtro("prioridade", $("#avfPri")); filtro("estado", $("#avfEstado")); filtro("de", $("#avfDe")); filtro("ate", $("#avfAte"));
   if ($("#avfLimpar")) $("#avfLimpar").onclick = function () { AV.filtro = {}; avDesenharGestao(); };
   $$("#avgCorpo .avAbas button").forEach(function (b) { b.onclick = function () { AV.aba = b.dataset.e; avDesenharGestao(); }; });
   $$("#avgCorpo .avCartao").forEach(function (c) { c.onclick = function () { avAbrirFicha(+c.dataset.id); }; });
@@ -195,9 +194,9 @@ function avCartao(a, varias) {
 }
 
 /* por prestador (administrador): abertas e dias médios até ficar resolvida */
-function avResumoPrest() {
+function avResumoPrest(LE) {
   if (!avAdmin() || !Object.keys(AV.prest).length) return "";
-  var L = AV.lista.map(function (x) { var p = avPrest(x); return {prestador_id: p ? p.nome : null, estado: x.estado, encaminhada_em: x.encaminhada_em, concluido_em: x.concluido_em}; });
+  var L = (LE || AV.lista).map(function (x) { var p = avPrest(x); return {prestador_id: p ? p.nome : null, estado: x.estado, encaminhada_em: x.encaminhada_em, concluido_em: x.concluido_em}; });
   var R = AVARIAS.resumoPrestadores(L), K = Object.keys(R); if (!K.length) return "";
   var porEnc = AV.lista.filter(function (x) { return x.estado === "aberta"; }).length;
   return "<div class='card avResumo'><b>Por prestador</b>" + (porEnc ? " <span class='mut'>· " + porEnc + " por encaminhar</span>" : "") + "<div class='avResumoL'>" + K.map(function (k) {
@@ -221,11 +220,10 @@ function avModeloHtml(est, L) {
 /* lista de prestadores (administrador): acrescentar, telefone, email, desativar */
 function avEditarPrestadores() {
   var d = document.createElement("dialog"); d.className = "avDlg"; document.body.appendChild(d);
-  var ests = (ESTS || []).map(function (e) { return e.id; }), est = AV.filtro.estacao || window.EST || ests[0];
+  var ests = (ESTS || []).map(function (e) { return e.id; }), est = window.EST || ests[0];
   function desenhar() {
     var L = AV.prest[est] || [];
-    d.innerHTML = "<div class='avDlg-cab'><b>Prestadores de serviço</b><button class='np-x' aria-label='Fechar'>✕</button></div><div class='avDlg-corpo'>" +
-      (ests.length > 1 ? "<div class='avLinha'>" + ests.map(function (e) { return "<button class='btn" + (e === est ? " p" : "") + "' data-pe='" + e + "'>" + esc(avEst(e)) + "</button>"; }).join("") + "</div>" : "") +
+    d.innerHTML = "<div class='avDlg-cab'><b>Prestadores de serviço · " + esc(avEst(est)) + "</b><button class='np-x' aria-label='Fechar'>✕</button></div><div class='avDlg-corpo'>" +
       L.map(function (p) { return "<div class='avSec avPrestL' data-id='" + p.id + "'><div class='avLinha'><input data-k='nome' value='" + esc(p.nome) + "' maxlength='60' aria-label='Nome'>" +
         "<input data-k='telefone' value='" + esc(p.telefone || "") + "' placeholder='Telefone' inputmode='tel' maxlength='40' aria-label='Telefone'><input data-k='email' value='" + esc(p.email || "") + "' placeholder='Email' type='email' maxlength='120' aria-label='Email'>" +
         "<label style='display:flex;gap:6px;align-items:center'><input type='checkbox' data-k='ativo'" + (p.ativo ? " checked" : "") + ">Ativo</label>" +
