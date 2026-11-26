@@ -517,3 +517,21 @@ body:not(.b-duas) main{box-shadow:inset 5px 0 0 var(--est)}
 .avPriSel button .avDot{width:14px;height:14px}.avPriSel .p-baixa .avDot{color:var(--pb)}.avPriSel .p-media .avDot{color:var(--pm)}.avPriSel .p-alta .avDot{color:var(--pa)}.avPriSel .p-critica .avDot{color:var(--pc)}
 .avPriSel button{justify-content:center}
 .avBigBtn{color:#fff!important;opacity:1!important}.avBigBtn.sec{color:var(--fg)!important}
+/* Avarias: passos da sequência com prestadores e resumo por prestador (26/11/2026) */
+.avPassos{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;list-style:none;margin:10px 0 0;padding:0;counter-reset:p}
+.avPassos li{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;font:600 11.5px/1.2 var(--f-body);color:var(--mut);position:relative}
+.avPassos li i{width:22px;height:22px;border-radius:50%;border:2px solid var(--bd);background:var(--card);display:grid;place-items:center;font-style:normal;font-size:11px;z-index:1}
+.avPassos li:not(:first-child)::before{content:"";position:absolute;top:10px;right:50%;width:100%;height:2px;background:var(--bd)}
+.avPassos li.feito,.avPassos li.atual{color:var(--fg)}
+.avPassos li.feito i{background:#1A63E8;border-color:#1A63E8}.avPassos li.feito i::after{content:"✓";color:#fff}
+.avPassos li.atual i{border-color:#1A63E8;box-shadow:0 0 0 4px rgba(26,99,232,.18)}
+.avPassos li.feito:not(:first-child)::before,.avPassos li.atual:not(:first-child)::before{background:#1A63E8}
+.avResumo{padding:12px 14px;margin-bottom:12px}.avResumoL{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.avResumoL button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;border:1px solid var(--bd);background:var(--card);border-radius:12px;padding:8px 12px;font:13px var(--f-body);color:var(--fg);cursor:pointer;min-height:44px}
+.avResumoL button span{color:var(--mut);font-size:12.5px}
+.avValidar{border:2px solid #1A63E8;border-radius:16px;padding:12px 14px}
+.avValidar .btn{min-height:48px;flex:1}
+#avfContacto .btn{min-height:40px;text-decoration:none}
+.avPrestL input{min-width:0;flex:1 1 140px}
+.avEmails{list-style:none;margin:0 0 10px;padding:0;display:grid;gap:8px;font-size:13.5px}.avEmails li{border:1px solid var(--bd);border-radius:12px;padding:8px 10px}
+.emFoto{position:relative;display:block;cursor:pointer}.emFoto input{position:absolute;top:6px;left:6px;width:20px;height:20px}.emFoto img{display:block}

@@ -27,11 +27,12 @@ async function colDados() {
     sb.from("msb_horario_meses").select("estado").eq("estacao", est).eq("mes", mes).maybeSingle(),
     sb.from("msb_ponto_horas").select("codigo,parte,inicio,fim").eq("estacao", est).order("parte"),
     sb.rpc("msb_faltas_minhas", {p_estacao: est}),
-    sb.from("msb_avarias").select("id", {count: "exact", head: true}).eq("estacao", est).neq("estado", "concluida")
+    sb.from("msb_avarias").select("id,estado").eq("estacao", est).neq("estado", "concluida")
   ].map(function (p) { return Promise.resolve(p).catch(function (e) { return {error: e}; }); }));
   return {est: est, M: M, reg: q[0].error ? null : (q[0].data || []).filter(function (r) { return r.estado === "aceite"; }),
     amanha: q[1].error ? null : q[1].data, selado: !q[2].error && q[2].data && q[2].data.estado === "real", horas: q[3].error ? [] : (q[3].data || []),
-    faltas: q[4].error ? null : q[4].data, avarias: q[5].error ? null : q[5].count};
+    faltas: q[4].error ? null : q[4].data, avarias: q[5].error ? null : (q[5].data || []).length,
+    avValidar: q[5].error ? 0 : (q[5].data || []).filter(function (a) { return a.estado === "em_analise" || a.estado === "em_resolucao"; }).length};
 }
 
 async function carregarColab() {
@@ -62,7 +63,8 @@ function colHtml(D) {
     "</section>";
   var amanha = D.amanha && D.selado ? colTurnoTxt(D.amanha.codigo, D.horas.filter(function (p) { return p.codigo === D.amanha.codigo; })) : null;
   var f = D.faltas, fTxt = !f ? "Listas de artigos em falta" : f.rascunho && f.rascunho.itens.length ? "1 lista por enviar · " + f.rascunho.itens.length + " artigos" : (f.enviadas || []).length ? "Última enviada " + new Date(f.enviadas[0].enviada_em).toLocaleDateString("pt-PT", {day: "2-digit", month: "2-digit"}) : "Nenhuma lista por enviar";
-  var aTxt = D.avarias == null ? "Comunicar e acompanhar" : D.avarias ? D.avarias + (D.avarias === 1 ? " avaria aberta" : " avarias abertas") + " na estação" : "Nenhuma avaria aberta";
+  var aTxt = D.avarias == null ? "Comunicar e acompanhar" : D.avarias ? D.avarias + (D.avarias === 1 ? " avaria aberta" : " avarias abertas") + " na estação" +
+    (D.avValidar ? " · " + D.avValidar + " com o prestador: valide quando ficar a funcionar" : "") : "Nenhuma avaria aberta";
   return h1 + colAtalhos() +
     "<div class='mut' style='font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin:4px 4px -4px'>Os meus módulos</div>" +
     "<section style='display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px'>" +

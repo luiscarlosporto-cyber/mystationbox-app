@@ -4,7 +4,7 @@
  * Quem pode o quê está em avarias_regras.js (para mostrar só os botões certos); quem decide é a base de dados (msb_avaria_*).
  * Fotografias: reduzidas no telemóvel a 1600 px em JPEG (sem dados de localização), bucket privado msb-avarias. */
 "use strict";
-var AV = {lista: [], fotosN: {}, cats: [], equip: {}, filtro: {}, aba: "aberta", novas: [], pedido: null, ficha: null, aEnviar: false};
+var AV = {lista: [], fotosN: {}, cats: [], equip: {}, prest: {}, filtro: {}, aba: "aberta", novas: [], pedido: null, ficha: null, aEnviar: false};
 var AV_BUCKET = "msb-avarias";
 function avAdmin() { return !!(window.PERFIL && PERFIL.role === "admin"); }   // só dois perfis: administrador e colaborador (dono, 25/11/2026)
 function avUUID() {
@@ -27,6 +27,21 @@ async function avListas() {
   if (c.error) throw c.error; AV.cats = c.data || [];
   var e = await sb.from("msb_equipamentos").select("id,estacao,nome").eq("ativo", true).order("nome");
   if (e.error) throw e.error; AV.equip = {}; (e.data || []).forEach(function (x) { (AV.equip[x.estacao] = AV.equip[x.estacao] || []).push(x); });
+  await avPrestadores();
+}
+/* prestadores de serviço por estação (26/11/2026); se a tabela ainda não existir, as avarias continuam a funcionar sem eles */
+async function avPrestadores() {
+  // contactos e envio automático só o administrador lê (função); o colaborador lê só o nome
+  var p = avAdmin() ? await sb.rpc("msb_av_prestadores_contactos") : await sb.from("msb_av_prestadores").select("id,estacao,nome,ordem,ativo").order("ordem").order("nome");
+  if (p.error && avAdmin()) p = await sb.from("msb_av_prestadores").select("id,estacao,nome,ordem,ativo").order("ordem").order("nome");
+  AV.prest = {}; if (p.error) return;
+  if (avAdmin()) { var m = await sb.from("msb_av_email_modelos").select("estacao,prestador_id,assunto,corpo"); AV.modelos = m.error ? [] : (m.data || []); }
+  (p.data || []).forEach(function (x) { (AV.prest[x.estacao] = AV.prest[x.estacao] || []).push(x); });
+}
+function avPrest(a) { var id = a && a.prestador_id; if (!id) return null; var L = AV.prest[a.estacao] || []; return L.find(function (x) { return x.id === id; }) || null; }
+function avDia(d) { return d ? d.split("-").reverse().join("/") : ""; }
+function avPassos(a) {
+  return "<ol class='avPassos'>" + AVARIAS.passos(a).map(function (p) { return "<li class='" + (p.atual ? "atual" : p.feito ? "feito" : "") + "'><i></i><span>" + esc(p.txt) + "</span></li>"; }).join("") + "</ol>";
 }
 
 /* ================= Comunicar avaria ================= */
@@ -124,7 +139,8 @@ async function avEnviar(est, pri) {
 
 /* ================= Gestão de avarias ================= */
 async function avCarregarLista() {
-  var r = await lerTudo(function () { return sb.from("msb_avarias").select("id,estacao,numero,titulo,prioridade,estado,criado_em,criado_por,criado_nome,responsavel,responsavel_nome,tecnico_externo,concluido_em,atualizado_em"); }, ["id"]);
+  var r = await lerTudo(function () { return sb.from("msb_avarias").select("id,estacao,numero,titulo,prioridade,estado,criado_em,criado_por,criado_nome,responsavel,responsavel_nome,tecnico_externo,concluido_em,atualizado_em,prestador_id,visita_prevista,aguarda_peca,encaminhada_em"); }, ["id"]);
+  if (r.error && /prestador_id|visita_prevista|aguarda_peca|encaminhada_em/.test(r.error.message || "")) r = await lerTudo(function () { return sb.from("msb_avarias").select("id,estacao,numero,titulo,prioridade,estado,criado_em,criado_por,criado_nome,responsavel,responsavel_nome,tecnico_externo,concluido_em,atualizado_em"); }, ["id"]);
   if (r.error) throw r.error;
   var f = await lerTudo(function () { return sb.from("msb_avarias_fotos").select("id,avaria_id"); }, ["id"]);
   if (f.error) throw f.error;
@@ -140,19 +156,22 @@ function avDesenharGestao() {
   var box = $("#avgCorpo"); if (!box) return;
   var F = AV.filtro, varias = (ESTS || []).length > 1;
   var L = AVARIAS.ordenar(AVARIAS.filtrar(AV.lista, {estacao: F.estacao, prioridade: F.prioridade, de: F.de, ate: F.ate}));
+  if (F.prest) L = L.filter(function (x) { var p = avPrest(x); return F.prest === "-" ? !p : p && p.nome === F.prest; });
+  var nomesP = []; Object.keys(AV.prest).forEach(function (k) { AV.prest[k].forEach(function (p) { if (p.ativo && nomesP.indexOf(p.nome) < 0) nomesP.push(p.nome); }); });
   var porEst = {}; AVARIAS.ESTADOS.forEach(function (e) { porEst[e.id] = L.filter(function (x) { return x.estado === e.id; }); });
   /* concluídas: as mais recentes primeiro e só as últimas 30, se não houver datas no filtro */
   porEst.concluida.sort(function (a, b) { return String(b.concluido_em).localeCompare(String(a.concluido_em)); });
   var maisC = !F.de && !F.ate && porEst.concluida.length > 30 ? porEst.concluida.length - 30 : 0; if (maisC) porEst.concluida = porEst.concluida.slice(0, 30);
   var abertas = AV.lista.filter(function (x) { return x.estado !== "concluida"; }), crit = abertas.filter(function (x) { return x.prioridade === "critica"; }).length;
-  box.innerHTML = "<div class='avTopo'><div><h2>Avarias</h2><p class='mut'>" + abertas.length + (abertas.length === 1 ? " por resolver" : " por resolver") + (crit ? " · <b class='bad'>🔴 " + crit + (crit === 1 ? " crítica" : " críticas") + "</b>" : "") + "</p></div><button class='btn p' id='avgNova'>＋ Comunicar avaria</button></div>" +
+  box.innerHTML = "<div class='avTopo'><div><h2>Avarias</h2><p class='mut'>" + abertas.length + (abertas.length === 1 ? " por resolver" : " por resolver") + (crit ? " · <b class='bad'>🔴 " + crit + (crit === 1 ? " crítica" : " críticas") + "</b>" : "") + "</p></div><div class='avLinha'>" + (avAdmin() && Object.keys(AV.prest).length ? "<button class='btn' id='avgPrest'>Prestadores</button>" : "") + "<button class='btn p' id='avgNova'>＋ Comunicar avaria</button></div></div>" +
     "<div class='card avFiltros'>" +
     (varias ? "<label>Estação<select id='avfEst'><option value=''>Todas</option>" + ESTS.map(function (e) { return "<option value='" + e.id + "'" + (F.estacao === e.id ? " selected" : "") + ">" + esc(e.short_name || e.name) + "</option>"; }).join("") + "</select></label>" : "") +
     "<label>Prioridade<select id='avfPri'><option value=''>Todas</option>" + AVARIAS.PRIORIDADES.slice().reverse().map(function (p) { return "<option value='" + p.id + "'" + (F.prioridade === p.id ? " selected" : "") + ">" + p.ic + " " + p.txt + "</option>"; }).join("") + "</select></label>" +
     "<label>Estado<select id='avfEstado'><option value=''>Todos</option>" + AVARIAS.ESTADOS.map(function (e) { return "<option value='" + e.id + "'" + (F.estado === e.id ? " selected" : "") + ">" + e.txt + "</option>"; }).join("") + "</select></label>" +
+    (nomesP.length ? "<label>Prestador<select id='avfPrest'><option value=''>Todos</option><option value='-'" + (F.prest === "-" ? " selected" : "") + ">Por encaminhar</option>" + nomesP.map(function (n) { return "<option" + (F.prest === n ? " selected" : "") + ">" + esc(n) + "</option>"; }).join("") + "</select></label>" : "") +
     "<label>De<input type='date' id='avfDe' value='" + (F.de || "") + "'></label><label>Até<input type='date' id='avfAte' value='" + (F.ate || "") + "'></label>" +
-    (F.estacao || F.prioridade || F.estado || F.de || F.ate ? "<button class='btn' id='avfLimpar'>Limpar</button>" : "") + "</div>" +
-    "<div class='avAbas' role='tablist'>" + AVARIAS.ESTADOS.map(function (e) { return "<button role='tab' data-e='" + e.id + "' aria-selected='" + (AV.aba === e.id) + "'" + (AV.aba === e.id ? " class='on'" : "") + ">" + e.pl + " <i>" + porEst[e.id].length + "</i></button>"; }).join("") + "</div>" +
+    (F.estacao || F.prioridade || F.estado || F.de || F.ate || F.prest ? "<button class='btn' id='avfLimpar'>Limpar</button>" : "") + "</div>" +
+    avResumoPrest() + "<div class='avAbas' role='tablist'>" + AVARIAS.ESTADOS.map(function (e) { return "<button role='tab' data-e='" + e.id + "' aria-selected='" + (AV.aba === e.id) + "'" + (AV.aba === e.id ? " class='on'" : "") + ">" + e.pl + " <i>" + porEst[e.id].length + "</i></button>"; }).join("") + "</div>" +
     "<div class='avQuadro'>" + AVARIAS.ESTADOS.filter(function (e) { return !F.estado || F.estado === e.id; }).map(function (e) {
       var C = porEst[e.id];
       return "<section class='avCol" + (AV.aba === e.id ? " on" : "") + "' data-e='" + e.id + "'><h3>" + e.ic + " " + e.pl + " <i>" + C.length + "</i></h3>" +
@@ -161,6 +180,8 @@ function avDesenharGestao() {
     }).join("") + "</div>";
   $("#avgNova").onclick = function () { ir("avn"); };
   function filtro(k, el) { if (el) el.onchange = function () { AV.filtro[k] = this.value || ""; avDesenharGestao(); }; }
+  filtro("prest", $("#avfPrest"));
+  if ($("#avgPrest")) $("#avgPrest").onclick = avEditarPrestadores;
   filtro("estacao", $("#avfEst")); filtro("prioridade", $("#avfPri")); filtro("estado", $("#avfEstado")); filtro("de", $("#avfDe")); filtro("ate", $("#avfAte"));
   if ($("#avfLimpar")) $("#avfLimpar").onclick = function () { AV.filtro = {}; avDesenharGestao(); };
   $$("#avgCorpo .avAbas button").forEach(function (b) { b.onclick = function () { AV.aba = b.dataset.e; avDesenharGestao(); }; });
@@ -170,7 +191,75 @@ function avCartao(a, varias) {
   var n = AV.fotosN[a.id] || 0;
   return "<button class='avCartao p-" + a.prioridade + "' data-id='" + a.id + "'><span class='avCartao-l1'><b class='avNum'>" + esc(avNum(a)) + "</b>" + avPri(a.prioridade) + "</span>" +
     "<span class='avCartao-tit'>" + esc(a.titulo) + "</span>" +
-    "<span class='avCartao-meta'>" + esc(AVARIAS.idade(a.criado_em)) + (n ? " · 📷 " + n : "") + (a.responsavel_nome ? " · 👤 " + esc(a.responsavel_nome) : " · <i>sem responsável</i>") + (varias ? " · " + esc(avEst(a.estacao)) : "") + "</span></button>";
+    "<span class='avCartao-meta'>" + esc(AVARIAS.idade(a.criado_em)) + (n ? " · 📷 " + n : "") + (avPrest(a) ? " · 🔧 " + esc(avPrest(a).nome) + (a.aguarda_peca ? " · à espera de peça" : a.visita_prevista ? " · visita " + esc(avDia(a.visita_prevista).slice(0, 5)) : "") : a.responsavel_nome ? " · 👤 " + esc(a.responsavel_nome) : " · <i>por encaminhar</i>") + (varias ? " · " + esc(avEst(a.estacao)) : "") + "</span></button>";
+}
+
+/* por prestador (administrador): abertas e dias médios até ficar resolvida */
+function avResumoPrest() {
+  if (!avAdmin() || !Object.keys(AV.prest).length) return "";
+  var L = AV.lista.map(function (x) { var p = avPrest(x); return {prestador_id: p ? p.nome : null, estado: x.estado, encaminhada_em: x.encaminhada_em, concluido_em: x.concluido_em}; });
+  var R = AVARIAS.resumoPrestadores(L), K = Object.keys(R); if (!K.length) return "";
+  var porEnc = AV.lista.filter(function (x) { return x.estado === "aberta"; }).length;
+  return "<div class='card avResumo'><b>Por prestador</b>" + (porEnc ? " <span class='mut'>· " + porEnc + " por encaminhar</span>" : "") + "<div class='avResumoL'>" + K.map(function (k) {
+    var r = R[k]; return "<button data-rp='" + esc(k) + "'><b>" + esc(k) + "</b><span>" + r.abertas + (r.abertas === 1 ? " aberta" : " abertas") + (r.dias != null ? " · resolve em " + String(r.dias).replace(".", ",") + " dias" : "") + "</span></button>";
+  }).join("") + "</div></div>";
+}
+document.addEventListener("click", function (e) { var b = e.target.closest && e.target.closest("[data-rp]"); if (!b) return; AV.filtro.prest = b.dataset.rp; avDesenharGestao(); });
+
+/* modelo do email (estação ou um prestador): {quadro} e os campos da avaria preenchem-se sozinhos */
+function avModeloHtml(est, L) {
+  var sel = AV.modeloSel || "", pid = sel ? +sel : null, M = (AV.modelos || []).find(function (m) { return m.estacao === est && (m.prestador_id || null) === pid; });
+  var base = M || (pid ? AVARIAS.escolherModelo(AV.modelos, est, null) : AVARIAS.MODELO_PADRAO);
+  return "<div class='avSec'><h4>Modelo do email ao prestador</h4>" +
+    "<label class='avCampo'>Modelo para <select id='amPara'><option value=''>Todos os prestadores desta estação</option>" + L.map(function (p) { return "<option value='" + p.id + "'" + (String(p.id) === sel ? " selected" : "") + ">Só " + esc(p.nome) + "</option>"; }).join("") + "</select></label>" +
+    (pid && !M ? "<p class='mut' style='margin:0'>Este prestador ainda usa o modelo da estação. Ao guardar, passa a ter o seu.</p>" : "") +
+    "<label class='avCampo'>Assunto <input id='amAss' maxlength='200' value='" + esc(base.assunto) + "'></label>" +
+    "<label class='avCampo'>Texto <textarea id='amCorpo' rows='8' maxlength='6000'>" + esc(base.corpo) + "</textarea></label>" +
+    "<p class='mut' style='margin:0'>Campos: " + AVARIAS.CAMPOS.map(function (c) { return "{" + c + "}"; }).join(" ") + " {quadro}. O {estacao} já leva o número do posto (ex.: «" + esc(AVARIAS.ESTACAO_NOME[est] || est) + "»).</p>" +
+    "<button class='btn p' id='amGravar'>Guardar modelo</button></div>";
+}
+/* lista de prestadores (administrador): acrescentar, telefone, email, desativar */
+function avEditarPrestadores() {
+  var d = document.createElement("dialog"); d.className = "avDlg"; document.body.appendChild(d);
+  var ests = (ESTS || []).map(function (e) { return e.id; }), est = AV.filtro.estacao || window.EST || ests[0];
+  function desenhar() {
+    var L = AV.prest[est] || [];
+    d.innerHTML = "<div class='avDlg-cab'><b>Prestadores de serviço</b><button class='np-x' aria-label='Fechar'>✕</button></div><div class='avDlg-corpo'>" +
+      (ests.length > 1 ? "<div class='avLinha'>" + ests.map(function (e) { return "<button class='btn" + (e === est ? " p" : "") + "' data-pe='" + e + "'>" + esc(avEst(e)) + "</button>"; }).join("") + "</div>" : "") +
+      L.map(function (p) { return "<div class='avSec avPrestL' data-id='" + p.id + "'><div class='avLinha'><input data-k='nome' value='" + esc(p.nome) + "' maxlength='60' aria-label='Nome'>" +
+        "<input data-k='telefone' value='" + esc(p.telefone || "") + "' placeholder='Telefone' inputmode='tel' maxlength='40' aria-label='Telefone'><input data-k='email' value='" + esc(p.email || "") + "' placeholder='Email' type='email' maxlength='120' aria-label='Email'>" +
+        "<label style='display:flex;gap:6px;align-items:center'><input type='checkbox' data-k='ativo'" + (p.ativo ? " checked" : "") + ">Ativo</label>" +
+        "<label style='display:flex;gap:6px;align-items:center' title='Ao encaminhar, o email sai logo com o modelo'><input type='checkbox' data-k='auto'" + (p.auto_email ? " checked" : "") + ">Email automático</label><button class='btn' data-gravar>Guardar</button></div></div>"; }).join("") +
+      avModeloHtml(est, L) +
+      "<div class='avSec'><h4>Novo prestador</h4><div class='avLinha'><input id='apNome' placeholder='Nome' maxlength='60'><input id='apTel' placeholder='Telefone' inputmode='tel' maxlength='40'><input id='apEmail' placeholder='Email' type='email' maxlength='120'><button class='btn p' id='apNovo'>Acrescentar</button></div></div>" +
+      "<p class='avMsg' id='apMsg' role='status'></p></div>";
+    d.querySelector(".np-x").onclick = function () { d.close(); d.remove(); };
+    d.querySelectorAll("[data-pe]").forEach(function (b) { b.onclick = function () { est = b.dataset.pe; desenhar(); }; });
+    function L0() { return AV.prest[est] || []; }
+    async function gravar(args, b, auto) {
+      b.disabled = true;
+      try { var r = await sb.rpc("msb_av_prestador_gravar", args); if (r.error) throw r.error;
+        if (auto) { var r2 = await sb.rpc("msb_av_prestador_auto", auto); if (r2.error) throw r2.error; }
+        await avPrestadores(); desenhar(); d.querySelector("#apMsg").textContent = "Guardado."; d.querySelector("#apMsg").className = "avMsg ok"; if (window.PAGINA === "avg") avDesenharGestao(); }
+      catch (e) { b.disabled = false; var m = d.querySelector("#apMsg"); m.textContent = "⚠ " + falhouAv(e); m.className = "avMsg bad"; }
+    }
+    d.querySelectorAll("[data-gravar]").forEach(function (b) { b.onclick = function () {
+      var c = b.closest(".avPrestL"), v = function (k) { return c.querySelector("[data-k='" + k + "']"); };
+      var auto = v("auto").checked, ant = (L0().find(function (x) { return x.id === +c.dataset.id; }) || {}).auto_email;
+      if (auto && !v("email").value.trim()) { var m0 = d.querySelector("#apMsg"); m0.textContent = "Para o email automático, escreva o email do prestador."; m0.className = "avMsg bad"; return; }
+      gravar({p_id: +c.dataset.id, p_estacao: est, p_nome: v("nome").value, p_telefone: v("telefone").value, p_email: v("email").value, p_ativo: v("ativo").checked}, b,
+        auto !== !!ant ? {p_id: +c.dataset.id, p_auto: auto} : null);
+    }; });
+    var ms = d.querySelector("#amPara"); if (ms) ms.onchange = function () { AV.modeloSel = ms.value; desenhar(); };
+    var mg = d.querySelector("#amGravar"); if (mg) mg.onclick = async function () {
+      var b = this, m = d.querySelector("#apMsg"); b.disabled = true;
+      try { var r = await sb.rpc("msb_av_modelo_gravar", {p_estacao: est, p_prestador: ms.value ? +ms.value : null, p_assunto: d.querySelector("#amAss").value, p_corpo: d.querySelector("#amCorpo").value}); if (r.error) throw r.error;
+        await avPrestadores(); desenhar(); m = d.querySelector("#apMsg"); m.textContent = "Modelo guardado."; m.className = "avMsg ok"; }
+      catch (e) { b.disabled = false; m.textContent = "⚠ " + falhouAv(e); m.className = "avMsg bad"; }
+    };
+    d.querySelector("#apNovo").onclick = function () { gravar({p_id: null, p_estacao: est, p_nome: d.querySelector("#apNome").value, p_telefone: d.querySelector("#apTel").value, p_email: d.querySelector("#apEmail").value, p_ativo: true}, this); };
+  }
+  desenhar(); d.showModal();
 }
 
 /* ================= Ficha ================= */
@@ -198,9 +287,12 @@ async function avAbrirFicha(id) {
     var q = await Promise.all([
       sb.from("msb_avarias").select("*").eq("id", id).maybeSingle(),
       sb.from("msb_avarias_fotos").select("id,caminho,fase,criado_em").eq("avaria_id", id).order("id"),
-      sb.from("msb_avarias_historico").select("id,tipo,texto,antes,depois,por_nome,em").eq("avaria_id", id).order("id")
+      sb.from("msb_avarias_historico").select("id,tipo,texto,antes,depois,por_nome,em").eq("avaria_id", id).order("id"),
+      avAdmin() ? sb.from("msb_avarias_admin").select("ref_pedido,nota").eq("avaria_id", id).maybeSingle() : Promise.resolve({data: null}),
+      avAdmin() ? sb.from("msb_av_emails").select("id,para,cc,assunto,estado,erro,anexos,enviado_em,enviado_nome").eq("avaria_id", id).order("id") : Promise.resolve({data: []})
     ]);
-    q.forEach(function (x) { if (x.error) throw x.error; });
+    q.slice(0, 3).forEach(function (x) { if (x.error) throw x.error; });
+    var adm = q[3].error ? null : (q[3].data || {}); if (adm) adm.emails = q[4].error ? null : (q[4].data || []);
     var a = q[0].data; if (!a) throw new Error("Avaria não encontrada.");
     var fotos = q[1].data || [], hist = q[2].data || [], urls = {};
     if (fotos.length) {
@@ -210,10 +302,11 @@ async function avAbrirFicha(id) {
     if (AV.ficha !== id) return;
     var resp = [];
     if (avAdmin() && a.estado !== "concluida") { var rr = await sb.rpc("msb_avaria_responsaveis", {p_estacao: a.estacao}); resp = rr.data || []; }
-    avDesenharFicha(d, a, fotos, urls, hist, resp);
+    avDesenharFicha(d, a, fotos, urls, hist, resp, adm);
   } catch (e) { d.querySelector(".avDlg-cab b").textContent = "⚠ " + falhouAv(e); }
 }
-function avDesenharFicha(d, a, fotos, urls, hist, resp) {
+function avDesenharFicha(d, a, fotos, urls, hist, resp, adm) {
+  var P = (AV.prest[a.estacao] || []).filter(function (x) { return x.ativo || x.id === a.prestador_id; }), pr = avPrest(a);
   var q = {admin: avAdmin(), eu: EU.id, avaria: a}, cat = AV.cats.find(function (c) { return c.id === a.categoria_id; });
   var eq = a.equipamento_id ? ((AV.equip[a.estacao] || []).find(function (x) { return x.id === a.equipamento_id; }) || {}).nome : a.equipamento_txt;
   function galeria(fase, titulo) {
@@ -237,20 +330,43 @@ function avDesenharFicha(d, a, fotos, urls, hist, resp) {
     return "<li class='h-" + h.tipo + "'><i>" + (H[h.tipo] || "•") + "</i><div><span><b>" + esc(h.por_nome) + "</b> · " + o + "</span><small>" + esc(avDataHora(h.em)) + "</small>" + txt + "</div></li>";
   }
   var acoes = "";
-  if (AVARIAS.pode("estado", q)) acoes += "<div class='avSec'><h4>Estado</h4><div class='avSeg'>" + AVARIAS.ESTADOS.filter(function (e) { return e.id !== "concluida"; }).map(function (e) {
+  if (AVARIAS.pode("validar", q)) acoes += "<div class='avSec avValidar'><h4>O técnico já resolveu?</h4><p class='mut'>Depois de o prestador passar na estação, confirme se ficou a funcionar.</p>" +
+    "<div class='avLinha'><button class='btn p' id='avfOk'>✅ Está a funcionar</button><button class='btn' id='avfNao'>❌ Ainda não funciona</button></div>" +
+    "<div id='avfNaoBox' hidden><label class='avCampo'>O que ainda não funciona? <textarea id='avfNaoTxt' rows='2' maxlength='2000'></textarea></label><button class='btn' id='avfNaoEnviar'>Enviar</button></div></div>";
+  if (AVARIAS.pode("encaminhar", q) && P.length) {
+    var sug = a.prestador_id || AVARIAS.sugerirPrestador(P.filter(function (x) { return x.ativo; }), cat ? cat.nome : "", (eq || "") + " " + a.titulo);
+    acoes += "<div class='avSec avEnc'><h4>" + (a.prestador_id ? "Encaminhamento" : "Encaminhar ao prestador") + "</h4>" +
+      "<label class='avCampo'>Prestador <select id='avfPrestS'><option value=''>— escolher —</option>" + P.map(function (x) { return "<option value='" + x.id + "'" + (x.id === sug ? " selected" : "") + ">" + esc(x.nome) + (!a.prestador_id && x.id === sug ? " (sugerido)" : "") + "</option>"; }).join("") + "</select></label>" +
+      "<div id='avfContacto' class='avLinha'></div>" +
+      "<label class='avCampo'>N.º do pedido no prestador (só o administrador vê) <input id='avfRef' maxlength='80' value='" + esc((adm && adm.ref_pedido) || "") + "'></label>" +
+      "<div class='avLinha'><label class='avCampo'>Visita prevista <input type='date' id='avfVisita' value='" + esc(a.visita_prevista || "") + "'></label>" +
+      "<label class='avCampo' style='flex-direction:row;align-items:center;gap:8px'><input type='checkbox' id='avfPeca'" + (a.aguarda_peca ? " checked" : "") + "> À espera de peça</label></div>" +
+      "<label class='avCampo'>Nota interna (só o administrador vê) <textarea id='avfNotaAdm' rows='2' maxlength='1000'>" + esc((adm && adm.nota) || "") + "</textarea></label>" +
+      "<button class='btn p' id='avfEncaminhar'>" + (a.prestador_id ? "Guardar encaminhamento" : "📨 Encaminhar") + "</button><p class='mut' id='avfAutoTxt' style='margin:6px 0 0'></p></div>";
+  }
+  if (q.admin && adm && adm.emails) acoes += "<div class='avSec'><h4>Emails ao prestador <i>" + adm.emails.length + "</i></h4>" +
+    (adm.emails.length ? "<ul class='avEmails'>" + adm.emails.slice().reverse().map(function (m) {
+      return "<li><b>" + (m.estado === "enviado" ? "✅ Enviado" : "❌ Falhou") + "</b> · " + esc(avDataHora(m.enviado_em)) + " · " + esc(m.enviado_nome || "") + "<br><span class='mut'>para " + esc(m.para) + (m.cc ? " · cc " + esc(m.cc) : "") + (m.anexos ? " · " + m.anexos + " fotografias" : "") + "</span><br>" + esc(m.assunto) + (m.erro ? "<br><span class='bad'>" + esc(m.erro) + "</span>" : "") + "</li>";
+    }).join("") + "</ul>" : "") + (a.estado !== "concluida" || adm.emails.length ? "<button class='btn' id='avfEmail'>✉️ Escrever email ao prestador</button>" : "") + "</div>";
+  if (AVARIAS.pode("estado", q) && !q.admin) acoes += "<div class='avSec'><h4>Estado</h4><div class='avSeg'>" + AVARIAS.ESTADOS.filter(function (e) { return e.id !== "concluida"; }).map(function (e) {
     return "<button data-estado='" + e.id + "'" + (a.estado === e.id ? " class='on' aria-pressed='true' disabled" : "") + ">" + e.ic + " " + e.txt + "</button>"; }).join("") + "</div>" +
     "<label class='avCampo'>Prioridade <select id='avfPriF'>" + AVARIAS.PRIORIDADES.map(function (p) { return "<option value='" + p.id + "'" + (p.id === a.prioridade ? " selected" : "") + ">" + p.ic + " " + p.txt + "</option>"; }).join("") + "</select></label></div>";
+  if (AVARIAS.pode("estado", q) && q.admin) acoes += "<div class='avSec'><label class='avCampo'>Prioridade <select id='avfPriF'>" + AVARIAS.PRIORIDADES.map(function (p) { return "<option value='" + p.id + "'" + (p.id === a.prioridade ? " selected" : "") + ">" + p.ic + " " + p.txt + "</option>"; }).join("") + "</select></label></div>";
   if (AVARIAS.pode("atribuir", q)) acoes += "<div class='avSec'><h4>Responsável</h4><div class='avLinha'><select id='avfResp' aria-label='Responsável'><option value=''>— sem responsável —</option>" + resp.map(function (p) {
     return "<option value='" + p.user_id + "'" + (p.user_id === a.responsavel ? " selected" : "") + ">" + esc(p.nome) + (p.admin ? " (administrador)" : "") + "</option>"; }).join("") + "</select>" +
     "<input id='avfTec' maxlength='200' placeholder='Técnico externo (opcional)' value='" + esc(a.tecnico_externo || "") + "'><button class='btn' id='avfAtribuir'>Guardar</button></div></div>";
-  if (AVARIAS.pode("concluir", q)) acoes += "<div class='avSec avConcluir'><h4>Concluir</h4><label class='avCampo'>Solução aplicada <textarea id='avfSol' rows='3' maxlength='4000' placeholder='O que foi feito para resolver'></textarea></label><button class='btn p' id='avfConcluir'>✅ Concluir avaria</button></div>";
+  if (AVARIAS.pode("concluir", q)) acoes += "<div class='avSec avConcluir'><h4>" + (q.admin ? "Fechar sem validação do colaborador" : "Concluir") + "</h4><label class='avCampo'>Solução aplicada <textarea id='avfSol' rows='3' maxlength='4000' placeholder='O que foi feito para resolver'></textarea></label><button class='btn p' id='avfConcluir'>✅ Concluir avaria</button></div>";
   if (AVARIAS.pode("reabrir", q)) acoes += "<div class='avSec'><h4>Reabrir</h4><div class='avLinha'><input id='avfMotivo' maxlength='300' placeholder='Motivo (obrigatório)'><button class='btn' id='avfReabrir'>↩️ Reabrir</button></div></div>";
   var fase = a.estado === "aberta" ? "abertura" : "resolucao";
   d.innerHTML = "<div class='avDlg-cab'><b>" + esc(avNum(a)) + " · " + esc(avEst(a.estacao)) + "</b><button class='np-x' aria-label='Fechar'>✕</button></div>" +
-    "<div class='avDlg-corpo'><div class='avFichaTopo p-" + a.prioridade + "'><h2>" + esc(a.titulo) + "</h2><div class='avLinha'>" + avPri(a.prioridade) + avEstado(a.estado) + "</div></div>" +
+    "<div class='avDlg-corpo'><div class='avFichaTopo p-" + a.prioridade + "'><h2>" + esc(a.titulo) + "</h2><div class='avLinha'>" + avPri(a.prioridade) + avEstado(a.estado) + "</div></div>" + avPassos(a) +
     "<dl class='avDados'><dt>Comunicada</dt><dd>" + esc(avDataHora(a.criado_em)) + " · " + esc(a.criado_nome) + "</dd>" +
     (cat ? "<dt>Categoria</dt><dd>" + esc(cat.nome) + "</dd>" : "") + (eq ? "<dt>Equipamento</dt><dd>" + esc(eq) + "</dd>" : "") +
-    "<dt>Responsável</dt><dd>" + (a.responsavel_nome ? esc(a.responsavel_nome) : "<i class='mut'>sem responsável</i>") + (a.tecnico_externo ? " · técnico: " + esc(a.tecnico_externo) : "") + "</dd>" +
+    (pr ? "<dt>Prestador</dt><dd>" + esc(pr.nome) + (a.aguarda_peca ? " · à espera de peça" : "") + "</dd>" : "") +
+    (a.visita_prevista ? "<dt>Visita prevista</dt><dd>" + esc(avDia(a.visita_prevista)) + "</dd>" : "") +
+    (q.admin && adm && adm.ref_pedido ? "<dt>N.º do pedido</dt><dd>" + esc(adm.ref_pedido) + "</dd>" : "") +
+    (a.validada_nome ? "<dt>Validada</dt><dd>" + esc(a.validada_nome) + " · " + esc(avDataHora(a.validada_em)) + "</dd>" : "") +
+    (a.responsavel_nome || a.tecnico_externo ? "<dt>Responsável</dt><dd>" + (a.responsavel_nome ? esc(a.responsavel_nome) : "—") + (a.tecnico_externo ? " · técnico: " + esc(a.tecnico_externo) : "") + "</dd>" : "") +
     (a.concluido_em ? "<dt>Concluída</dt><dd>" + esc(avDataHora(a.concluido_em)) + "</dd><dt>Solução</dt><dd class='avSol'>" + esc(a.solucao) + "</dd>" : "") + "</dl>" +
     (a.descricao ? "<div class='avSec'><h4>Descrição</h4><p class='avTexto'>" + esc(a.descricao) + "</p></div>" : "") +
     galeria("abertura", "Fotografias") + galeria("resolucao", "Fotografias da resolução") +
@@ -274,6 +390,47 @@ function avDesenharFicha(d, a, fotos, urls, hist, resp) {
     if (await msbConfirma("Concluir a avaria " + avNum(a) + "? Quem a comunicou é avisado.", "Concluir")) fazer("msb_avaria_concluir", {p_id: a.id, p_solucao: s}, cc);
   };
   var ra = d.querySelector("#avfReabrir"); if (ra) ra.onclick = function () { var m = d.querySelector("#avfMotivo").value.trim(); if (m.length < 3) { msg("Escreva o motivo para reabrir.", false); return; } fazer("msb_avaria_reabrir", {p_id: a.id, p_motivo: m}, ra); };
+  var ok = d.querySelector("#avfOk"); if (ok) ok.onclick = async function () {
+    if (await msbConfirma("Confirma que a avaria " + avNum(a) + " está resolvida e a funcionar?", "Está a funcionar")) fazer("msb_avaria_validar", {p_id: a.id, p_ok: true, p_texto: null}, ok);
+  };
+  var nao = d.querySelector("#avfNao"); if (nao) nao.onclick = function () { d.querySelector("#avfNaoBox").hidden = false; d.querySelector("#avfNaoTxt").focus(); };
+  var naoE = d.querySelector("#avfNaoEnviar"); if (naoE) naoE.onclick = function () {
+    var t = d.querySelector("#avfNaoTxt").value.trim(); if (t.length < 3) { msg("Diga o que ainda não funciona.", false); return; }
+    fazer("msb_avaria_validar", {p_id: a.id, p_ok: false, p_texto: t}, naoE);
+  };
+  var ps = d.querySelector("#avfPrestS");
+  function contacto() {
+    var box = d.querySelector("#avfContacto"); if (!box) return;
+    var p = P.find(function (x) { return String(x.id) === ps.value; }); if (!p) { box.innerHTML = ""; return; }
+    var txt = "Avaria " + avNum(a) + " · " + avEst(a.estacao) + ": " + a.titulo + (a.descricao ? "\n" + a.descricao : "");
+    var tel = (p.telefone || "").replace(/[^0-9+]/g, ""), wa = tel.replace(/^\+/, ""); if (wa.length === 9) wa = "351" + wa;
+    box.innerHTML = (tel ? "<a class='btn' href='tel:" + esc(tel) + "'>📞 Ligar</a><a class='btn' target='_blank' rel='noopener' href='https://wa.me/" + esc(wa) + "?text=" + encodeURIComponent(txt) + "'>WhatsApp</a>" : "") +
+      (p.email ? "<a class='btn' href='mailto:" + esc(p.email) + "?subject=" + encodeURIComponent("Avaria " + avNum(a) + " · " + avEst(a.estacao)) + "&body=" + encodeURIComponent(txt) + "'>✉️ Email</a>" : "") +
+      (!tel && !p.email ? "<span class='mut'>Sem telefone nem email: acrescente em «Prestadores».</span>" : "");
+  }
+  if (ps) { ps.onchange = contacto; contacto(); }
+  function autoTxt() {
+    var t = d.querySelector("#avfAutoTxt"), p = ps && P.find(function (x) { return String(x.id) === ps.value; }); if (!t) return;
+    t.textContent = p && p.auto_email && p.email && !a.prestador_id ? "Ao encaminhar, o email segue logo para " + p.email + " (envio automático deste prestador)." : "";
+  }
+  if (ps) { ps.addEventListener("change", autoTxt); autoTxt(); }
+  var en = d.querySelector("#avfEncaminhar"); if (en) en.onclick = async function () {
+    if (!ps.value) { msg("Escolha o prestador.", false); return; }
+    var p = P.find(function (x) { return String(x.id) === ps.value; }), novo = !a.prestador_id || a.prestador_id !== p.id;
+    en.disabled = true;
+    try {
+      var r = await sb.rpc("msb_avaria_encaminhar", {p_id: a.id, p_prestador: +ps.value, p_ref: d.querySelector("#avfRef").value.trim() || null,
+        p_visita: d.querySelector("#avfVisita").value || null, p_peca: d.querySelector("#avfPeca").checked, p_nota: d.querySelector("#avfNotaAdm").value.trim() || null});
+      if (r.error) throw r.error;
+      if (novo && p.auto_email && p.email) {   // envio automático deste prestador: modelo tal como está, com as fotografias
+        var M = AVARIAS.escolherModelo(AV.modelos, a.estacao, p.id), ex = {equipamento: eq || ""};
+        var e = await avEnviarEmail({avaria_id: a.id, para: p.email, cc: "", assunto: AVARIAS.preencherModelo(M.assunto, a, ex), corpo: AVARIAS.preencherModelo(M.corpo, a, ex), fotos: fotos.map(function (f) { return f.id; })});
+        if (e) { msg("Encaminhada, mas o email não saiu: " + e, false); AV.lista = []; setTimeout(function () { avAbrirFicha(a.id); }, 2500); return; }
+      }
+      AV.lista = []; avAbrirFicha(a.id); if (window.PAGINA === "avg") carregarAvGestao();
+    } catch (x) { msg("⚠ " + falhouAv(x), false); en.disabled = false; }
+  };
+  var em = d.querySelector("#avfEmail"); if (em) em.onclick = function () { avEscreverEmail(a, P, fotos, urls, eq); };
   d.querySelector("#avfComBtn").onclick = function () { var t = d.querySelector("#avfCom").value.trim(); if (!t) return; fazer("msb_avaria_comentar", {p_id: a.id, p_texto: t}, this); };
   d.querySelector("#avfFoto").onchange = async function () {
     var L = Array.prototype.slice.call(this.files || []), out = d.querySelector("#avfFotoMsg"), erros = []; this.value = "";
@@ -285,6 +442,42 @@ function avDesenharFicha(d, a, fotos, urls, hist, resp) {
     out.textContent = ""; if (erros.length) msg("⚠ " + erros.join(" "), false); else { AV.lista = []; avAbrirFicha(a.id); }
   };
 }
+/* email ao prestador (só administrador): envia pela Edge Function, a partir do Gmail da estação. Devolve null ou a mensagem de erro. */
+async function avEnviarEmail(corpo) {
+  try {
+    var r = await sb.functions.invoke("msb-avarias-email", {body: corpo});
+    if (r.error) { var t = ""; try { t = (await r.error.context.json()).erro; } catch (e) { /* sem corpo */ } return t || falhouAv(r.error); }
+    return r.data && r.data.ok ? null : ((r.data && r.data.erro) || "Resposta inesperada do servidor.");
+  } catch (e) { return falhouAv(e); }
+}
+function avEscreverEmail(a, P, fotos, urls, eq) {
+  var p = avPrest(a) || {}, M = AVARIAS.escolherModelo(AV.modelos, a.estacao, p.id || null), ex = {equipamento: eq || ""};
+  var dl = document.createElement("dialog"); dl.className = "avDlg"; document.body.appendChild(dl);
+  var de = a.estacao === "sto" ? "portojoaonuneslda@gmail.com" : a.estacao === "pnf" ? "portonuneslda@gmail.com" : "Gmail da estação";
+  dl.innerHTML = "<div class='avDlg-cab'><b>Email ao prestador · " + esc(avNum(a)) + "</b><button class='np-x' aria-label='Fechar'>✕</button></div><div class='avDlg-corpo'>" +
+    "<p class='mut' style='margin:0'>Sai de <b>" + esc(de) + "</b> (" + esc(AVARIAS.ESTACAO_NOME[a.estacao] || a.estacao) + ") e fica nos «Enviados» desse Gmail.</p>" +
+    "<label class='avCampo'>Para <input id='emPara' type='email' multiple value='" + esc(p.email || "") + "' placeholder='email do prestador'></label>" +
+    "<label class='avCampo'>Cc <input id='emCc' type='email' multiple placeholder='opcional'></label>" +
+    "<label class='avCampo'>Assunto <input id='emAss' maxlength='200' value='" + esc(AVARIAS.preencherModelo(M.assunto, a, ex)) + "'></label>" +
+    "<label class='avCampo'>Texto <textarea id='emCorpo' rows='9' maxlength='6000'>" + esc(AVARIAS.preencherModelo(M.corpo, a, ex)) + "</textarea></label>" +
+    "<p class='mut' style='margin:0'>{quadro} é trocado pelo quadro com o registo da avaria (estação e n.º do posto, n.º da avaria, data, equipamento, prioridade, descrição).</p>" +
+    (fotos.length ? "<div class='avSec'><h4>Fotografias em anexo</h4><div class='avGal'>" + fotos.map(function (f) {
+      return "<label class='emFoto'><input type='checkbox' value='" + f.id + "' checked>" + (urls[f.caminho] ? "<img src='" + esc(urls[f.caminho]) + "' alt=''>" : "📷") + "</label>"; }).join("") + "</div></div>" : "") +
+    "<div class='avLinha'><button class='btn' id='emVoltar'>Cancelar</button><button class='btn p' id='emEnviar'>✉️ Enviar email</button></div><p class='avMsg' id='emMsg' role='status'></p></div>";
+  var fechar = function () { try { dl.close(); } catch (e) { /* já fechada */ } dl.remove(); };
+  dl.querySelector(".np-x").onclick = fechar; dl.querySelector("#emVoltar").onclick = fechar;
+  dl.querySelector("#emEnviar").onclick = async function () {
+    var b = this, m = dl.querySelector("#emMsg"), para = dl.querySelector("#emPara").value.trim();
+    if (!para) { m.textContent = "Escreva o email do prestador."; m.className = "avMsg bad"; return; }
+    b.disabled = true; b.textContent = "A enviar…";
+    var e = await avEnviarEmail({avaria_id: a.id, para: para, cc: dl.querySelector("#emCc").value.trim(), assunto: dl.querySelector("#emAss").value.trim(), corpo: dl.querySelector("#emCorpo").value,
+      fotos: Array.prototype.map.call(dl.querySelectorAll(".emFoto input:checked"), function (x) { return +x.value; })});
+    if (e) { m.textContent = "⚠ " + e; m.className = "avMsg bad"; b.disabled = false; b.textContent = "✉️ Enviar email"; return; }
+    fechar(); avAbrirFicha(a.id);
+  };
+  dl.showModal();
+}
+
 /* nova notificação em tempo real: se a avaria está aberta no ecrã, volta a ler */
 function avAtualizar(n) {
   if (n && AV.ficha && n.avaria_id === AV.ficha) avAbrirFicha(AV.ficha);

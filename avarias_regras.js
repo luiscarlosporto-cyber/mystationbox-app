@@ -5,10 +5,11 @@
 // Só dois perfis (dono, 25/11/2026): administrador e colaborador. «Responsável» é a pessoa a quem a avaria foi atribuída.
 (function (raiz) {
   const ESTADOS = [
-    { id: "aberta", txt: "Aberta", pl: "Abertas", ic: "📥" },
-    { id: "em_analise", txt: "Em análise", pl: "Em análise", ic: "🔍" },
-    { id: "em_resolucao", txt: "Em resolução", pl: "Em resolução", ic: "🛠️" },
-    { id: "concluida", txt: "Concluída", pl: "Concluídas", ic: "✅" }
+    /* nomes da sequência com prestadores (26/11/2026); os ids da base de dados não mudaram */
+    { id: "aberta", txt: "Comunicada", pl: "Comunicadas", ic: "📥" },
+    { id: "em_analise", txt: "Encaminhada", pl: "Encaminhadas", ic: "📨" },
+    { id: "em_resolucao", txt: "Visita marcada", pl: "Com visita ou peça", ic: "📅" },
+    { id: "concluida", txt: "Resolvida", pl: "Resolvidas", ic: "✅" }
   ];
   const PRIORIDADES = [
     { id: "baixa", txt: "Baixa", ic: "⚪", peso: 1 },
@@ -37,6 +38,8 @@
       case "estado": case "concluir": return !fechada && (q.admin || resp);
       case "atribuir": return !fechada && !!q.admin;
       case "reabrir": return fechada && !!q.admin;
+      case "encaminhar": return !fechada && !!q.admin;
+      case "validar": return a.estado === "em_analise" || a.estado === "em_resolucao";   // qualquer pessoa da estação (dono, 26/11/2026)
       case "categorias": return !!q.admin;
       default: return false;   // apagar ou alterar histórico: ninguém
     }
@@ -98,6 +101,57 @@
     return L.sort((a, b) => (prioridade(b.prioridade) || {}).peso - (prioridade(a.prioridade) || {}).peso || String(a.criado_em).localeCompare(String(b.criado_em)));
   }
 
-  const api = { ESTADOS, PRIORIDADES, ABERTOS, MAX_FOTOS, MAX_BYTES, LADO_MAX, estado, prioridade, transicaoValida, pode, destinatarios, validarFoto, dimensoes, numeroTxt, lerNumero, idade, filtrar, ordenar, diaPT };
+  /* prestador sugerido pelo tipo de avaria e pelo equipamento; null se não houver regra ou o prestador não existir na estação */
+  function sugerirPrestador(P, categoria, equipamento) {
+    const t = ((categoria || "") + " " + (equipamento || "")).toLowerCase();
+    const achar = (re) => { const p = (P || []).find((x) => re.test(x.nome)); return p ? p.id : null; };
+    if (/cerveja|barril|chopp|imperial/.test(t)) return achar(/super\s*bock/i);
+    if (/caf[eé]|delta/.test(t)) return achar(/delta/i);
+    if (/inform[aá]tica|pos\b|computador|impressora|rede/.test(t)) return achar(/inform[aá]tica/i);
+    if (/bomba|combust|lavagem|aspira/.test(t)) return achar(/repsol/i);
+    return null;
+  }
+  /* passos para o ecrã: Comunicada → Encaminhada → Visita marcada (ou À espera de peça) → Resolvida */
+  function passos(a) {
+    const i = ["aberta", "em_analise", "em_resolucao", "concluida"].indexOf(a.estado);
+    const txt = ["Comunicada", "Encaminhada", a.aguarda_peca ? "À espera de peça" : "Visita marcada", "Resolvida"];
+    return txt.map((t, k) => ({ txt: t, feito: k <= i, atual: k === i }));
+  }
+  /* por prestador: abertas, resolvidas e dias médios do encaminhamento até ficar resolvida */
+  function resumoPrestadores(L) {
+    const R = {};
+    (L || []).forEach((a) => {
+      if (!a.prestador_id) return;
+      const r = R[a.prestador_id] || (R[a.prestador_id] = { abertas: 0, resolvidas: 0, soma: 0 });
+      if (a.estado === "concluida") { r.resolvidas++; if (a.encaminhada_em && a.concluido_em) r.soma += (new Date(a.concluido_em) - new Date(a.encaminhada_em)) / 864e5; }
+      else r.abertas++;
+    });
+    Object.keys(R).forEach((k) => { const r = R[k]; R[k] = { abertas: r.abertas, resolvidas: r.resolvidas, dias: r.resolvidas ? Math.round(r.soma / r.resolvidas * 10) / 10 : null }; });
+    return R;
+  }
+
+  /* email ao prestador (26/11/2026): nome da estação com o número do posto, como o dono pediu no assunto */
+  const ESTACAO_NOME = { sto: "Repsol Santo Tirso 1344", pnf: "Repsol Penafiel Circular 1346" };
+  const MODELO_PADRAO = {
+    assunto: "Avaria {numero} · {estacao} · {titulo}",
+    corpo: "Bom dia,\n\nPedimos a vossa intervenção para a avaria abaixo.\n\n{quadro}\n\nObrigado.\nLuís Carlos\n{estacao}"
+  };
+  const CAMPOS = ["numero", "estacao", "titulo", "descricao", "prioridade", "equipamento", "comunicada_em"];
+  /* modelo do prestador, senão o da estação, senão o padrão */
+  function escolherModelo(M, estacao, prestadorId) {
+    const L = M || [];
+    return L.find((m) => m.estacao === estacao && m.prestador_id === prestadorId) || L.find((m) => m.estacao === estacao && !m.prestador_id) || MODELO_PADRAO;
+  }
+  /* troca {campo} pelos dados da avaria; {quadro} fica (é montado no servidor) e campos desconhecidos ficam como estão */
+  function preencherModelo(t, a, extra) {
+    const x = extra || {}, d = {
+      numero: numeroTxt(a.estacao, a.numero), estacao: ESTACAO_NOME[a.estacao] || a.estacao, titulo: a.titulo || "", descricao: a.descricao || "",
+      prioridade: (prioridade(a.prioridade) || {}).txt || a.prioridade || "", equipamento: x.equipamento || "",
+      comunicada_em: a.criado_em ? new Date(a.criado_em).toLocaleString("pt-PT", { timeZone: "Europe/Lisbon", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).replace(",", "") : ""
+    };
+    return String(t || "").replace(/\{(\w+)\}/g, (m, k) => (CAMPOS.indexOf(k) >= 0 ? d[k] : m));
+  }
+
+  const api = { ESTACAO_NOME, MODELO_PADRAO, CAMPOS, escolherModelo, preencherModelo, sugerirPrestador, passos, resumoPrestadores, ESTADOS, PRIORIDADES, ABERTOS, MAX_FOTOS, MAX_BYTES, LADO_MAX, estado, prioridade, transicaoValida, pode, destinatarios, validarFoto, dimensoes, numeroTxt, lerNumero, idade, filtrar, ordenar, diaPT };
   if (typeof module !== "undefined") module.exports = api; else raiz.AVARIAS = api;
 })(this);
