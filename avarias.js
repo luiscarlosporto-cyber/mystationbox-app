@@ -467,9 +467,21 @@ function avEscreverEmail(a, P, fotos, urls, eq) {
     "<p class='mut' style='margin:0'>{quadro} é trocado pelo quadro com o registo da avaria (estação e n.º do posto, n.º da avaria, data, equipamento, prioridade, descrição).</p>" +
     (fotos.length ? "<div class='avSec'><h4>Fotografias em anexo</h4><div class='avGal'>" + fotos.map(function (f) {
       return "<label class='emFoto'><input type='checkbox' value='" + f.id + "' checked>" + (urls[f.caminho] ? "<img src='" + esc(urls[f.caminho]) + "' alt=''>" : "📷") + "</label>"; }).join("") + "</div></div>" : "") +
-    "<div class='avLinha'><button class='btn' id='emVoltar'>Cancelar</button><button class='btn p' id='emEnviar'>✉️ Enviar email</button></div><p class='avMsg' id='emMsg' role='status'></p></div>";
+    "<div class='avLinha'><button class='btn' id='emVoltar'>Cancelar</button><button class='btn p' id='emRever'>Rever o email →</button></div></div>" +
+    /* 2.º passo (pedido do dono, 26/11/2026): ver o email como vai sair e só então enviar */
+    "<div class='avDlg-corpo' id='emPasso2' hidden><p class='mut' style='margin:0'>É assim que o email vai sair. Confira e carregue em «Enviar agora».</p><div id='emPrevia'></div>" +
+    "<div class='avLinha'><button class='btn' id='emEditar'>✏️ Voltar a editar</button><button class='btn p' id='emEnviar'>✉️ Enviar agora</button></div><p class='avMsg' id='emMsg' role='status'></p></div>";
   var fechar = function () { try { dl.close(); } catch (e) { /* já fechada */ } dl.remove(); };
   dl.querySelector(".np-x").onclick = fechar; dl.querySelector("#emVoltar").onclick = fechar;
+  var p1 = dl.querySelectorAll(".avDlg-corpo")[0], p2 = dl.querySelector("#emPasso2");
+  dl.querySelector("#emRever").onclick = function () {
+    var para = dl.querySelector("#emPara").value.trim();
+    if (!para) { alert("Escreva o email do prestador."); return; }
+    var nF = dl.querySelectorAll(".emFoto input:checked").length;
+    dl.querySelector("#emPrevia").innerHTML = avEmailPrevia(a, eq, nF, de, para, dl.querySelector("#emCc").value.trim(), dl.querySelector("#emAss").value.trim(), dl.querySelector("#emCorpo").value);
+    p1.hidden = true; p2.hidden = false; dl.querySelector(".avDlg-cab b").textContent = "Rever email · " + avNum(a); p2.scrollIntoView ? p2.scrollIntoView() : 0;
+  };
+  dl.querySelector("#emEditar").onclick = function () { p2.hidden = true; p1.hidden = false; dl.querySelector(".avDlg-cab b").textContent = "Email ao prestador · " + avNum(a); };
   dl.querySelector("#emEnviar").onclick = async function () {
     var b = this, m = dl.querySelector("#emMsg"), para = dl.querySelector("#emPara").value.trim();
     if (!para) { m.textContent = "Escreva o email do prestador."; m.className = "avMsg bad"; return; }
@@ -480,6 +492,25 @@ function avEscreverEmail(a, P, fotos, urls, eq) {
     fechar(); avAbrirFicha(a.id);
   };
   dl.showModal();
+}
+
+/* Pré-visualização do email: o mesmo desenho que a função msb-avarias-email monta no servidor (o quadro vem sempre da base de dados) */
+function avEmailPrevia(a, eq, nF, de, para, cc, ass, texto) {
+  var PRI = {baixa: ["Baixa", "#6b7280"], media: ["Média", "#A16207"], alta: ["Alta", "#C2410C"], critica: ["Crítica", "#B91C1C"]}, pr = PRI[a.prioridade] || [a.prioridade || "", "#374151"];
+  var nome = AVARIAS.ESTACAO_NOME[a.estacao] || a.estacao, emp = {sto: "Porto João & Nunes, Lda.", pnf: "Porto & Nunes, Lda."}[a.estacao] || "";
+  var dt = a.criado_em ? new Date(a.criado_em).toLocaleString("pt-PT", {day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit"}).replace(",", "") : "";
+  var L = [["Estação", esc(nome)], ["Empresa", esc(emp)], ["N.º da avaria", "<b>" + esc(avNum(a)) + "</b>"], ["Comunicada em", esc(dt)]];
+  if (eq) L.push(["Equipamento", esc(eq)]);
+  L.push(["Prioridade", "<span style='color:" + pr[1] + ";font-weight:bold'>● " + esc(pr[0]) + "</span>"], ["Avaria", "<b>" + esc(a.titulo || "") + "</b>" + (a.descricao ? "<br>" + esc(a.descricao).replace(/\n/g, "<br>") : "")]);
+  if (nF) L.push(["Fotografias", nF + " em anexo"]);
+  var quadro = "<table style='width:100%;table-layout:fixed;border-collapse:collapse;font-size:14px;margin:6px 0'>" + L.map(function (l) { return "<tr><td style='padding:8px 10px;background:#F3F6FB;width:38%;font-weight:bold;vertical-align:top;text-align:left;white-space:normal'>" + l[0] + "</td><td style='padding:8px 10px;border-bottom:1px solid #eef2f7;text-align:left;white-space:normal;overflow-wrap:anywhere'>" + l[1] + "</td></tr>"; }).join("") + "</table>";
+  var partes = texto.indexOf("{quadro}") >= 0 ? texto.split("{quadro}") : [texto, ""];
+  var par = function (t) { t = String(t || "").trim(); return t ? "<p style='margin:0 0 12px;font-size:15px;line-height:1.5'>" + esc(t).replace(/\n/g, "<br>") + "</p>" : ""; };
+  return "<div style='font-size:14px;margin:8px 0;display:grid;gap:2px;overflow-wrap:anywhere'><div><span class='mut'>De:</span> " + esc(de) + "</div><div><span class='mut'>Para:</span> <b>" + esc(para) + "</b></div>" + (cc ? "<div><span class='mut'>Cc:</span> " + esc(cc) + "</div>" : "") +
+    "<div><span class='mut'>Assunto:</span> <b>" + esc(ass) + "</b></div>" + (nF ? "<div><span class='mut'>Anexos:</span> " + nF + " fotografia(s)</div>" : "") + "</div>" +
+    "<div style='max-width:100%;overflow-wrap:anywhere;font-family:Arial,Helvetica,sans-serif;color:#1f2937;border-radius:12px;overflow:hidden;border:1px solid #dbe3ef;background:#fff'>" +
+    "<div style='background:#0B3D91;color:#fff;padding:14px 16px'><div style='font-size:12px;opacity:.85'>Pedido de assistência técnica</div><div style='font-size:18px;font-weight:bold;margin-top:4px'>Avaria " + esc(avNum(a)) + " · " + esc(nome) + "</div></div>" +
+    "<div style='padding:14px 16px'>" + par(partes[0]) + quadro + par(partes.slice(1).join("")) + "<p style='margin:12px 0 0;font-size:12px;color:#9ca3af'>Na resposta, mantenha o n.º " + esc(avNum(a)) + " no assunto.</p></div></div>";
 }
 
 /* nova notificação em tempo real: se a avaria está aberta no ecrã, volta a ler */
