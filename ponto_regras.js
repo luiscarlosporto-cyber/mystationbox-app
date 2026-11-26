@@ -71,6 +71,33 @@ var PONTO = (function () {
     R.pares = pares;
     return R;
   }
-  return {motivo: motivo, proxima: proxima, dia: dia, hm: hm, duracao: duracao, MOTIVOS: MOTIVOS};
+  /* Gestão de Picagens (dono, 26/11/2026): um estado por colaborador e dia, para a tabela do administrador.
+   * R = resultado de dia(); o = {corrigido: houve correção nesse dia, recusadas: n.º de picagens recusadas}.
+   * Ordem: em falta > por validar > atraso > regularizado > correto. null = dia sem turno e sem picagens (não aparece). */
+  var ESTADOS = {
+    falta: {txt: "Picagem em falta", ic: "❌", ord: 0}, pendente: {txt: "Por validar", ic: "⏳", ord: 1},
+    atraso: {txt: "Atraso", ic: "⚠️", ord: 2}, regularizado: {txt: "Regularizado", ic: "✏️", ord: 3},
+    correto: {txt: "Correto", ic: "✅", ord: 4}, curso: {txt: "Ao serviço", ic: "🟢", ord: 5}
+  };
+  function estadoDia(R, o) {
+    o = o || {};
+    if (!R.partes.length && !R.pares.length) return o.recusadas ? "pendente" : null;
+    if (R.faltas.length || R.sem_saida.length) return "falta";
+    if (R.fora_horario || R.avisos.length || o.recusadas) return o.corrigido && !R.avisos.length && !R.fora_horario ? "regularizado" : "pendente";
+    if (R.atraso || R.antecipada) return "atraso";
+    if (R.partes.some(function (p) { return p.estado === "ao_servico" || p.estado === "por_entrar"; })) return "curso";
+    return o.corrigido ? "regularizado" : "correto";
+  }
+  /* motivos da regularização (lista do pedido do dono) */
+  var MOTIVOS_CORR = [["esqueceu", "Esqueceu-se de picar"], ["sem_rede", "Sem rede"], ["sem_bateria", "Telemóvel sem bateria"],
+    ["gps", "A localização (GPS) falhou"], ["fora", "Trabalho fora da estação"], ["outro", "Outro"]];
+  /* texto gravado em msb_ponto_correcoes.motivo: «Motivo — justificação» (mínimo de 5 letras, regra da base de dados) */
+  function motivoCorrecao(id, just) {
+    var m = MOTIVOS_CORR.find(function (x) { return x[0] === id; }), j = String(just || "").trim();
+    if (!m) return null;
+    if (id === "outro" && j.length < 5) return null;
+    return m[1] + (j ? " — " + j : "");
+  }
+  return {motivo: motivo, proxima: proxima, dia: dia, hm: hm, duracao: duracao, MOTIVOS: MOTIVOS, ESTADOS: ESTADOS, estadoDia: estadoDia, MOTIVOS_CORR: MOTIVOS_CORR, motivoCorrecao: motivoCorrecao};
 })();
 if (typeof module !== "undefined") module.exports = PONTO;

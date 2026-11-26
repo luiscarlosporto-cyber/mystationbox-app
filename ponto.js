@@ -95,8 +95,12 @@ function desenharPonto() {
       (x.estado === "aceite" ? (x.anulado_por ? " · anulada" : " · ✅ a " + (x.distancia_m == null ? "—" : x.distancia_m + " m")) : " · ❌ " + esc(PONTO.MOTIVOS[x.motivo] || x.motivo)) + "</li>"; }).join("") + "</ul>" : "<p class='mut' style='margin:0'>Ainda não há registos hoje.</p>") + "</div>";
 
   if (M.pode_picar || X.adm) h += ptoLembretesHtml();
+  // O administrador sem colaborador ligado não pica: o registo de teste fica fechado e a Gestão de Picagens vem primeiro (dono, 26/11/2026)
+  if (X.adm && teste) h = "<div class='card' style='padding:14px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap'><div><h3 style='margin:0'>Gestão de Picagens</h3><p class='mut' style='margin:2px 0 0'>Todos os colaboradores e dias, estados e regularizações.</p></div><button class='btn p' id='ptoIrGestao'>Abrir</button></div>" +
+    "<details class='card' style='padding:14px'" + (PTO.res || PTO.a_picar ? " open" : "") + "><summary style='cursor:pointer'><b>🧪 Experimentar o registo (modo de teste)</b> <span class='mut'>· não conta como trabalho</span></summary><div style='display:grid;gap:14px;margin-top:12px'>" + h + "</div></details>";
   if (X.adm) h += ptoAdminHtml();
   box.innerHTML = h;
+  if ($("#ptoIrGestao")) $("#ptoIrGestao").onclick = function () { ir("ptg"); };
   if ($("#ptoBtn")) $("#ptoBtn").onclick = function () { ptoPicar(prox); };
   if ($("#ptoLembAtivar")) $("#ptoLembAtivar").onclick = ptoLembretesAtivar;
   if ($("#ptoLembDesativar")) $("#ptoLembDesativar").onclick = ptoLembretesDesativar;

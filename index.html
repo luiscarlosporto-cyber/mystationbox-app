@@ -204,7 +204,7 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
 .pto-cp{display:grid;gap:3px;font-size:13px;color:var(--mut)}.pto-cp input{font-size:16px;padding:8px;border:1px solid var(--bd);border-radius:8px;color:var(--fg)}
 #ptoHoras input{font-size:15px;padding:5px;border:1px solid var(--bd);border-radius:6px}
 </style>
-<link rel="stylesheet" href="beta/beta.css?v=f63baaf5">
+<link rel="stylesheet" href="beta/beta.css?v=34e0ff10">
 </head>
 <body>
 <script src="abertura.js"></script>
@@ -309,6 +309,7 @@ textarea.ocr{width:100%;height:90px;border:1px solid var(--bd);border-radius:9px
   <div id="v-avn" class="v" hidden><div id="avnCorpo"></div></div>
   <div id="v-avg" class="v" hidden><div id="avgCorpo"></div></div>
   <div id="v-pto" class="v" hidden><div id="ptoCorpo" style="display:grid;gap:14px"></div></div>
+  <div id="v-ptg" class="v" hidden><div id="ptgCorpo" style="display:grid;gap:14px"></div></div>
   <div id="v-col" class="v" hidden><div id="colCorpo" style="display:grid;gap:14px"></div></div>
   <div id="v-per" class="v" hidden><div id="perCorpo" style="display:grid;gap:14px"></div></div>
   <div id="v-art" class="v" hidden><div id="artCorpo" style="display:grid;gap:14px"></div></div>
@@ -622,6 +623,7 @@ entrar().catch(function(e){$("#vLogin").hidden=false;$("#lErro").textContent=fal
 <script src="saidas_tabaco.js"></script>
 <script src="ponto_regras.js"></script>
 <script src="ponto.js"></script>
+<script src="ponto_gestao.js"></script>
 <script src="artigos.js"></script>
 <script src="artigos_falta.js"></script>
 <script src="colaborador.js"></script>
