@@ -19,12 +19,18 @@
     k: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/>',
     o: '<path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>',
     w: '<path d="M14.7 6.3a4 4 0 0 0 5 5l-8.4 8.4a2.1 2.1 0 0 1-3-3z"/><path d="M14.7 6.3 17 4l3 3-2.3 2.3"/>',
+    q: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    y: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>',
+    e: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+    n: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
     u: '<circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14c2.8 0 5 2.2 5 5"/>'
   };
   /* páginas que no menu são uma só, com separadores em cima */
   var GRUPOS = [{n: "Receções", p: ["ent", "dig", "fad"]}, {n: "Vendas", p: ["ven", "va", "maq"]}];
   function grupoDe(pg) { return GRUPOS.find(function (g) { return g.p.indexOf(pg) >= 0; }); }
-  var IC_AREA = {avr: "w", ini: "p", cx: "t", cmb: "g", stk: "c", cpr: "h", cnf: "f", frn: "k", res: "d", fra: "b", dcs: "o", eqp: "u", def: "a"};
+  /* barra do telemóvel do colaborador (Área do Colaborador, 26/11/2026): páginas, não áreas. Stock fica aceso em qualquer página do Stock. */
+  var BARRA_COL = [["col", "Início", "n"], ["pto", "Ponto", "q"], ["hor", "Horário", "y"], ["art", "Stock", "c", "stk"], ["per", "Perfil", "e"]];
+  var IC_AREA = {col: "n", avr: "w", ini: "p", cx: "t", cmb: "g", stk: "c", cpr: "h", cnf: "f", frn: "k", res: "d", fra: "b", dcs: "o", eqp: "u", def: "a"};
   /* título de cada bloco do menu (Dia a dia · Controlo · Gestão), quando a área seguinte muda de bloco; o funcionário, com 2 áreas, não os vê */
   function blocoDe(x) { var b = ""; for (var i = 0; i < AREAS.length; i++) { if (AREAS[i].b) b = AREAS[i].b; if (AREAS[i] === x) return b; } return b; }
   function blocos(L) { var ant = ""; return function (x) { var b = blocoDe(x); if (!ADMIN || b === ant) return ""; ant = b; return "<b class='bBloco'>" + b + "</b>"; }; }
@@ -74,6 +80,7 @@
     barra.onclick = function (e) {
       var b = e.target.closest("button"); if (!b) return;
       if (b.dataset.a === "mais") return abrirMais();
+      if (b.dataset.p) { fecharTudo(); return ir(b.dataset.p); }
       fecharTudo(); var a = AREAS.find(function (x) { return x.id === b.dataset.a; }); ir(paginasDe(a)[0][0]);
     };
     $("#bRec").onclick = function () { recolhido = !recolhido; gravar("msb_lat", recolhido ? "1" : "0"); acertarLargura(); };
@@ -124,11 +131,12 @@
     var tabs = $("#bTabs"), noG = grp ? grp.p.filter(function (k) { return ps.some(function (p) { return p[0] === k; }); }) : [];
     tabs.innerHTML = noG.length > 1 ? noG.map(function (k) { var p = ps.find(function (x) { return x[0] === k; }); return "<button data-p='" + k + "' role='tab' aria-selected='" + (k === pg) + "'" + (k === pg ? " class='on'" : "") + ">" + p[1] + "</button>"; }).join("") : "";
     var chips = $("#bChips");
-    chips.innerHTML = ps.length > 1 ? itens.map(function (p) { return "<button data-p='" + p[0] + "'" + (emFoco(p) ? " class='on'" : "") + ">" + rotulo(p) + "</button>"; }).join("") : "";
+    chips.innerHTML = ps.length > 1 && a.id !== "col" ? itens.map(function (p) { return "<button data-p='" + p[0] + "'" + (emFoco(p) ? " class='on'" : "") + ">" + rotulo(p) + "</button>"; }).join("") : "";
     var on = chips.querySelector(".on"); if (on) chips.scrollLeft = Math.max(0, on.offsetLeft - 40);
     var vis = areasVisiveis(), noTel = vis.filter(function (x) { return AREAS_TEL.indexOf(x.id) >= 0; });
     var fora = AREAS_TEL.indexOf(a.id) < 0;
-    $("#bBarra").innerHTML = noTel.map(function (x) { return "<button data-a='" + x.id + "'" + (x.id === a.id ? " class='on'" : "") + ">" + ic(IC_AREA[x.id]) + (x.c || nomeArea(x)) + seloH(x) + "</button>"; }).join("") +
+    if (soColab()) $("#bBarra").innerHTML = BARRA_COL.map(function (x) { var on = x[0] === pg || (x[3] && x[3] === a.id); return "<button data-p='" + x[0] + "'" + (on ? " class='on' aria-current='page'" : "") + ">" + ic(x[2]) + x[1] + "</button>"; }).join("");
+    else $("#bBarra").innerHTML = noTel.map(function (x) { return "<button data-a='" + x.id + "'" + (x.id === a.id ? " class='on'" : "") + ">" + ic(IC_AREA[x.id]) + (x.c || nomeArea(x)) + seloH(x) + "</button>"; }).join("") +
       "<button data-a='mais'" + (fora ? " class='on'" : "") + ">" + ic("x") + "Mais</button>";
     document.title = (DUAS.indexOf(pg) < 0 ? estInfo(EST).s + " · " : "") + (atual ? atual[1] + " · " : "") + "mystationbox";
   }
