@@ -30,10 +30,11 @@ async function carregarPonto() {
       sb.rpc("msb_ponto_meu_dia", {p_estacao: est}),
       sb.from("msb_ponto_registos").select("*").eq("user_id", EU.id).eq("dia", hoje).order("hora").order("id"),   // as minhas, nas duas estações
       sb.from("msb_ponto_avisos").select("versao").eq("user_id", EU.id).eq("versao", PTO_AVISO_VERSAO).maybeSingle(),
-      sb.from("msb_ponto_push").select("id,endpoint").eq("user_id", EU.id)
+      sb.from("msb_ponto_push").select("id,endpoint").eq("user_id", EU.id),
+      sb.from("msb_ponto_ocorrencias").select("*").eq("user_id", EU.id).gte("dia", new Date(Date.now() - 31 * 864e5).toISOString().slice(0, 10)).neq("estado", "resolvida").order("dia", {ascending: false})
     ]);
-    q.forEach(function (r) { if (r.error) throw r.error; });
-    var X = {est: est, hoje: hoje, adm: adm, meu: q[0].data || {}, meus: q[1].data || [], aviso: !!q[2].data, push: q[3].data || [], pushAqui: await ptoSubAtual(), reg: [], local: null, horas: [], nomes: {}, legenda: [], contas: [], contasEst: [], perfis: []};
+    q.slice(0, 4).forEach(function (r) { if (r.error) throw r.error; });
+    var X = {est: est, hoje: hoje, adm: adm, meu: q[0].data || {}, meus: q[1].data || [], aviso: !!q[2].data, push: q[3].data || [], pushAqui: await ptoSubAtual(), ocorr: q[4].error ? [] : (q[4].data || []), reg: [], local: null, horas: [], nomes: {}, legenda: [], contas: [], contasEst: [], perfis: []};
     if (adm) {
       var w = await Promise.all([
         sb.from("msb_ponto_locais").select("*").eq("estacao", est).maybeSingle(),
@@ -90,6 +91,7 @@ function desenharPonto() {
     "<button id='ptoBtn' class='pto-btn" + (prox === "saida" ? " sai" : "") + "'" + (PTO.a_picar || noutra ? " disabled" : "") + "><span class='pto-ic'>" + (prox === "entrada" ? "➜]" : "[➜") + "</span><b>" + (prox === "entrada" ? "REGISTAR ENTRADA" : "REGISTAR SAÍDA") + "</b><small>Validar localização e registar ponto</small></button>" +
     "<div class='pto-nota'>O registo utiliza a hora do servidor.</div>" + "</div>";
 
+  h += ptoOcHtml(X.ocorr);
   h += "<div class='card' style='padding:14px'><h3 style='margin:0 0 8px'>Os meus registos de hoje</h3>" + (meus.length ? "<ul class='pto-lista'>" + meus.map(function (x) {
     return "<li class='" + (x.estado === "aceite" && !x.anulado_por ? "ok" : "bad") + "'><b>" + ptoHora(x.hora) + "</b> " + (x.tipo === "entrada" ? "Entrada" : "Saída") + (x.estacao !== X.est ? " (" + esc(ptoNomeEst(x.estacao)) + ")" : "") +
       (x.estado === "aceite" ? (x.anulado_por ? " · anulada" : " · ✅ a " + (x.distancia_m == null ? "—" : x.distancia_m + " m")) : " · ❌ " + esc(PONTO.MOTIVOS[x.motivo] || x.motivo)) + "</li>"; }).join("") + "</ul>" : "<p class='mut' style='margin:0'>Ainda não há registos hoje.</p>") + "</div>";
@@ -102,11 +104,38 @@ function desenharPonto() {
   box.innerHTML = h;
   if ($("#ptoIrGestao")) $("#ptoIrGestao").onclick = function () { ir("ptg"); };
   if ($("#ptoBtn")) $("#ptoBtn").onclick = function () { ptoPicar(prox); };
+  box.querySelectorAll("[data-ocj]").forEach(function (b) { b.onclick = function () { ptoOcJustificar(+b.dataset.ocj, b); }; });
   if ($("#ptoLembAtivar")) $("#ptoLembAtivar").onclick = ptoLembretesAtivar;
   if ($("#ptoLembDesativar")) $("#ptoLembDesativar").onclick = ptoLembretesDesativar;
   if ($("#ptoLembTeste")) $("#ptoLembTeste").onclick = ptoLembretesTeste;
   if (X.adm) ptoAdminLigar();
   if (!PTO.relogio) PTO.relogio = setInterval(function () { var el = $("#ptoRelogio"); if (!el) { clearInterval(PTO.relogio); PTO.relogio = null; return; } el.textContent = new Date().toLocaleTimeString("pt-PT", {timeZone: "Europe/Lisbon", hour: "2-digit", minute: "2-digit"}); }, 5000);
+}
+
+/* ocorrências do colaborador (fase B, 26/11/2026): explica o motivo; só o administrador valida */
+var PTO_OC_EST = {aberta: ["⚠️ Por explicar", "#92400E", "#FEF3C7"], justificada: ["⏳ Explicada, à espera da administração", "#075985", "#E0F2FE"],
+  validada: ["✅ Validada pela administração", "#166534", "#DCFCE7"], recusada: ["❌ Recusada pela administração", "#9B1C1C", "#FDE8E8"]};
+function ptoOcHtml(L) {
+  if (!L || !L.length) return "";
+  return "<div class='card' style='padding:14px;border:2px solid #F5D78E'><h3 style='margin:0 0 4px'>Picagens em falta</h3><p class='mut' style='margin:0 0 8px'>Se se esqueceu ou não conseguiu registar, explique o motivo. Quem valida é a administração.</p>" +
+    L.map(function (o) {
+      var e = PTO_OC_EST[o.estado] || [o.estado, "", ""], d = o.dia.split("-");
+      return "<div style='border-top:1px solid var(--bd);padding:10px 0;display:grid;gap:6px'><div style='display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap'><b>" +
+        (o.tipo === "sem_entrada" ? "Sem entrada" : "Sem saída") + " · " + d[2] + "/" + d[1] + " · turno " + esc(o.turno_codigo || "") + " (" + ptoHora(o.hora_prevista) + ")</b>" +
+        "<span style='border-radius:999px;padding:2px 10px;font-size:12.5px;font-weight:600;color:" + e[1] + ";background:" + e[2] + "'>" + e[0] + "</span></div>" +
+        (o.justificacao ? "<div class='mut'>O seu motivo: «" + esc(o.justificacao) + "»</div>" : "") +
+        (o.decisao_nota ? "<div class='mut'>Administração: «" + esc(o.decisao_nota) + "»</div>" : "") +
+        (o.estado === "aberta" || o.estado === "justificada" ? "<textarea id='ocTxt" + o.id + "' rows='2' maxlength='600' style='font:inherit;width:100%;box-sizing:border-box;border:1px solid var(--bd);border-radius:10px;padding:8px 10px' placeholder='Ex.: esqueci-me; o telemóvel ficou sem bateria; saí às 14:05' aria-label='Motivo'>" + esc(o.justificacao || "") + "</textarea>" +
+          "<button class='btn' data-ocj='" + o.id + "' style='min-height:44px'>" + (o.justificacao ? "Atualizar o motivo" : "Enviar o motivo") + "</button>" : "") + "</div>";
+    }).join("") + "</div>";
+}
+async function ptoOcJustificar(id, b) {
+  var t = ($("#ocTxt" + id) || {}).value || "";
+  if (t.trim().length < 3) { msbConfirma("Escreva o motivo.", "OK"); return; }
+  b.disabled = true;
+  var r = await sb.rpc("msb_ponto_ocorrencia_justificar", {p_id: id, p_texto: t.trim()});
+  if (r.error) { b.disabled = false; msbConfirma("✖ " + falhouPto(r.error), "OK"); return; }
+  await carregarPonto();
 }
 
 function ptoAvisoHtml() {

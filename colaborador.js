@@ -27,12 +27,14 @@ async function colDados() {
     sb.from("msb_horario_meses").select("estado").eq("estacao", est).eq("mes", mes).maybeSingle(),
     sb.from("msb_ponto_horas").select("codigo,parte,inicio,fim").eq("estacao", est).order("parte"),
     sb.rpc("msb_faltas_minhas", {p_estacao: est}),
-    sb.from("msb_avarias").select("id,estado").eq("estacao", est).neq("estado", "concluida")
+    sb.from("msb_avarias").select("id,estado").eq("estacao", est).neq("estado", "concluida"),
+    sb.from("msb_ponto_ocorrencias").select("id,estado").eq("user_id", EU.id).eq("estado", "aberta")
   ].map(function (p) { return Promise.resolve(p).catch(function (e) { return {error: e}; }); }));
   return {est: est, M: M, reg: q[0].error ? null : (q[0].data || []).filter(function (r) { return r.estado === "aceite"; }),
     amanha: q[1].error ? null : q[1].data, selado: !q[2].error && q[2].data && q[2].data.estado === "real", horas: q[3].error ? [] : (q[3].data || []),
     faltas: q[4].error ? null : q[4].data, avarias: q[5].error ? null : (q[5].data || []).length,
-    avValidar: q[5].error ? 0 : (q[5].data || []).filter(function (a) { return a.estado === "em_analise" || a.estado === "em_resolucao"; }).length};
+    avValidar: q[5].error ? 0 : (q[5].data || []).filter(function (a) { return a.estado === "em_analise" || a.estado === "em_resolucao"; }).length,
+    ocorrencias: q[6].error ? 0 : (q[6].data || []).length};
 }
 
 async function carregarColab() {
@@ -65,7 +67,10 @@ function colHtml(D) {
   var f = D.faltas, fTxt = !f ? "Listas de artigos em falta" : f.rascunho && f.rascunho.itens.length ? "1 lista por enviar · " + f.rascunho.itens.length + " artigos" : (f.enviadas || []).length ? "Última enviada " + new Date(f.enviadas[0].enviada_em).toLocaleDateString("pt-PT", {day: "2-digit", month: "2-digit"}) : "Nenhuma lista por enviar";
   var aTxt = D.avarias == null ? "Comunicar e acompanhar" : D.avarias ? D.avarias + (D.avarias === 1 ? " avaria aberta" : " avarias abertas") + " na estação" +
     (D.avValidar ? " · " + D.avValidar + " com o prestador: valide quando ficar a funcionar" : "") : "Nenhuma avaria aberta";
-  return h1 + colAtalhos() +
+  /* ocorrências do Ponto por explicar: aviso que fica até ser explicado (fase B, 26/11/2026) */
+  var oc = D.ocorrencias ? "<button class='card' data-ir='pto' style='margin:0;padding:14px 16px;text-align:left;font:inherit;cursor:pointer;background:#FEF3C7;color:#92400E;border:1px solid #F5D78E;display:grid;gap:2px'>" +
+    "<b>⚠️ " + (D.ocorrencias === 1 ? "Tem 1 picagem em falta por explicar" : "Tem " + D.ocorrencias + " picagens em falta por explicar") + "</b><span>Toque para registar ou explicar o motivo.</span></button>" : "";
+  return h1 + oc + colAtalhos() +
     "<div class='mut' style='font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin:4px 4px -4px'>Os meus módulos</div>" +
     "<section style='display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px'>" +
     colCartao("hor", "#1A63E8", "#EAF1FF", "Horário", amanha ? "Amanhã: " + amanha : "Ver a semana") +

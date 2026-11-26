@@ -35,10 +35,12 @@ async function carregarPtg() {
       lerTudo(function () { return sb.from("msb_ponto_registos").select("id,estacao,colaborador_id,dia,tipo,hora,estado,motivo,distancia_m,precisao_m,turno_codigo,origem,anulado_por").in("estacao", ests).eq("teste", false).gte("dia", F.de).lte("dia", F.ate); }, ["id"]),
       lerTudo(function () { return sb.from("msb_ponto_correcoes").select("id,estacao,registo_original,registo_novo,acao,motivo,feito_por,feito_em").in("estacao", ests).gte("feito_em", F.de); }, ["id"]),
       sb.from("profiles").select("user_id,display_name"),
-      sb.from("msb_ponto_registos").select("estacao,dia").eq("teste", false).eq("estado", "aceite").order("dia").limit(1000)
+      sb.from("msb_ponto_registos").select("estacao,dia").eq("teste", false).eq("estado", "aceite").order("dia").limit(1000),
+      sb.from("msb_ponto_ocorrencias").select("*").in("estacao", ests).gte("dia", F.de).lte("dia", F.ate)
     ]);
-    q.forEach(function (r) { if (r.error) throw r.error; });
-    var D = {hoje: hoje, colabs: {}, lojas: q[1].data || [], hor: {}, horas: {}, cfg: {}, reg: q[5].data || [], corr: q[6].data || [], quem: {}, inicio: {}};
+    q.slice(0, 9).forEach(function (r) { if (r.error) throw r.error; });
+    var D = {hoje: hoje, colabs: {}, lojas: q[1].data || [], hor: {}, horas: {}, cfg: {}, reg: q[5].data || [], corr: q[6].data || [], quem: {}, inicio: {}, oc: {}};
+    (q[9].error ? [] : q[9].data || []).forEach(function (o) { var k = o.estacao + "|" + o.dia + "|" + o.colaborador_id; (D.oc[k] = D.oc[k] || []).push(o); });
     (q[0].data || []).forEach(function (c) { D.colabs[c.id] = c; });
     (q[2].data || []).forEach(function (h) { D.hor[h.estacao + "|" + h.dia + "|" + h.colaborador_id] = h.codigo; });
     (q[3].data || []).forEach(function (h) { (D.horas[h.estacao + "|" + h.codigo] = D.horas[h.estacao + "|" + h.codigo] || []).push({inicio: ptgMinHora(h.inicio), fim: ptgMinHora(h.fim)}); });
@@ -66,7 +68,8 @@ function ptgCalcular() {
         var R = PONTO.dia(L.map(function (r) { return {id: r.id, tipo: r.tipo, min: ptoMin(r.hora), estado: r.estado, anulado_por: r.anulado_por}; }), partes, D.cfg[est] || {}, dia === D.hoje ? agora : null);
         var st = PONTO.estadoDia(R, {corrigido: L.some(function (r) { return corrigidos[r.id]; }), recusadas: L.filter(function (r) { return r.estado === "rejeitada"; }).length});
         if (!st) return;
-        linhas.push({est: est, cid: +cid, nome: (D.colabs[cid] || {}).curto || (D.colabs[cid] || {}).nome || "?", dia: dia, cod: cod, R: R, st: st, L: L, partes: partes});
+        var oc = D.oc[est + "|" + dia + "|" + cid] || [];
+        linhas.push({oc: oc, porDecidir: oc.filter(function (o) { return o.estado === "justificada" || o.estado === "aberta"; }).length, est: est, cid: +cid, nome: (D.colabs[cid] || {}).curto || (D.colabs[cid] || {}).nome || "?", dia: dia, cod: cod, R: R, st: st, L: L, partes: partes});
       });
     });
   });
@@ -77,7 +80,8 @@ function ptgCalcular() {
 function ptgDesenhar() {
   var box = $("#ptgCorpo"), D = PTG.d, F = PTG.f, E = PONTO.ESTADOS; if (!box || !D) return;
   var todas = PTG.linhas.filter(function (x) { return (!F.est || x.est === F.est) && (!F.colab || String(x.cid) === F.colab); });
-  var L = todas.filter(function (x) { return !F.estado || x.st === F.estado; });
+  var L = todas.filter(function (x) { return !F.estado || (F.estado === "decidir" ? x.porDecidir : x.st === F.estado); });
+  var nDec = todas.filter(function (x) { return x.porDecidir; }).length;
   var cont = {}; todas.forEach(function (x) { cont[x.st] = (cont[x.st] || 0) + 1; });
   var nomes = {}; PTG.linhas.forEach(function (x) { nomes[x.cid] = x.nome; });
   var sem = !Object.keys(D.inicio).length;
@@ -87,13 +91,15 @@ function ptgDesenhar() {
     "<div class='ptg-filtros'><label>Estação<select id='ptgEst'><option value=''>Todas</option>" + (ESTS || []).map(function (e) { return "<option value='" + e.id + "'" + (F.est === e.id ? " selected" : "") + ">" + esc(e.short_name || e.name) + "</option>"; }).join("") + "</select></label>" +
     "<label>Colaborador<select id='ptgColab'><option value=''>Todos</option>" + Object.keys(nomes).sort(function (a, b) { return nomes[a].localeCompare(nomes[b], "pt"); }).map(function (k) { return "<option value='" + k + "'" + (F.colab === k ? " selected" : "") + ">" + esc(nomes[k]) + "</option>"; }).join("") + "</select></label>" +
     "<label>De<input type='date' id='ptgDe' value='" + F.de + "'></label><label>Até<input type='date' id='ptgAte' value='" + F.ate + "'></label></div>" +
-    "<div class='ptg-chips'><button data-st=''" + (!F.estado ? " class='on'" : "") + ">Todos <b>" + todas.length + "</b></button>" + Object.keys(E).sort(function (a, b) { return E[a].ord - E[b].ord; }).map(function (k) {
+    "<div class='ptg-chips'><button data-st=''" + (!F.estado ? " class='on'" : "") + ">Todos <b>" + todas.length + "</b></button>" +
+    (nDec ? "<button data-st='decidir'" + (F.estado === "decidir" ? " class='on'" : "") + ">📝 Ocorrências por decidir <b>" + nDec + "</b></button>" : "") + Object.keys(E).sort(function (a, b) { return E[a].ord - E[b].ord; }).map(function (k) {
       return cont[k] ? "<button data-st='" + k + "'" + (F.estado === k ? " class='on'" : "") + ">" + E[k].ic + " " + E[k].txt + " <b>" + cont[k] + "</b></button>" : ""; }).join("") + "</div></div>";
   h += "<div class='card' style='padding:0'>" + (sem ? "<p class='mut' style='padding:14px;margin:0'>Ainda não há picagens a sério em nenhuma estação.</p>" : L.length ?
     "<div class='sc'><table class='t ptg-t'><thead><tr><th class='l'>Colaborador</th><th class='l'>Estado</th><th>Data</th><th>Turno</th><th>Entrada</th><th>Saída</th><th>Horas</th><th>Tempo a mais</th><th>Estação</th></tr></thead><tbody>" +
     L.map(function (x, i) {
       var P = x.R.pares, e = E[x.st];
-      var est = esc(x.est === "sto" ? "ST" : x.est === "pnf" ? "PN" : x.est), stH = "<span class='ptg-st ptg-" + x.st + "'>" + e.ic + " " + e.txt + "</span>" + (x.R.atraso ? " <span class='mut'>+" + x.R.atraso + " min</span>" : "");
+      var est = esc(x.est === "sto" ? "ST" : x.est === "pnf" ? "PN" : x.est), stH = "<span class='ptg-st ptg-" + x.st + "'>" + e.ic + " " + e.txt + "</span>" + (x.R.atraso ? " <span class='mut'>+" + x.R.atraso + " min</span>" : "") +
+        (x.porDecidir ? " <span class='ptg-st ptg-pendente'>📝 " + (x.oc.some(function (o) { return o.estado === "justificada"; }) ? "motivo por decidir" : "ocorrência aberta") + "</span>" : "");
       return "<tr data-i='" + PTG.linhas.indexOf(x) + "' tabindex='0'><td class='l'><b>" + esc(x.nome) + "</b></td><td class='l'>" + stH + "</td><td>" + ptgSemana(x.dia) + " " + ptgDataPT(x.dia) + "</td><td>" + esc(x.cod || "—") + "</td>" +
         "<td>" + (P.length ? P.map(function (p) { return PONTO.hm(p.e); }).join("<br>") : "—") + "</td><td>" + (P.length ? P.map(function (p) { return p.s == null ? "—" : PONTO.hm(p.s); }).join("<br>") : "—") + "</td>" +
         "<td>" + (x.R.trabalhado ? PONTO.duracao(x.R.trabalhado) : "—") + "</td><td>" + (x.R.extra ? PONTO.duracao(x.R.extra) : "—") + "</td><td>" + est + "</td></tr>";
@@ -120,6 +126,14 @@ function ptgAbrir(x) {
     (x.partes.length ? " (" + x.partes.slice().sort(function (a, b) { return a.inicio - b.inicio; }).map(function (p) { return PONTO.hm(p.inicio) + "–" + PONTO.hm(p.fim); }).join(" e ") + ")" : "") + "</p>" +
     "<p class='mut' style='margin:0'>Trabalhado " + PONTO.duracao(x.R.trabalhado) + (x.R.extra ? " · tempo a mais " + PONTO.duracao(x.R.extra) : "") + (x.R.atraso ? " · atraso " + x.R.atraso + " min" : "") + (x.R.antecipada ? " · saída antecipada " + x.R.antecipada + " min" : "") + "</p>" +
     (x.R.avisos.length ? "<p class='msgErr' style='margin:0'>" + x.R.avisos.map(esc).join("<br>") + "</p>" : "") +
+    (x.oc.length ? "<div class='avSec'><h4>Ocorrências</h4>" + x.oc.map(function (o) {
+      var E2 = {aberta: "⚠️ Aberta, sem motivo", justificada: "⏳ Motivo por decidir", validada: "✅ Validada", recusada: "❌ Recusada", resolvida: "✔ Resolvida (a picagem apareceu)"};
+      return "<div style='border-top:1px solid var(--bd);padding:8px 0;display:grid;gap:6px'><div><b>" + (o.tipo === "sem_entrada" ? "Sem entrada" : "Sem saída") + "</b> (turno às " + ptoHora(o.hora_prevista) + ") · " + E2[o.estado] + "</div>" +
+        (o.justificacao ? "<div>Motivo do colaborador: «" + esc(o.justificacao) + "»</div>" : "") +
+        (o.decisao_nome ? "<div class='mut'>" + esc(o.decisao_nome) + " · " + new Date(o.decisao_em).toLocaleString("pt-PT", {timeZone: "Europe/Lisbon", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"}) + (o.decisao_nota ? " · «" + esc(o.decisao_nota) + "»" : "") + "</div>" : "") +
+        (o.estado === "aberta" || o.estado === "justificada" ? "<input id='ocNota" + o.id + "' maxlength='600' style='font:inherit;width:100%;box-sizing:border-box;border:1px solid var(--bd);border-radius:10px;padding:8px 10px;min-height:42px' placeholder='Nota (obrigatória para recusar)' aria-label='Nota'><div class='avLinha'><button class='btn p' data-ocv='" + o.id + "'>✅ Validar</button><button class='btn' data-ocr='" + o.id + "'>❌ Recusar</button></div>" +
+          "<p class='mut' style='margin:0;font-size:12.5px'>Validar aceita o motivo. Para pôr a hora certa, use «Regularizar» abaixo: a ocorrência fica resolvida sozinha.</p>" : "") + "</div>";
+    }).join("") + "</div>" : "") +
     "<div class='avSec'><h4>Picagens do dia</h4>" + (x.L.length ? "<ul class='ptg-pic'>" + x.L.slice().sort(function (a, b) { return a.hora < b.hora ? -1 : 1; }).map(function (r) {
       var anul = r.anulado_por != null, novo = anul && r.anulado_por !== r.id ? porId[r.anulado_por] : null;
       return "<li class='" + (r.estado !== "aceite" ? "rej" : anul ? "anul" : "") + "'><b>" + ptoHora(r.hora) + "</b> " + (r.tipo === "entrada" ? "Entrada" : "Saída") +
@@ -151,6 +165,17 @@ function ptgAbrir(x) {
   dl.querySelectorAll("[data-alt]").forEach(function (b) { b.onclick = function () { porModo("alterar_hora", aceites.find(function (r) { return r.id === +b.dataset.alt; })); }; });
   dl.querySelectorAll("[data-anu]").forEach(function (b) { b.onclick = function () { porModo("anular", aceites.find(function (r) { return r.id === +b.dataset.anu; })); }; });
   dl.querySelector("#ptgNovo").onclick = function () { porModo("acrescentar", null); };
+  async function decidir(id, ok, b) {
+    var nota = (dl.querySelector("#ocNota" + id) || {}).value || "";
+    if (!ok && nota.trim().length < 3) { var m0 = dl.querySelector("#ptgMsg"); m0.textContent = "Para recusar, escreva a nota."; m0.className = "avMsg bad"; dl.querySelector("#ocNota" + id).focus(); return; }
+    b.disabled = true;
+    var r = await sb.rpc("msb_ponto_ocorrencia_decidir", {p_id: id, p_validar: ok, p_nota: nota.trim() || null});
+    if (r.error) { b.disabled = false; var m = dl.querySelector("#ptgMsg"); m.textContent = "✖ " + falhouPto(r.error); m.className = "avMsg bad"; return; }
+    fechar(); await carregarPtg();
+    var nx = PTG.linhas.find(function (l) { return l.est === x.est && l.cid === x.cid && l.dia === x.dia; }); if (nx) ptgAbrir(nx);
+  }
+  dl.querySelectorAll("[data-ocv]").forEach(function (b) { b.onclick = function () { decidir(+b.dataset.ocv, true, b); }; });
+  dl.querySelectorAll("[data-ocr]").forEach(function (b) { b.onclick = function () { decidir(+b.dataset.ocr, false, b); }; });
   dl.querySelector("#ptgValidar").onclick = async function () {
     var b = this, m = dl.querySelector("#ptgMsg"), hora = dl.querySelector("#ptgHora").value;
     var mot = PONTO.motivoCorrecao(dl.querySelector("#ptgMot").value, dl.querySelector("#ptgJust").value);

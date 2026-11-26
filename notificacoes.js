@@ -12,7 +12,8 @@ var NOTIF_TIPOS = [
   ["atribuida", "Avaria atribuída a mim", "Quando passa a ser o responsável"],
   ["estado", "Mudança de estado", "Avarias que comunicou ou de que é responsável"],
   ["concluida", "Avaria concluída", "Quando fica resolvida"],
-  ["comentario", "Comentários", "Novos comentários nas avarias que comunicou ou trata"]
+  ["comentario", "Comentários", "Novos comentários nas avarias que comunicou ou trata"],
+  ["ponto", "Ponto", "Picagens em falta, justificações e decisões"]
 ];
 function notifEsc(s) { return window.esc ? esc(s) : String(s == null ? "" : s); }
 function notifQuando(t) { return window.AVARIAS ? AVARIAS.idade(t) : new Date(t).toLocaleString("pt-PT"); }
@@ -107,6 +108,11 @@ function notifClicar(x) {
 }
 /* …#avaria=PN-0007 abre a ficha da avaria */
 function notifAbrirLink(url) {
+  var hs = String(url || "").replace(/^[^#]*/, "");
+  if (/^#(ponto|ptg)\b/.test(hs) && window.ir) {   // avisos do Ponto: colaborador → Ponto; administrador → Gestão de Picagens
+    try { if (/#(ponto|ptg)/.test(location.hash)) history.replaceState(null, "", location.pathname + location.search); } catch (e) { /* fica o # */ }
+    ir(/^#ptg/.test(hs) ? "ptg" : "pto"); return true;
+  }
   if (!url || !window.AVARIAS) return false;
   var n = AVARIAS.lerNumero(String(url).replace(/^[^#]*/, ""));
   if (!n) return false;
