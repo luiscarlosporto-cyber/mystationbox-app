@@ -229,7 +229,9 @@ function avEditarPrestadores() {
       L.map(function (p) { return "<div class='avSec avPrestL' data-id='" + p.id + "'><div class='avLinha'><input data-k='nome' value='" + esc(p.nome) + "' maxlength='60' aria-label='Nome'>" +
         "<input data-k='telefone' value='" + esc(p.telefone || "") + "' placeholder='Telefone' inputmode='tel' maxlength='40' aria-label='Telefone'><input data-k='email' value='" + esc(p.email || "") + "' placeholder='Email' type='email' maxlength='120' aria-label='Email'>" +
         "<label style='display:flex;gap:6px;align-items:center'><input type='checkbox' data-k='ativo'" + (p.ativo ? " checked" : "") + ">Ativo</label>" +
-        "<label style='display:flex;gap:6px;align-items:center' title='Ao encaminhar, o email sai logo com o modelo'><input type='checkbox' data-k='auto'" + (p.auto_email ? " checked" : "") + ">Email automático</label><button class='btn' data-gravar>Guardar</button></div></div>"; }).join("") +
+        "<label class='avCampo' style='flex:1 1 220px'>Email ao encaminhar <select data-k='modo'>" + [["nao", "Não abrir (escrevo quando quiser)"], ["abrir", "Abrir o email para eu rever"], ["auto", "Enviar logo, sem rever"]].map(function (o) {
+          var m = p.auto_email ? "auto" : p.abrir_email ? "abrir" : "nao"; return "<option value='" + o[0] + "'" + (o[0] === m ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select></label>" +
+        "<button class='btn' data-gravar>Guardar</button></div></div>"; }).join("") +
       avModeloHtml(est, L) +
       "<div class='avSec'><h4>Novo prestador</h4><div class='avLinha'><input id='apNome' placeholder='Nome' maxlength='60'><input id='apTel' placeholder='Telefone' inputmode='tel' maxlength='40'><input id='apEmail' placeholder='Email' type='email' maxlength='120'><button class='btn p' id='apNovo'>Acrescentar</button></div></div>" +
       "<p class='avMsg' id='apMsg' role='status'></p></div>";
@@ -239,16 +241,16 @@ function avEditarPrestadores() {
     async function gravar(args, b, auto) {
       b.disabled = true;
       try { var r = await sb.rpc("msb_av_prestador_gravar", args); if (r.error) throw r.error;
-        if (auto) { var r2 = await sb.rpc("msb_av_prestador_auto", auto); if (r2.error) throw r2.error; }
+        if (auto) { var r2 = await sb.rpc("msb_av_prestador_modo", auto); if (r2.error) throw r2.error; }
         await avPrestadores(); desenhar(); d.querySelector("#apMsg").textContent = "Guardado."; d.querySelector("#apMsg").className = "avMsg ok"; if (window.PAGINA === "avg") avDesenharGestao(); }
       catch (e) { b.disabled = false; var m = d.querySelector("#apMsg"); m.textContent = "⚠ " + falhouAv(e); m.className = "avMsg bad"; }
     }
     d.querySelectorAll("[data-gravar]").forEach(function (b) { b.onclick = function () {
       var c = b.closest(".avPrestL"), v = function (k) { return c.querySelector("[data-k='" + k + "']"); };
-      var auto = v("auto").checked, ant = (L0().find(function (x) { return x.id === +c.dataset.id; }) || {}).auto_email;
-      if (auto && !v("email").value.trim()) { var m0 = d.querySelector("#apMsg"); m0.textContent = "Para o email automático, escreva o email do prestador."; m0.className = "avMsg bad"; return; }
+      var modo = v("modo").value, x0 = L0().find(function (x) { return x.id === +c.dataset.id; }) || {}, ant = x0.auto_email ? "auto" : x0.abrir_email ? "abrir" : "nao";
+      if (modo !== "nao" && !v("email").value.trim()) { var m0 = d.querySelector("#apMsg"); m0.textContent = "Para abrir ou enviar o email ao encaminhar, escreva o email do prestador."; m0.className = "avMsg bad"; return; }
       gravar({p_id: +c.dataset.id, p_estacao: est, p_nome: v("nome").value, p_telefone: v("telefone").value, p_email: v("email").value, p_ativo: v("ativo").checked}, b,
-        auto !== !!ant ? {p_id: +c.dataset.id, p_auto: auto} : null);
+        modo !== ant ? {p_id: +c.dataset.id, p_modo: modo} : null);
     }; });
     var ms = d.querySelector("#amPara"); if (ms) ms.onchange = function () { AV.modeloSel = ms.value; desenhar(); };
     var mg = d.querySelector("#amGravar"); if (mg) mg.onclick = async function () {
@@ -411,7 +413,8 @@ function avDesenharFicha(d, a, fotos, urls, hist, resp, adm) {
   if (ps) { ps.onchange = contacto; contacto(); }
   function autoTxt() {
     var t = d.querySelector("#avfAutoTxt"), p = ps && P.find(function (x) { return String(x.id) === ps.value; }); if (!t) return;
-    t.textContent = p && p.auto_email && p.email && !a.prestador_id ? "Ao encaminhar, o email segue logo para " + p.email + " (envio automático deste prestador)." : "";
+    t.textContent = !p || !p.email || a.prestador_id === p.id ? "" : p.auto_email ? "Ao encaminhar, o email segue logo para " + p.email + " (envio automático deste prestador)." :
+      p.abrir_email ? "Ao encaminhar, abre o email para " + p.email + " para rever antes de enviar." : "";
   }
   if (ps) { ps.addEventListener("change", autoTxt); autoTxt(); }
   var en = d.querySelector("#avfEncaminhar"); if (en) en.onclick = async function () {
@@ -427,7 +430,8 @@ function avDesenharFicha(d, a, fotos, urls, hist, resp, adm) {
         var e = await avEnviarEmail({avaria_id: a.id, para: p.email, cc: "", assunto: AVARIAS.preencherModelo(M.assunto, a, ex), corpo: AVARIAS.preencherModelo(M.corpo, a, ex), fotos: fotos.map(function (f) { return f.id; })});
         if (e) { msg("Encaminhada, mas o email não saiu: " + e, false); AV.lista = []; setTimeout(function () { avAbrirFicha(a.id); }, 2500); return; }
       }
-      AV.lista = []; avAbrirFicha(a.id); if (window.PAGINA === "avg") carregarAvGestao();
+      AV.lista = []; await avAbrirFicha(a.id); if (window.PAGINA === "avg") carregarAvGestao();
+      if (novo && p.abrir_email && !p.auto_email && p.email) avEscreverEmail(Object.assign({}, a, {prestador_id: p.id}), P, fotos, urls, eq);   // opção 2: rever antes de enviar
     } catch (x) { msg("⚠ " + falhouAv(x), false); en.disabled = false; }
   };
   var em = d.querySelector("#avfEmail"); if (em) em.onclick = function () { avEscreverEmail(a, P, fotos, urls, eq); };
