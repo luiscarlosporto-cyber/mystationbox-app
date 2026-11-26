@@ -15,7 +15,7 @@ function avUUID() {
 }
 function falhouAv(e) { var m = falhou(e); return /msb_avaria|does not exist|schema cache|42P01|42883|PGRST20/i.test(m + " " + (e && e.code || "")) ? "As avarias ainda não estão ativas na base de dados." : m; }
 function avEst(id) { var e = (ESTS || []).find(function (x) { return x.id === id; }); return e ? (e.short_name || e.name) : id; }
-function avNum(a) { return AVARIAS.numeroTxt(a.estacao, a.numero); }
+function avNum(a) { return AVARIAS.numeroTxt(a.estacao, a.numero, a.ano); }
 function avDataHora(t) { var d = new Date(t); return d.toLocaleDateString("pt-PT", {timeZone: "Europe/Lisbon"}) + " " + d.toLocaleTimeString("pt-PT", {timeZone: "Europe/Lisbon", hour: "2-digit", minute: "2-digit"}); }
 function avPri(id) { var p = AVARIAS.prioridade(id) || {}; return "<span class='avPri p-" + id + "'><i class='avDot'></i>" + esc(p.txt || id) + "</span>"; }
 function avEstado(id) { var e = AVARIAS.estado(id) || {}; return "<span class='avEst e-" + id + "'>" + (e.ic || "") + " " + esc(e.txt || id) + "</span>"; }
@@ -120,7 +120,7 @@ async function avEnviar(est, pri) {
     var r = await sb.rpc("msb_avaria_criar", {p_pedido: AV.pedido, p_estacao: est, p_titulo: tit, p_descricao: ($("#avnDesc").value || "").trim(),
       p_categoria: +$("#avnCat").value || null, p_equipamento: eq ? eq.id : null, p_equipamento_txt: eq ? null : eqTxt || null, p_prioridade: pri});
     if (r.error) throw r.error;
-    var a = {id: r.data.id, numero: r.data.numero, estacao: r.data.estacao}, falhas = [];
+    var a = {id: r.data.id, numero: r.data.numero, estacao: r.data.estacao, ano: r.data.ano}, falhas = [];
     for (var i = 0; i < AV.novas.length; i++) {
       avMsg("A enviar fotografia " + (i + 1) + " de " + AV.novas.length + "…", true);
       try { await avSubirFoto(a, AV.novas[i].f, "abertura"); } catch (e) { falhas.push((i + 1) + ": " + falhouAv(e)); }
@@ -131,7 +131,7 @@ async function avEnviar(est, pri) {
       "<p>" + (pri === "critica" ? "Os administradores receberam um <b>alerta urgente</b>." : "Os administradores foram avisados.") + "</p>" +
       (falhas.length ? "<div class='aviso'>⚠ A avaria ficou registada, mas " + (falhas.length === 1 ? "uma fotografia não foi enviada" : falhas.length + " fotografias não foram enviadas") + " (" + esc(falhas.join("; ")) + "). Pode juntá-las na ficha da avaria.</div>" : "") +
       "<div class='bar'><button class='btn p' id='avnVer'>Ver a avaria</button><button class='btn' id='avnOutra'>Comunicar outra</button></div></div>";
-    $("#avnVer").onclick = function () { avAbrirNumero(a.estacao, a.numero); };
+    $("#avnVer").onclick = function () { avAbrirNumero(a.estacao, a.numero, a.ano); };
     $("#avnOutra").onclick = function () { carregarAvNova(); };
   } catch (e) { avMsg("⚠ " + falhouAv(e), false); b.disabled = false; }
   finally { AV.aEnviar = false; }
@@ -139,8 +139,8 @@ async function avEnviar(est, pri) {
 
 /* ================= Gestão de avarias ================= */
 async function avCarregarLista() {
-  var r = await lerTudo(function () { return sb.from("msb_avarias").select("id,estacao,numero,titulo,prioridade,estado,criado_em,criado_por,criado_nome,responsavel,responsavel_nome,tecnico_externo,concluido_em,atualizado_em,prestador_id,visita_prevista,aguarda_peca,encaminhada_em"); }, ["id"]);
-  if (r.error && /prestador_id|visita_prevista|aguarda_peca|encaminhada_em/.test(r.error.message || "")) r = await lerTudo(function () { return sb.from("msb_avarias").select("id,estacao,numero,titulo,prioridade,estado,criado_em,criado_por,criado_nome,responsavel,responsavel_nome,tecnico_externo,concluido_em,atualizado_em"); }, ["id"]);
+  var r = await lerTudo(function () { return sb.from("msb_avarias").select("id,estacao,numero,ano,titulo,prioridade,estado,criado_em,criado_por,criado_nome,responsavel,responsavel_nome,tecnico_externo,concluido_em,atualizado_em,prestador_id,visita_prevista,aguarda_peca,encaminhada_em"); }, ["id"]);
+  if (r.error && /ano|prestador_id|visita_prevista|aguarda_peca|encaminhada_em/.test(r.error.message || "")) r = await lerTudo(function () { return sb.from("msb_avarias").select("id,estacao,numero,titulo,prioridade,estado,criado_em,criado_por,criado_nome,responsavel,responsavel_nome,tecnico_externo,concluido_em,atualizado_em"); }, ["id"]);
   if (r.error) throw r.error;
   var f = await lerTudo(function () { return sb.from("msb_avarias_fotos").select("id,avaria_id"); }, ["id"]);
   if (f.error) throw f.error;
@@ -265,12 +265,14 @@ function avEditarPrestadores() {
 }
 
 /* ================= Ficha ================= */
-async function avAbrirNumero(est, numero) {
+async function avAbrirNumero(est, numero, ano) {
   if (window.PAGINA !== "avg" && window.ir) ir("avg");
   try {
-    var r = await sb.from("msb_avarias").select("id").eq("estacao", est).eq("numero", numero).maybeSingle();
+    var q = sb.from("msb_avarias").select("id").eq("estacao", est).eq("numero", numero);
+    if (ano) q = q.eq("ano", ano);   // ligações antigas sem ano: a mais recente com esse número
+    var r = await q.order("criado_em", {ascending: false}).limit(1).maybeSingle();
     if (r.error) throw r.error;
-    if (!r.data) { if (window.MSB_NAV) MSB_NAV.confirma("A avaria " + AVARIAS.numeroTxt(est, numero) + " não existe ou não é de uma estação a que tenha acesso.", "OK"); return; }
+    if (!r.data) { if (window.MSB_NAV) MSB_NAV.confirma("A avaria " + AVARIAS.numeroTxt(est, numero, ano) + " não existe ou não é de uma estação a que tenha acesso.", "OK"); return; }
     avAbrirFicha(r.data.id);
   } catch (e) { alert(falhouAv(e)); }
 }

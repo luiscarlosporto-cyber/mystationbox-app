@@ -72,12 +72,13 @@
     return { w: Math.round(w * k), h: Math.round(h * k) };
   }
 
-  function numeroTxt(est, n) { return (SIGLA[est] || String(est).toUpperCase()) + "-" + String(n).padStart(4, "0"); }
+  /* n.º interno: sigla, número e ano; recomeça em 0001 todos os anos (dono, 26/11/2026). Sem ano = forma antiga. */
+  function numeroTxt(est, n, ano) { return (SIGLA[est] || String(est).toUpperCase()) + "-" + String(n).padStart(4, "0") + (ano ? "/" + ano : ""); }
   function lerNumero(hash) {
-    const m = /[#&]avaria=([A-Za-z]{2})-(\d+)/.exec(hash || "");
+    const m = /[#&]avaria=([A-Za-z]{2})-(\d+)(?:(?:\/|%2F)(\d{4}))?/i.exec(hash || "");
     if (!m) return null;
     const s = m[1].toUpperCase(), est = Object.keys(SIGLA).find((k) => SIGLA[k] === s);
-    return est ? { estacao: est, numero: +m[2] } : null;
+    return est ? (m[3] ? { estacao: est, numero: +m[2], ano: +m[3] } : { estacao: est, numero: +m[2] }) : null;
   }
 
   function idade(t, agora) {
@@ -145,7 +146,7 @@
   /* troca {campo} pelos dados da avaria; {quadro} fica (é montado no servidor) e campos desconhecidos ficam como estão */
   function preencherModelo(t, a, extra) {
     const x = extra || {}, d = {
-      numero: numeroTxt(a.estacao, a.numero), estacao: ESTACAO_NOME[a.estacao] || a.estacao, titulo: a.titulo || "", descricao: a.descricao || "",
+      numero: numeroTxt(a.estacao, a.numero, a.ano), estacao: ESTACAO_NOME[a.estacao] || a.estacao, titulo: a.titulo || "", descricao: a.descricao || "",
       prioridade: (prioridade(a.prioridade) || {}).txt || a.prioridade || "", equipamento: x.equipamento || "",
       comunicada_em: a.criado_em ? new Date(a.criado_em).toLocaleString("pt-PT", { timeZone: "Europe/Lisbon", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).replace(",", "") : ""
     };

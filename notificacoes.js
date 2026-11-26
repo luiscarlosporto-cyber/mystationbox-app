@@ -111,7 +111,7 @@ function notifAbrirLink(url) {
   var n = AVARIAS.lerNumero(String(url).replace(/^[^#]*/, ""));
   if (!n) return false;
   try { if (/avaria=/.test(location.hash)) history.replaceState(null, "", location.pathname + location.search); } catch (e) { /* fica o # */ }
-  if (window.avAbrirNumero) avAbrirNumero(n.estacao, n.numero);
+  if (window.avAbrirNumero) avAbrirNumero(n.estacao, n.numero, n.ano);
   return true;
 }
 
