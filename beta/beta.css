@@ -545,3 +545,14 @@ body:not(.b-duas) main{box-shadow:inset 5px 0 0 var(--est)}
 .ptg-regularizado{background:#E0E7FF;color:#3730A3}.ptg-correto{background:#DCFCE7;color:#166534}.ptg-curso{background:#E0F2FE;color:#075985}
 .ptg-pic{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:14px}.ptg-pic li{border:1px solid var(--bd);border-radius:10px;padding:8px 10px}
 .ptg-pic li.rej{opacity:.75}.ptg-pic li.anul{text-decoration:line-through;opacity:.6}.ptg-pic .mini{margin-left:4px}
+/* Ponto · Fecho do mês (26/11/2026) */
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 11px;font-size:13px;font-weight:600}
+.ptf-pre{background:#DCFCE7;color:#166534}.ptf-msg{background:#FEF3C7;color:#92400E;white-space:normal}.ptf-val{background:#E0E7FF;color:#3730A3}.ptf-esp{background:#E0F2FE;color:#075985}.ptf-baixa{background:#F1F5F9;color:#334155}
+.ptf-passos{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:13px;margin-top:10px}.ptf-passos span{padding:4px 10px;border-radius:999px;background:#eef2f7}.ptf-passos .ok{background:#DCFCE7;color:#166534}.ptf-passos .at{background:#1A63E8;color:#fff}
+.ptf-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.ptf-tiles>div{background:var(--card);border-radius:16px;padding:12px 14px;box-shadow:0 2px 10px rgba(16,40,90,.06)}.ptf-tiles small{display:block;color:var(--mut);font-size:12.5px}.ptf-tiles b{font-size:21px}
+.ptf-col{border-top:1px solid var(--bd);padding:10px 0}.ptf-col:first-of-type{border-top:0}
+.ptf-cab{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;width:100%;background:none;border:0;padding:4px 0;text-align:left;font:inherit;color:inherit;cursor:pointer;min-height:44px}.ptf-cab span:not(.chip){color:var(--mut);font-size:13px}
+.ptf-num{display:flex;gap:18px;flex-wrap:wrap;margin:4px 0 6px}.ptf-num small{display:block;color:var(--mut);font-size:12px}.ptf-num b{font-size:18px}
+.ptf-ex{width:96px;font:600 17px var(--f-body);padding:6px 8px;border:1px solid var(--bd);border-radius:10px;min-height:40px}.ptf-ex.bad{border-color:#B91C1C}
+.ptf-dias td{font-size:13.5px}.ptf-cont{display:inline-flex;border:1px solid var(--bd);border-radius:10px;overflow:hidden}.ptf-cont button{border:0;background:#fff;padding:6px 10px;font:12.5px var(--f-body);color:var(--fg);cursor:pointer;min-height:34px}.ptf-cont button.on{background:#1A63E8;color:#fff;font-weight:600}.ptf-cont button:disabled:not(.on){opacity:.5;cursor:default}
+.ptf-fim{display:flex;gap:10px;flex-wrap:wrap}.ptf-fim .btn{min-height:52px}.ptf-fim .btn.p{flex:1 1 260px}

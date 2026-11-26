@@ -98,6 +98,43 @@ var PONTO = (function () {
     if (id === "outro" && j.length < 5) return null;
     return m[1] + (j ? " — " + j : "");
   }
-  return {motivo: motivo, proxima: proxima, dia: dia, hm: hm, duracao: duracao, MOTIVOS: MOTIVOS, ESTADOS: ESTADOS, estadoDia: estadoDia, MOTIVOS_CORR: MOTIVOS_CORR, motivoCorrecao: motivoCorrecao};
+  /* Fecho do mês (dono, 26/11/2026): pré-validação pelo horário. Devolve {pre: true} quando bate certo com o turno,
+   * ou {pre: false, msg} com o que difere. semPonto = dia antes de o Ponto começar na estação (conta pelo horário). */
+  function horasHorario(partes) { return (partes || []).reduce(function (t, p) { return t + (p.fim - p.inicio); }, 0); }
+  function preValidar(R, partes, codigo, semPonto) {
+    partes = (partes || []).slice().sort(function (a, b) { return a.inicio - b.inicio; });
+    if (semPonto) return {pre: true, semPonto: true};
+    if (!partes.length) return R.pares.length ? {pre: false, msg: "Picou num dia sem turno" + (codigo ? " (" + codigo + ")" : "")} : {pre: true};
+    var M = [];
+    R.partes.forEach(function (o) {
+      if (o.estado === "falta") M.push("Sem entrada (turno às " + hm(o.inicio) + ")");
+      else {
+        if (o.atraso) M.push("Entrou às " + hm(o.entrada) + ", o turno começa às " + hm(o.inicio) + " (+" + o.atraso + " min)");
+        if (o.estado === "sem_saida") M.push("Sem saída registada (turno até " + hm(o.fim) + ")");
+        else if (o.antecipada) M.push("Saiu às " + hm(o.saida) + ", o turno acaba às " + hm(o.fim) + " (−" + o.antecipada + " min)");
+      }
+    });
+    R.avisos.forEach(function (a) { M.push(a); });
+    return M.length ? {pre: false, msg: M.join(" · ")} : {pre: true};
+  }
+  /* resumo de um colaborador no mês. dias = [{partes, codigo, R, contar ('horario'|'picadas'), semPonto}] */
+  function resumoFecho(dias, extraMin) {
+    var o = {horario: 0, picadas: 0, contar: 0, tempo_mais: 0, baixa: 0, dias: 0, msg: 0};
+    dias.forEach(function (d) {
+      var h = horasHorario(d.partes), t = d.R ? d.R.trabalhado : 0, v = d.pv || preValidar(d.R, d.partes, d.codigo, d.semPonto);
+      if (d.codigo === "B") o.baixa++;
+      if (h || t) o.dias++;
+      o.horario += h; o.picadas += t; o.tempo_mais += d.R ? d.R.extra : 0;
+      o.contar += d.contar === "picadas" ? t : h;
+      if (!v.pre) o.msg++;
+    });
+    o.extra = extraMin == null ? 0 : extraMin;
+    return o;
+  }
+  function hhmm(m) { m = Math.round(m || 0); return Math.floor(m / 60) + ":" + String(m % 60).padStart(2, "0"); }
+  function lerHHMM(t) { var x = /^\s*(\d{1,4})(?:[:h,.]\s*(\d{1,2}))?\s*$/.exec(String(t || "0")); if (!x) return null; var mi = +(x[2] || 0); return mi > 59 ? null : +x[1] * 60 + mi; }
+
+  return {horasHorario: horasHorario, preValidar: preValidar, resumoFecho: resumoFecho, hhmm: hhmm, lerHHMM: lerHHMM,
+    motivo: motivo, proxima: proxima, dia: dia, hm: hm, duracao: duracao, MOTIVOS: MOTIVOS, ESTADOS: ESTADOS, estadoDia: estadoDia, MOTIVOS_CORR: MOTIVOS_CORR, motivoCorrecao: motivoCorrecao};
 })();
 if (typeof module !== "undefined") module.exports = PONTO;

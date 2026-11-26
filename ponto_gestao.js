@@ -81,7 +81,7 @@ function ptgDesenhar() {
   var cont = {}; todas.forEach(function (x) { cont[x.st] = (cont[x.st] || 0) + 1; });
   var nomes = {}; PTG.linhas.forEach(function (x) { nomes[x.cid] = x.nome; });
   var sem = !Object.keys(D.inicio).length;
-  var h = "<div class='card' style='padding:14px'><h3 style='margin:0 0 4px'>Gestão de Picagens</h3>" +
+  var h = "<div class='card' style='padding:14px'><div style='display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center'><h3 style='margin:0 0 4px'>Gestão de Picagens</h3><button class='btn' id='ptgFecho'>Fecho do mês</button></div>" +
     "<p class='mut' style='margin:0 0 10px'>Todos os colaboradores e dias desde que o Ponto Digital começou a ser usado em cada estação" +
     Object.keys(D.inicio).map(function (k) { return " · " + esc(ptgNomeEst(k)) + " desde " + ptgDataPT(D.inicio[k]); }).join("") + ". Toque numa linha para ver ou regularizar.</p>" +
     "<div class='ptg-filtros'><label>Estação<select id='ptgEst'><option value=''>Todas</option>" + (ESTS || []).map(function (e) { return "<option value='" + e.id + "'" + (F.est === e.id ? " selected" : "") + ">" + esc(e.short_name || e.name) + "</option>"; }).join("") + "</select></label>" +
@@ -100,6 +100,7 @@ function ptgDesenhar() {
     }).join("") + "</tbody></table></div>" : "<p class='mut' style='padding:14px;margin:0'>Nada com estes filtros.</p>") + "</div>";
   box.innerHTML = h;
   var mud = function (k, el, recarregar) { el.onchange = function () { F[k] = el.value; if (recarregar) carregarPtg(); else ptgDesenhar(); }; };
+  $("#ptgFecho").onclick = function () { ir("ptf"); };
   mud("est", $("#ptgEst")); mud("colab", $("#ptgColab")); mud("de", $("#ptgDe"), 1); mud("ate", $("#ptgAte"), 1);
   box.querySelectorAll("[data-st]").forEach(function (b) { b.onclick = function () { F.estado = b.dataset.st; ptgDesenhar(); }; });
   box.querySelectorAll("tr[data-i]").forEach(function (tr) { tr.onclick = function () { ptgAbrir(PTG.linhas[+tr.dataset.i]); }; tr.onkeydown = function (ev) { if (ev.key === "Enter") tr.click(); }; });
