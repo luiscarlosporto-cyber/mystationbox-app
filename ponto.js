@@ -85,9 +85,10 @@ function desenharPonto() {
     "<div class='pto-rot'>COLABORADOR</div><div class='pto-nome'>" + esc(nome) + "</div>" +
     "<div class='pto-turno'>" + esc(ptoNomeEst(X.est)) + (semT ? " · Hoje: " + esc(semT) : M.codigo ? " · Turno previsto " + esc(M.codigo) + " · " + esc(turno) : M.colaborador_id ? " · Sem turno previsto hoje" : "") + "</div>" +
     "<div class='pto-relogio'><div class='pto-rot'>HORA ATUAL</div><div id='ptoRelogio' class='pto-hora'>" + new Date().toLocaleTimeString("pt-PT", {timeZone: "Europe/Lisbon", hour: "2-digit", minute: "2-digit"}) + "</div><div class='pto-data'>" + esc(data) + "</div></div>" +
-    (bloqueio ? "<div class='pto-faixa'>ℹ️ " + esc(bloqueio) + "</div>" : faixa +
+    /* o botão aparece sempre (dono, 26/11/2026): sem configuração, o registo fica gravado como recusado, com o motivo, para o administrador ver */
+    (bloqueio && !r ? "<div class='pto-faixa'>ℹ️ " + esc(bloqueio) + "</div>" : faixa) +
     "<button id='ptoBtn' class='pto-btn" + (prox === "saida" ? " sai" : "") + "'" + (PTO.a_picar || noutra ? " disabled" : "") + "><span class='pto-ic'>" + (prox === "entrada" ? "➜]" : "[➜") + "</span><b>" + (prox === "entrada" ? "REGISTAR ENTRADA" : "REGISTAR SAÍDA") + "</b><small>Validar localização e registar ponto</small></button>" +
-    "<div class='pto-nota'>O registo utiliza a hora do servidor.</div>") + "</div>";
+    "<div class='pto-nota'>O registo utiliza a hora do servidor.</div>" + "</div>";
 
   h += "<div class='card' style='padding:14px'><h3 style='margin:0 0 8px'>Os meus registos de hoje</h3>" + (meus.length ? "<ul class='pto-lista'>" + meus.map(function (x) {
     return "<li class='" + (x.estado === "aceite" && !x.anulado_por ? "ok" : "bad") + "'><b>" + ptoHora(x.hora) + "</b> " + (x.tipo === "entrada" ? "Entrada" : "Saída") + (x.estacao !== X.est ? " (" + esc(ptoNomeEst(x.estacao)) + ")" : "") +

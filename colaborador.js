@@ -53,7 +53,6 @@ function colHtml(D) {
   if (!ult) estado = M.codigo && !COL_FOLGA[M.codigo] ? "Por iniciar" : "";
   else if (ult.tipo === "entrada") estado = "Turno em curso · entrou às " + colHora(ult.hora);
   else estado = "Saiu às " + colHora(ult.hora) + (ent.length ? " · entrou às " + colHora(ent[0].hora) : "");
-  if (M.pode_picar === false) botao = "";
   var h1 = "<section class='card' style='display:grid;gap:12px;padding:18px'>" +
     "<div><div style='font-size:24px;font-weight:700;letter-spacing:-.3px'>" + saud + (nome ? ", " + esc(nome) : "") + "</div>" +
     "<div class='mut'>" + esc(colNomeEst(D.est)) + " · " + esc(data) + "</div></div>" +

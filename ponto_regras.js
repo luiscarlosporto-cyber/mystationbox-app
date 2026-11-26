@@ -11,7 +11,7 @@ var PONTO = (function () {
     sem_local: "A estação ainda não tem localização definida",
     inativo: "O Ponto Digital ainda não está ativo nesta estação",
     sem_conta: "A sua conta não está ligada a um colaborador",
-    sem_permissao: "Não está escalado para esta estação",
+    sem_permissao: "Não está na equipa desta estação. Fale com o administrador",
     sem_localizacao: "Não foi possível obter a localização"
   };
   function motivo(r) {
