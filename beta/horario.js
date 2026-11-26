@@ -110,6 +110,7 @@
   }
   /* 👥 Equipa do mês (dono, 19/11/2026): acrescentar ou retirar pessoas; férias e baixa a partir do nome */
   function dmCurto(iso) { return iso.slice(8) + "/" + iso.slice(5, 7); }
+  function outrasEst(id) { return (X.OUT[id] || []).map(function (e) { return MSB_NAV.estInfo(e).s; }).join(", "); }
   function equipa() {
     var fim = X.M + "-" + String(X.dias.length).padStart(2, "0");
     var h = "<div class='bl'><h3>👥 Equipa do mês</h3><div class='bar'>" + X.P.map(function (l) {
@@ -117,6 +118,8 @@
       if (l.desde && l.desde > X.M + "-01" && l.desde <= fim) x.push("desde " + dmCurto(l.desde));
       if (l.ate && l.ate >= X.M + "-01" && l.ate < fim) x.push("até " + dmCurto(l.ate));
       if (l.espelho) x.push("faz o da " + ((X.C[l.espelho] || {}).curto || ""));
+      if (!l.escala && !l.espelho) x.push("só alguns turnos");
+      if (X.OUT[l.colaborador_id]) x.push("também em " + outrasEst(l.colaborador_id));
       return "<button class='btn" + (X.pess === l.colaborador_id ? " p" : "") + "' data-pess='" + l.colaborador_id + "'>" + esc(c.curto || "") + (x.length ? " <small>" + esc(x.join(" · ")) + "</small>" : "") + "</button>";
     }).join("") + "<button class='btn' id='horAdd'>+ Acrescentar</button></div>";
     if (X.pess) {
@@ -127,11 +130,11 @@
     if (X.add) {
       var fora = Object.keys(X.C).map(Number).filter(function (i) { return !X.P.some(function (l) { return l.colaborador_id === i; }); });
       h += "<div class='aviso' style='margin-top:8px;display:grid;gap:8px'><b>Acrescentar ao horário</b><div class='ff'>" +
-        "<label>Quem<select id='addQuem'><option value=''>Pessoa nova</option>" + fora.map(function (i) { return "<option value='" + i + "'>" + esc(X.C[i].nome || X.C[i].curto) + "</option>"; }).join("") + "</select></label>" +
+        "<label>Quem<select id='addQuem'><option value=''>Pessoa nova</option>" + fora.sort(function (a, b) { return (X.OUT[b] ? 1 : 0) - (X.OUT[a] ? 1 : 0); }).map(function (i) { return "<option value='" + i + "'>" + esc(X.C[i].nome || X.C[i].curto) + (X.OUT[i] ? " · já em " + esc(outrasEst(i)) : "") + "</option>"; }).join("") + "</select></label>" +
         "<label class='addNovo'>Nome completo<input id='addNome'></label><label class='addNovo'>Nome curto (no horário)<input id='addCurto'></label>" +
         "<label>Desde<input type='date' id='addDesde' value='" + (hoje().slice(0, 7) === X.M ? hoje() : X.M + "-01") + "'></label>" +
         "<label>Código no Picaponto<input id='addCod' inputmode='numeric'></label>" +
-        "<label>Horário<select id='addEsp'><option value=''>Próprio (conta para a escala)</option>" + X.P.filter(function (l) { return l.escala && !l.espelho; }).map(function (l) { return "<option value='" + l.colaborador_id + "'>Faz o da " + esc((X.C[l.colaborador_id] || {}).curto || "") + "</option>"; }).join("") + "</select></label></div>" +
+        "<label>Horário<select id='addEsp'><option value=''>Próprio (conta para a escala)</option><option value='x'>Só alguns turnos (não conta para a escala)</option>" + X.P.filter(function (l) { return l.escala && !l.espelho; }).map(function (l) { return "<option value='" + l.colaborador_id + "'>Faz o da " + esc((X.C[l.colaborador_id] || {}).curto || "") + "</option>"; }).join("") + "</select></label></div>" +
         "<div class='bar'><button class='btn p' id='addOk'>Acrescentar</button><button class='btn' id='addFim'>Cancelar</button></div></div>";
     }
     return h + "</div>";
@@ -158,7 +161,7 @@
     } catch (x) { msbAviso("Erro: " + falhou(x)); }
   }
   async function acrescentar() {
-    var quem = +$("#addQuem").value || null, desde = $("#addDesde").value, cod = $("#addCod").value.trim(), esp = +$("#addEsp").value || null;
+    var quem = +$("#addQuem").value || null, desde = $("#addDesde").value, cod = $("#addCod").value.trim(), so = $("#addEsp").value === "x", esp = so ? null : +$("#addEsp").value || null;
     if (!desde) return msbAviso("Erro: escolha desde quando.");
     if (!/^\d{1,4}$/.test(cod)) return msbAviso("Erro: escreva o código do Picaponto (número).");
     if (X.LJ.some(function (l) { return l.codigo === cod && l.colaborador_id !== quem; })) return msbAviso("Erro: o código " + cod + " já é de outra pessoa nesta estação.");
@@ -171,11 +174,11 @@
         quem = c.data.id;
       } else { nome = X.C[quem].nome; var a = await sb.from("msb_colaboradores").update({ativo: true}).eq("id", quem); if (a.error) throw a.error; }
       var ja = X.LJ.find(function (l) { return l.colaborador_id === quem; }), ordem = X.LJ.reduce(function (m, l) { return Math.max(m, l.ordem || 0); }, 0) + 1;
-      var dados = {codigo: cod, desde: desde, ate: null, escala: !esp, espelho: esp};
+      var dados = {codigo: cod, desde: desde, ate: null, escala: !esp && !so, espelho: esp};   // «só alguns turnos»: ex. quem é de outra estação e faz cá uns turnos; a escala não lhe dá turnos, marcam-se à mão
       var r = ja ? await sb.from("msb_colab_lojas").update(dados).eq("colaborador_id", quem).eq("estacao", EST)
         : await sb.from("msb_colab_lojas").insert(Object.assign({colaborador_id: quem, estacao: EST, ordem: ordem, nome_picaponto: semAcento(nome).toUpperCase()}, dados));
       if (r.error) throw r.error;
-      msbAviso(nome + " acrescentado(a) desde " + dmy(desde) + ". Carregue em ✨ Propor horário para lhe dar turnos."); X.add = null; abrir(X.M);
+      msbAviso(nome + " acrescentado(a) desde " + dmy(desde) + (so ? ". Marque-lhe os turnos à mão no horário; também pode registar o ponto nesta estação." : ". Carregue em ✨ Propor horário para lhe dar turnos.")); X.add = null; abrir(X.M);
     } catch (x) { msbAviso("Erro: " + falhou(x)); }
   }
   function sair(seg) {
@@ -568,12 +571,14 @@
         sb.from("msb_colaboradores").select("id,curto,nome,ativo"),
         sb.from("msb_horario_meses").select("estado,sem_mt,aprovado_em,enviado_em,atualizado_em").eq("estacao", est).eq("mes", M).maybeSingle(),
         sb.from("msb_config").select("horario").eq("estacao", est).maybeSingle(),
-        sb.from("msb_horario_inicial_equipa").select("dias").eq("estacao", est).eq("mes", M).maybeSingle()
+        sb.from("msb_horario_inicial_equipa").select("dias").eq("estacao", est).eq("mes", M).maybeSingle(),
+        sb.from("msb_colab_lojas").select("colaborador_id,estacao,ate")   // as duas estações: quem também está na outra (dono, 26/11/2026)
       ]);
       R.forEach(function (r) { if (r.error) throw r.error; });
       if (est !== EST || M !== MES) return;
       var ano = +M.slice(0, 4), n = new Date(ano, +M.slice(5), 0).getDate(), cfg = (R[4].data && R[4].data.horario) || {};
       var C = {}; R[2].data.forEach(function (c) { C[c.id] = c; });
+      var OUT = {}; (R[6].data || []).forEach(function (l) { if (l.estacao !== est && (!l.ate || l.ate >= hoje())) (OUT[l.colaborador_id] = OUT[l.colaborador_id] || []).push(l.estacao); });
       var dias = []; for (var d = 1; d <= n; d++) dias.push(d);
       var G = {}, ORI = {}, ANT = {}, FX = {}, FXO = {};
       R[0].data.forEach(function (x) {
@@ -584,7 +589,7 @@
       Object.keys(ANT).forEach(function (i) { ANT[i].sort(function (a, b) { return a[0] < b[0] ? -1 : 1; }); });
       var FDS = {}; Object.keys(ANT).forEach(function (i) { ANT[i].forEach(function (a) { var w = new Date(a[0] + "T12:00:00").getDay(); if (w === 6 || w === 0) FDS[i] = a[1]; }); });
       var existe = !!R[3].data && (ADMIN || R[3].data.estado === "real"), P = existe ? R[1].data.filter(function (l) { return G[l.colaborador_id] || ((C[l.colaborador_id] || {}).ativo && (!l.desde || l.desde < fim) && (!l.ate || l.ate >= M + "-01")); }) : [];
-      X = {M: M, dias: dias, fer: feriados(ano), G: G, ORI: ORI, ANT: ANT, FX: FX, FXO: FXO, reforco: cfg.reforco, INI: R[5].data, LJ: R[1].data, ER0: [], inv: "", ESP: [], EM: {}, esp: !!(X && X.esp && X.M === M), espF: novoEspF(), FDS: FDS, C: C, P: P, ALT: {}, ed: !!ADMIN, menu: "", SUG: {}, pess: null, add: null, rolar: true, apr: existe ? R[3].data.aprovado_em : null, env: existe ? R[3].data.enviado_em : null, atu: existe ? R[3].data.atualizado_em : null, envio: false, MAIL: {}, ultEnv: null, estado: existe ? R[3].data.estado : "simulacao", semMT: existe && R[3].data.sem_mt, mt: !!cfg.mt, leg: cfg.legenda || []};
+      X = {M: M, OUT: OUT, dias: dias, fer: feriados(ano), G: G, ORI: ORI, ANT: ANT, FX: FX, FXO: FXO, reforco: cfg.reforco, INI: R[5].data, LJ: R[1].data, ER0: [], inv: "", ESP: [], EM: {}, esp: !!(X && X.esp && X.M === M), espF: novoEspF(), FDS: FDS, C: C, P: P, ALT: {}, ed: !!ADMIN, menu: "", SUG: {}, pess: null, add: null, rolar: true, apr: existe ? R[3].data.aprovado_em : null, env: existe ? R[3].data.enviado_em : null, atu: existe ? R[3].data.atualizado_em : null, envio: false, MAIL: {}, ultEnv: null, estado: existe ? R[3].data.estado : "simulacao", semMT: existe && R[3].data.sem_mt, mt: !!cfg.mt, leg: cfg.legenda || []};
       var nEsp = 0;
       if (ADMIN) { await lerEsp(R[1].data.map(function (l) { return l.colaborador_id; })); if (est !== EST || M !== MES) return; X.ER0 = verif().erros.map(function (e) { return e.msg; }); if (!ADIAR[est + M] && !X.apr) nEsp = aplicarEsp(); }
       if (nEsp) ajustar(); else pintar();
