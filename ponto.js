@@ -179,14 +179,18 @@ function ptoContasHtml() {
   X.contasEst.forEach(function (l) { if (!ids[l.colaborador_id]) { ids[l.colaborador_id] = 1; var c = X.colabs.find(function (x) { return x.id === l.colaborador_id; }); if (c && c.ativo !== false) linhas.push(c); } });
   linhas.sort(function (a, b) { return (a.curto || a.nome).localeCompare(b.curto || b.nome, "pt"); });
   var perfis = X.perfis.filter(function (p) { return p.role !== "admin"; });
-  return "<div class='card' style='padding:14px'><h3 style='margin:0 0 4px'>👥 Contas dos colaboradores · " + esc(ptoNomeEst(X.est)) + "</h3>" +
-    "<p class='mut' style='margin:0 0 10px'>Ligue a conta da app de cada colaborador ao seu nome no horário. <b>Piloto</b>: essa pessoa já pica a sério, mesmo com o Ponto Digital ainda desligado para os outros.</p>" +
-    (linhas.length ? "<div class='sc'><table class='t'><thead><tr><th class='l'>Colaborador</th><th class='l'>Conta da app</th><th>Piloto</th><th></th></tr></thead><tbody>" + linhas.map(function (c) {
+  // Com o Ponto Digital ligado o «Piloto» não muda nada: esconde-se (volta se a estação for desligada). Quadro fechado se estiverem todas ligadas (dono, 26/11/2026).
+  var ligado = !!(X.local && X.local.ativo), semConta = linhas.filter(function (c) { return !X.contas.some(function (x) { return x.colaborador_id === c.id; }); }).length;
+  var pil = ligado ? " style='display:none'" : "";
+  return "<details class='card pto-contas' style='padding:14px'" + (semConta || !linhas.length ? " open" : "") + "><summary style='cursor:pointer;list-style:none'><h3 style='margin:0;display:inline'>👥 Contas dos colaboradores · " + esc(ptoNomeEst(X.est)) +
+    (linhas.length ? (semConta ? " · " + semConta + " sem conta ⚠️" : " · todas ligadas ✅") : "") + "</h3> <span class='mut' style='font-size:13px'>(tocar para abrir)</span></summary>" +
+    "<p class='mut' style='margin:8px 0 10px'>Ligue a conta da app de cada colaborador ao seu nome no horário." + (ligado ? "" : " <b>Piloto</b>: essa pessoa já pica a sério, mesmo com o Ponto Digital ainda desligado para os outros.") + "</p>" +
+    (linhas.length ? "<div class='sc'><table class='t'><thead><tr><th class='l'>Colaborador</th><th class='l'>Conta da app</th><th" + pil + ">Piloto</th><th></th></tr></thead><tbody>" + linhas.map(function (c) {
       var k = X.contas.find(function (x) { return x.colaborador_id === c.id; }) || {};
       return "<tr><td class='l'>" + esc(c.curto || c.nome) + "</td><td class='l'><select data-cc='" + c.id + "'><option value=''>— sem conta —</option>" +
         perfis.map(function (p) { return "<option value='" + esc(p.user_id) + "'" + (p.user_id === k.user_id ? " selected" : "") + ">" + esc(p.display_name || "(sem nome)") + "</option>"; }).join("") +
-        "</select></td><td><input type='checkbox' data-cp='" + c.id + "'" + (k.piloto ? " checked" : "") + " aria-label='Piloto'></td><td><button class='mini' data-cg='" + c.id + "'>Guardar</button> <span data-cr='" + c.id + "'></span></td></tr>"; }).join("") + "</tbody></table></div>"
-      : "<p class='mut' style='margin:0'>Não há colaboradores ativos nesta estação.</p>") + "</div>";
+        "</select></td><td" + pil + "><input type='checkbox' data-cp='" + c.id + "'" + (k.piloto ? " checked" : "") + " aria-label='Piloto'></td><td><button class='mini' data-cg='" + c.id + "'>Guardar</button> <span data-cr='" + c.id + "'></span></td></tr>"; }).join("") + "</tbody></table></div>"
+      : "<p class='mut' style='margin:0'>Não há colaboradores ativos nesta estação.</p>") + "</details>";
 }
 async function ptoGuardarConta(id) {
   var u = $("[data-cc='" + id + "']").value, pil = $("[data-cp='" + id + "']").checked, o = $("[data-cr='" + id + "']"), r;
