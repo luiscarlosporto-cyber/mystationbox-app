@@ -63,14 +63,14 @@ function farPedirHtml() {
   var ano = new Date().getFullYear(), u = FARDAS.usadosNoAno(FAR.d.pedidos, ano), T = FAR.d.tamanhos, n = 0;
   FARDAS.PECAS.forEach(function (p) { n += FAR.qtd[p.id] || 0; });
   return "<section class='card' style='display:grid;gap:12px;padding:18px'><div><h2 style='margin:0'>📦 Pedir fardamento</h2>" +
-    "<p class='mut' style='margin:4px 0 0'>Até " + FARDAS.LIMITE_ANO + " peças de cada tipo por ano. O tamanho vem do seu perfil.</p></div>" +
+    "<p class='mut' style='margin:4px 0 0'>Por ano: até " + FARDAS.LIMITE_ANO + " peças de cada tipo e 1 casaco / polar. O tamanho vem do seu perfil.</p></div>" +
     "<div style='display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px'>" + FARDAS.PECAS.map(function (p) {
       var q = FAR.qtd[p.id] || 0, usado = u[p.id] || 0;
       return "<div style='border:" + (q ? "2px solid #1A63E8" : "1px solid var(--bd)") + ";border-radius:14px;padding:10px;text-align:center;display:grid;gap:6px;justify-items:center'>" + farIc(p.id, 64) +
         "<div style='font-weight:600;font-size:14px'>" + esc(p.nome) + " · " + esc(T[p.id]) + "</div>" +
         "<div style='display:flex;align-items:center;gap:8px'><button class='btn' data-q='" + p.id + "' data-d='-1' aria-label='Menos' style='min-width:44px;min-height:44px'>−</button>" +
         "<b style='min-width:20px;font-size:18px'>" + q + "</b><button class='btn' data-q='" + p.id + "' data-d='1' aria-label='Mais' style='min-width:44px;min-height:44px'>+</button></div>" +
-        "<div class='mut' style='font-size:12px" + (usado + q > FARDAS.LIMITE_ANO ? ";color:#B42318" : "") + "'>Este ano: " + usado + " de " + FARDAS.LIMITE_ANO + "</div></div>"; }).join("") + "</div>" +
+        "<div class='mut' style='font-size:12px" + (usado + q > FARDAS.limite(p.id) ? ";color:#B42318" : "") + "'>Este ano: " + usado + " de " + FARDAS.limite(p.id) + "</div></div>"; }).join("") + "</div>" +
     "<div><div class='mut' style='margin-bottom:6px'>Motivo</div><div style='display:flex;flex-wrap:wrap;gap:6px'>" + Object.keys(FARDAS.MOTIVOS).map(function (k) {
       return "<button class='btn" + (FAR.motivo === k ? " p" : "") + "' data-mot='" + k + "' style='min-height:42px'>" + esc(FARDAS.MOTIVOS[k]) + "</button>"; }).join("") + "</div></div>" +
     "<label>Nota (opcional)<textarea id='farNota' rows='2' maxlength='300' style='width:100%;box-sizing:border-box'>" + esc(FAR.nota || "") + "</textarea></label>" +
@@ -114,7 +114,7 @@ function farLigar() {
     var itens = FARDAS.PECAS.filter(function (x) { return FAR.qtd[x.id]; }).map(function (x) { return {peca: x.id, qtd: FAR.qtd[x.id]}; });
     if (!itens.length) return;
     var acima = FARDAS.acimaLimite(itens, FARDAS.usadosNoAno(FAR.d.pedidos, new Date().getFullYear()));
-    if (acima.length && !FAR.aviso) { FAR.aviso = "⚠️ Passa o limite de " + FARDAS.LIMITE_ANO + " por ano em: " + esc(acima.map(FARDAS.nomePeca).join(", ")) + ". O pedido segue, mas a gerência pode recusar."; farDesenhar(); return; }
+    if (acima.length && !FAR.aviso) { FAR.aviso = "⚠️ Passa o limite do ano em: " + esc(acima.map(function (x) { return FARDAS.nomePeca(x) + " (máx. " + FARDAS.limite(x) + ")"; }).join(", ")) + ". O pedido segue, mas a gerência pode recusar."; farDesenhar(); return; }
     p.disabled = true; p.textContent = "A enviar…";
     try { FAR.d = await farRpc("msb_fardas_pedir", {p_estacao: EST, p_itens: itens, p_motivo: FAR.motivo, p_nota: FAR.nota || null}); FAR.qtd = {}; FAR.nota = ""; FAR.aviso = null; farDesenhar(); farMsg("#farMsgP", "✔ Pedido enviado à gerência."); }
     catch (e) { p.disabled = false; p.textContent = "Enviar pedido"; farMsg("#farMsgP", "❌ " + e.message, true); }

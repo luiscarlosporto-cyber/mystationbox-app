@@ -1,7 +1,7 @@
 /* mystationbox · Fardamento: regras puras (sem ecrã nem base de dados), testadas em app/testes/fardas.js.
  * Pedido do dono (27/11/2026): perfil de tamanhos obrigatório e pedido de fardamento novo.
  * Peças: polo de manga curta, polo de manga comprida, calças e casaco/polar (sem calçado nem colete, decisão do dono).
- * Limite: 3 peças de cada tipo por ano (o pedido acima do limite segue, marcado, e decide o administrador).
+ * Limite por ano: 3 peças de cada tipo; casaco/polar só 1 (dono, 27/11/2026). O pedido acima do limite segue, marcado, e decide o administrador.
  * Tabelas de medidas da folha de fardas enviada pelo dono (cm). Casaco: sem tabela própria, segue o tamanho do polo. */
 "use strict";
 (function (raiz) {
@@ -13,7 +13,8 @@
     {id: "calcas", nome: "Calças", parte: "baixo"},
     {id: "casaco", nome: "Casaco / polar", parte: "cima"}
   ];
-  var LIMITE_ANO = 3;
+  var LIMITE_ANO = 3, LIMITES = {casaco: 1};
+  function limite(peca) { return LIMITES[peca] != null ? LIMITES[peca] : LIMITE_ANO; }
   var MOTIVOS = {desgaste: "Desgaste", tamanho: "Tamanho errado", novo: "Colaborador novo", outro: "Outro"};
   var ESTADOS = {pedido: "Pedido", aprovado: "Aprovado", recusado: "Recusado", encomendado: "Encomendado", entregue: "Entregue"};
   // [min, max] por tamanho, pela ordem de TAMANHOS
@@ -59,7 +60,7 @@
   }
   /* peças que passariam o limite do ano com este pedido */
   function acimaLimite(itens, usados) {
-    return (itens || []).filter(function (i) { return (usados[i.peca] || 0) + (Number(i.qtd) || 0) > LIMITE_ANO; }).map(function (i) { return i.peca; });
+    return (itens || []).filter(function (i) { return (usados[i.peca] || 0) + (Number(i.qtd) || 0) > limite(i.peca); }).map(function (i) { return i.peca; });
   }
   /* total a encomendar por peça e tamanho (pedidos aprovados), para a lista e o PDF */
   function resumoEncomenda(pedidos) {
@@ -75,7 +76,7 @@
   function nomePeca(id) { var p = PECAS.find(function (x) { return x.id === id; }); return p ? p.nome : id; }
   function itensTxt(itens) { return (itens || []).map(function (i) { return i.qtd + " × " + nomePeca(i.peca) + " " + i.tamanho; }).join(", "); }
 
-  var API = {TAMANHOS: TAMANHOS, TAM_PT: TAM_PT, PECAS: PECAS, LIMITE_ANO: LIMITE_ANO, MOTIVOS: MOTIVOS, ESTADOS: ESTADOS, TABELA: TABELA,
+  var API = {TAMANHOS: TAMANHOS, TAM_PT: TAM_PT, PECAS: PECAS, LIMITE_ANO: LIMITE_ANO, LIMITES: LIMITES, limite: limite, MOTIVOS: MOTIVOS, ESTADOS: ESTADOS, TABELA: TABELA,
     indice: indice, sugerir: sugerir, medidas: medidas, completo: completo, usadosNoAno: usadosNoAno, acimaLimite: acimaLimite,
     resumoEncomenda: resumoEncomenda, nomePeca: nomePeca, itensTxt: itensTxt};
   if (typeof module !== "undefined" && module.exports) module.exports = API; else raiz.FARDAS = API;
