@@ -81,8 +81,10 @@ function ptfDesenhar() {
   var val = D.fecho && D.fecho.estado === "validado", terminou = D.mes < D.hoje.slice(0, 7), sel = D.mes;
   var T = D.linhas.reduce(function (t, l) { t.pre += l.dias.filter(function (d) { return d.pv.pre; }).length; t.msg += l.r.msg; t.contar += l.total; t.pic += l.r.picadas; t.extra += l.f.extra; t.baixa += l.r.baixa; t.normais += l.f.normais; t.feriado += l.f.feriado; t.ferias += l.ferias; return t; }, {pre: 0, msg: 0, contar: 0, pic: 0, extra: 0, baixa: 0, normais: 0, feriado: 0, ferias: 0});
   var ferMes = Object.keys(D.fer).filter(function (d) { return d.slice(0, 7) === D.mes; }).sort();
-  var meses = []; for (var m = "2026-11"; m <= D.hoje.slice(0, 7); ) { meses.push(m); var p = m.split("-"), a = +p[0], mm = +p[1] + 1; if (mm > 12) { mm = 1; a++; } m = a + "-" + String(mm).padStart(2, "0"); }
+  var ini = (function () { var h = D.hoje.slice(0, 7).split("-"), a0 = +h[0] - 1, m0 = +h[1] + 1; if (m0 > 12) { m0 = 1; a0++; } return a0 + "-" + String(m0).padStart(2, "0"); })();   // últimos 12 meses (dono, 27/11/2026: «não vejo outros meses»)
+  var meses = []; for (var m = ini; m <= D.hoje.slice(0, 7); ) { meses.push(m); var p = m.split("-"), a = +p[0], mm = +p[1] + 1; if (mm > 12) { mm = 1; a++; } m = a + "-" + String(mm).padStart(2, "0"); }
   if (meses.indexOf(sel) < 0) meses.unshift(sel);
+  meses.reverse();   // o mais recente primeiro
   var estado = val ? "<span class='chip ptf-val'>✔ Validado pela administração · " + esc(D.fecho.validado_nome || "") + " · " + new Date(D.fecho.validado_em).toLocaleDateString("pt-PT", {timeZone: "Europe/Lisbon"}) + "</span>"
     : terminou ? "<span class='chip ptf-esp'>⏳ À espera da sua validação</span>" : "<span class='chip ptf-esp'>🕒 Mês em curso · valida-se a partir do dia 1</span>";
   var h = (D.semTabelas ? "<div class='card msgErr' style='padding:12px'>⚠ O fecho do mês ainda não está ativo na base de dados: pode ver a pré-validação, mas ainda não grava escolhas nem valida.</div>" : "") +
