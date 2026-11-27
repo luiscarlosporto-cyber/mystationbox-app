@@ -118,23 +118,66 @@ var PONTO = (function () {
     return M.length ? {pre: false, msg: M.join(" · ")} : {pre: true};
   }
   /* resumo de um colaborador no mês. dias = [{partes, codigo, R, contar ('horario'|'picadas'), semPonto}] */
-  function resumoFecho(dias, extraMin) {
-    var o = {horario: 0, picadas: 0, contar: 0, tempo_mais: 0, baixa: 0, dias: 0, msg: 0};
+  /* Feriados que contam para o pagamento (dono, 27/11/2026): os 13 nacionais obrigatórios e o municipal da estação.
+   * O Carnaval não conta (não é obrigatório). Devolve {"AAAA-MM-DD": nome}. */
+  var MUNICIPAL = {sto: ["07-11", "Feriado municipal (São Bento)"], pnf: ["11-11", "Feriado municipal (São Martinho)"]};
+  function pascoa(a) { var b = a % 19, c = Math.floor(a / 100), d = a % 100, e = Math.floor(c / 4), f = c % 4, g = Math.floor((c + 8) / 25), h = Math.floor((c - g + 1) / 3), i = (19 * b + c - e - h + 15) % 30, k = Math.floor(d / 4), l = d % 4, m = (32 + 2 * f + 2 * k - i - l) % 7, n = Math.floor((b + 11 * m + 22 * l) / 451), mes = Math.floor((i + m - 7 * n + 114) / 31), dia = ((i + m - 7 * n + 114) % 31) + 1; return Date.UTC(a, mes - 1, dia); }
+  function feriados(ano, estacao) {
+    var f = {}, p = pascoa(ano), mais = function (n) { return new Date(p + n * 864e5).toISOString().slice(0, 10); };
+    [["01-01", "Ano Novo"], ["04-25", "Dia da Liberdade"], ["05-01", "Dia do Trabalhador"], ["06-10", "Dia de Portugal"], ["08-15", "Assunção de Nossa Senhora"], ["10-05", "Implantação da República"],
+     ["11-01", "Todos os Santos"], ["12-01", "Restauração da Independência"], ["12-08", "Imaculada Conceição"], ["12-25", "Natal"]].forEach(function (x) { f[ano + "-" + x[0]] = x[1]; });
+    f[mais(-2)] = "Sexta-feira Santa"; f[mais(0)] = "Páscoa"; f[mais(60)] = "Corpo de Deus";
+    if (MUNICIPAL[estacao]) f[ano + "-" + MUNICIPAL[estacao][0]] = MUNICIPAL[estacao][1];
+    return f;
+  }
+  /* Horas previstas do mês, como no Horário (horario_regras.js, meta): 8 h por dia útil (seg. a sex.) que não é feriado,
+   * menos os dias úteis de férias (F), baixa (B) e falta justificada (FJ). Os feriados aqui são os do Horário: nacionais + Carnaval.
+   * cods = {"AAAA-MM-DD": código do horário} do colaborador nesse mês. Devolve minutos. */
+  function feriadosHorario(ano) { var f = feriados(ano, null), p = pascoa(ano); f[new Date(p - 47 * 864e5).toISOString().slice(0, 10)] = "Carnaval"; return f; }
+  function previstasMes(mes, cods) {
+    var a = +mes.slice(0, 4), m = +mes.slice(5, 7), n = new Date(Date.UTC(a, m, 0)).getUTCDate(), fer = feriadosHorario(a), dias = 0;
+    for (var d = 1; d <= n; d++) {
+      var iso = mes + "-" + String(d).padStart(2, "0"), w = new Date(Date.UTC(a, m - 1, d)).getUTCDay();
+      if (w > 0 && w < 6 && !fer[iso] && !{F: 1, B: 1, FJ: 1}[(cods || {})[iso]]) dias++;
+    }
+    return dias * 480;
+  }
+  /* Dias úteis de férias gozadas no mês (dono, 27/11/2026): F em dia útil que não é feriado; MDF (½ dia de férias) conta 0,5 */
+  function feriasUteis(mes, cods) {
+    var a = +mes.slice(0, 4), fer = feriadosHorario(a), t = 0;
+    Object.keys(cods || {}).forEach(function (iso) {
+      if (iso.slice(0, 7) !== mes) return;
+      var w = new Date(iso + "T12:00:00Z").getUTCDay();
+      if (w === 0 || w === 6 || fer[iso]) return;
+      if (cods[iso] === "F") t += 1; else if (cods[iso] === "MDF") t += 0.5;
+    });
+    return t;
+  }
+  /* Pré-preenchido pelo horário (dono, 27/11/2026): feriado = horas que contam em dias de feriado (fer = feriados());
+   * horas extra = horas fora de feriado acima das previstas do mês; normais = o resto. Total = normais + feriado + extra.
+   * extraMin (gravado pelo administrador) substitui o extra calculado; sem previstas, não há extra calculado. */
+  function resumoFecho(dias, extraMin, fer, previstas) {
+    var o = {horario: 0, picadas: 0, contar: 0, tempo_mais: 0, baixa: 0, dias: 0, msg: 0, feriado: 0, feriado_dias: []};
     dias.forEach(function (d) {
       var h = horasHorario(d.partes), t = d.R ? d.R.trabalhado : 0, v = d.pv || preValidar(d.R, d.partes, d.codigo, d.semPonto);
       if (d.codigo === "B") o.baixa++;
       if (h || t) o.dias++;
       o.horario += h; o.picadas += t; o.tempo_mais += d.R ? d.R.extra : 0;
-      o.contar += d.contar === "picadas" ? t : h;
+      var c = d.contar === "picadas" ? t : h;
+      o.contar += c;
+      if (c && fer && d.dia && fer[d.dia]) { o.feriado += c; o.feriado_dias.push(d.dia); }
       if (!v.pre) o.msg++;
     });
-    o.extra = extraMin == null ? 0 : extraMin;
+    var fora = o.contar - o.feriado;
+    o.extra_auto = previstas == null ? 0 : Math.max(0, fora - previstas);
+    o.normais = fora - o.extra_auto;
+    o.extra = extraMin == null ? o.extra_auto : extraMin;
     return o;
   }
   function hhmm(m) { m = Math.round(m || 0); return Math.floor(m / 60) + ":" + String(m % 60).padStart(2, "0"); }
   function lerHHMM(t) { var x = /^\s*(\d{1,4})(?:[:h,.]\s*(\d{1,2}))?\s*$/.exec(String(t || "0")); if (!x) return null; var mi = +(x[2] || 0); return mi > 59 ? null : +x[1] * 60 + mi; }
 
-  return {horasHorario: horasHorario, preValidar: preValidar, resumoFecho: resumoFecho, hhmm: hhmm, lerHHMM: lerHHMM,
+  return {horasHorario: horasHorario, preValidar: preValidar, resumoFecho: resumoFecho, feriados: feriados, feriadosHorario: feriadosHorario, previstasMes: previstasMes, feriasUteis: feriasUteis, hhmm: hhmm, lerHHMM: lerHHMM,
     motivo: motivo, proxima: proxima, dia: dia, hm: hm, duracao: duracao, MOTIVOS: MOTIVOS, ESTADOS: ESTADOS, estadoDia: estadoDia, MOTIVOS_CORR: MOTIVOS_CORR, motivoCorrecao: motivoCorrecao};
 })();
 if (typeof module !== "undefined") module.exports = PONTO;
