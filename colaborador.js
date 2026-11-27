@@ -100,6 +100,9 @@ async function carregarPerfil() {
     "<div aria-hidden='true' style='width:56px;height:56px;border-radius:28px;background:#EAF1FF;color:#1A63E8;font-weight:700;font-size:20px;display:flex;align-items:center;justify-content:center;flex:none'>" + esc(ini || "?") + "</div>" +
     "<div><div style='font-size:18px;font-weight:700'>" + esc(nome || "—") + "</div><div class='mut'>Colaborador · " + esc(ests) + "</div>" +
     "<div class='mut' style='font-size:13px'>" + esc((window.EU && EU.email) || "") + "</div></div></section>" +
+    "<section class='card' style='display:grid;gap:10px;padding:18px'><h2 style='margin:0'>Fardamento</h2>" +
+    "<p class='mut' style='margin:0'>Os seus tamanhos e os pedidos de fardamento novo.</p>" +
+    "<button class='btn p' data-ir='far' style='min-height:48px'>👕 Fardamento</button></section>" +
     "<section class='card' style='display:grid;gap:10px;padding:18px'><h2 style='margin:0'>Notificações</h2>" +
     "<p class='mut' style='margin:0'>Escolha que avisos recebe e ative as notificações neste telemóvel.</p>" +
     "<button class='btn p' id='perNotif' style='min-height:48px'>🔔 Preferências de notificações</button>" +

@@ -14,7 +14,8 @@ var NOTIF_TIPOS = [
   ["concluida", "Avaria concluída", "Quando fica resolvida"],
   ["comentario", "Comentários", "Novos comentários nas avarias que comunicou ou trata"],
   ["ponto", "Ponto", "Picagens em falta, justificações e decisões"],
-  ["compras", "Listas em falta", "Quando um colaborador envia uma lista de artigos em falta (administradores)"]
+  ["compras", "Listas em falta", "Quando um colaborador envia uma lista de artigos em falta (administradores)"],
+  ["farda", "Fardamento", "Pedidos de fardamento e respostas a esses pedidos"]
 ];
 function notifEsc(s) { return window.esc ? esc(s) : String(s == null ? "" : s); }
 function notifQuando(t) { return window.AVARIAS ? AVARIAS.idade(t) : new Date(t).toLocaleString("pt-PT"); }
@@ -116,13 +117,13 @@ async function notifIrEst(est) {
 }
 /* …#avaria=PN-0007 abre a ficha da avaria */
 async function notifAbrirLink(url, est) {
-  var hs = String(url || "").replace(/^[^#]*/, ""), m = /^#(?:sug|ptg)=(\w+)/.exec(hs);
+  var hs = String(url || "").replace(/^[^#]*/, ""), m = /^#(?:sug|ptg|fdm)=(\w+)/.exec(hs);
   if (m && !est) est = m[1];
   var nAv = window.AVARIAS ? AVARIAS.lerNumero(hs) : null;
-  if (/^#(ponto|ptg|sug)\b/.test(hs) || nAv) await notifIrEst(est || (nAv && nAv.estacao));
-  if (/^#(ponto|ptg|sug)\b/.test(hs) && window.ir) {   // Ponto: colaborador → Ponto, administrador → Gestão de Picagens; listas em falta → Compras
-    try { if (/#(ponto|ptg|sug)/.test(location.hash)) history.replaceState(null, "", location.pathname + location.search); } catch (e) { /* fica o # */ }
-    ir(/^#ptg/.test(hs) ? "ptg" : /^#sug/.test(hs) ? "sug" : "pto"); return true;
+  if (/^#(ponto|ptg|sug|fdm)\b/.test(hs) || nAv) await notifIrEst(est || (nAv && nAv.estacao));
+  if (/^#(ponto|ptg|sug|fdm|far)\b/.test(hs) && window.ir) {   // Ponto: colaborador → Ponto, administrador → Gestão de Picagens; listas em falta → Compras; fardamento
+    try { if (/#(ponto|ptg|sug|fdm|far)/.test(location.hash)) history.replaceState(null, "", location.pathname + location.search); } catch (e) { /* fica o # */ }
+    ir(/^#ptg/.test(hs) ? "ptg" : /^#sug/.test(hs) ? "sug" : /^#fdm/.test(hs) ? "fdm" : /^#far/.test(hs) ? "far" : "pto"); return true;
   }
   if (!url || !window.AVARIAS) return false;
   var n = AVARIAS.lerNumero(String(url).replace(/^[^#]*/, ""));
