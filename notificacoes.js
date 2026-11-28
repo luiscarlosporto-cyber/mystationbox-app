@@ -121,6 +121,11 @@ async function notifAbrirLink(url, est) {
   if (m && !est) est = m[1];
   var nAv = window.AVARIAS ? AVARIAS.lerNumero(hs) : null;
   if (/^#(ponto|ptg|sug|fdm)\b/.test(hs) || nAv) await notifIrEst(est || (nAv && nAv.estacao));
+  if (/^#fs/.test(hs) && window.ir) {   // Formação & Segurança (28/11/2026): colaborador → Formação; administrador → gestão
+    try { if (/#fs/.test(location.hash)) history.replaceState(null, "", location.pathname + location.search); } catch (e) { /* fica o # */ }
+    if (est) await notifIrEst(est);
+    ir(ADMIN ? "fsa" : "fsc"); return true;
+  }
   if (/^#(ponto|ptg|sug|fdm|far)\b/.test(hs) && window.ir) {   // Ponto: colaborador → Ponto, administrador → Gestão de Picagens; listas em falta → Compras; fardamento
     try { if (/#(ponto|ptg|sug|fdm|far)/.test(location.hash)) history.replaceState(null, "", location.pathname + location.search); } catch (e) { /* fica o # */ }
     ir(/^#ptg/.test(hs) ? "ptg" : /^#sug/.test(hs) ? "sug" : /^#fdm/.test(hs) ? "fdm" : /^#far/.test(hs) ? "far" : "pto"); return true;

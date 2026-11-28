@@ -28,13 +28,15 @@ async function colDados() {
     sb.from("msb_ponto_horas").select("codigo,parte,inicio,fim").eq("estacao", est).order("parte"),
     sb.rpc("msb_faltas_minhas", {p_estacao: est}),
     sb.from("msb_avarias").select("id,estado").eq("estacao", est).neq("estado", "concluida"),
-    sb.from("msb_ponto_ocorrencias").select("id,estado").eq("user_id", EU.id).eq("estado", "aberta")
+    sb.from("msb_ponto_ocorrencias").select("id,estado").eq("user_id", EU.id).eq("estado", "aberta"),
+    sb.rpc("msb_curso_meus")   // Formação (28/11/2026): cursos por fazer
   ].map(function (p) { return Promise.resolve(p).catch(function (e) { return {error: e}; }); }));
   return {est: est, M: M, reg: q[0].error ? null : (q[0].data || []).filter(function (r) { return r.estado === "aceite"; }),
     amanha: q[1].error ? null : q[1].data, selado: !q[2].error && q[2].data && q[2].data.estado === "real", horas: q[3].error ? [] : (q[3].data || []),
     faltas: q[4].error ? null : q[4].data, avarias: q[5].error ? null : (q[5].data || []).length,
     avValidar: q[5].error ? 0 : (q[5].data || []).filter(function (a) { return a.estado === "em_analise" || a.estado === "em_resolucao"; }).length,
-    ocorrencias: q[6].error ? 0 : (q[6].data || []).length};
+    ocorrencias: q[6].error ? 0 : (q[6].data || []).length,
+    cursos: q[7].error ? [] : (q[7].data || []).filter(function (c) { return c.estado !== "concluido" && c.estado !== "aguarda"; })};
 }
 
 async function carregarColab() {
@@ -70,7 +72,11 @@ function colHtml(D) {
   /* ocorrências do Ponto por explicar: aviso que fica até ser explicado (fase B, 26/11/2026) */
   var oc = D.ocorrencias ? "<button class='card' data-ir='pto' style='margin:0;padding:14px 16px;text-align:left;font:inherit;cursor:pointer;background:#FEF3C7;color:#92400E;border:1px solid #F5D78E;display:grid;gap:2px'>" +
     "<b>⚠️ " + (D.ocorrencias === 1 ? "Tem 1 picagem em falta por explicar" : "Tem " + D.ocorrencias + " picagens em falta por explicar") + "</b><span>Toque para registar ou explicar o motivo.</span></button>" : "";
-  return h1 + oc + colAtalhos() +
+  /* formação por fazer (28/11/2026): aviso que leva à página Formação */
+  var cs = D.cursos || [], prox = cs.filter(function (c) { return c.prazo; }).sort(function (a, b) { return a.prazo < b.prazo ? -1 : 1; })[0], fora = cs.some(function (c) { return c.fora_prazo; });
+  var fs = cs.length ? "<button class='card' data-ir='fsc' style='margin:0;padding:14px 16px;text-align:left;font:inherit;cursor:pointer;background:" + (fora ? "#FEE2E2;color:#991B1B;border:1px solid #FCA5A5" : "#EAF1FF;color:#1E3A8A;border:1px solid #BFD3FB") + ";display:grid;gap:2px'>" +
+    "<b>🎓 " + (cs.length === 1 ? "Tem 1 formação para fazer" : "Tem " + cs.length + " formações para fazer") + "</b><span>" + esc(fora ? "Há uma fora de prazo. Toque para continuar." : prox ? cs.length === 1 ? cs[0].titulo + " · até " + new Date(prox.prazo + "T12:00:00").toLocaleDateString("pt-PT") : "A próxima até " + new Date(prox.prazo + "T12:00:00").toLocaleDateString("pt-PT") : "Toque para começar.") + "</span></button>" : "";
+  return h1 + oc + fs + colAtalhos() +
     "<div class='mut' style='font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin:4px 4px -4px'>Os meus módulos</div>" +
     "<section style='display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px'>" +
     colCartao("hor", "#1A63E8", "#EAF1FF", "Horário", amanha ? "Amanhã: " + amanha : "Ver a semana") +
@@ -103,6 +109,9 @@ async function carregarPerfil() {
     "<section class='card' style='display:grid;gap:10px;padding:18px'><h2 style='margin:0'>Fardamento</h2>" +
     "<p class='mut' style='margin:0'>Os seus tamanhos e os pedidos de fardamento novo.</p>" +
     "<button class='btn p' data-ir='far' style='min-height:48px'>👕 Fardamento</button></section>" +
+    "<section class='card' style='display:grid;gap:10px;padding:18px'><h2 style='margin:0'>Formação</h2>" +
+    "<p class='mut' style='margin:0'>Cursos para fazer na app, as suas formações e os certificados.</p>" +
+    "<button class='btn p' data-ir='fsc' style='min-height:48px'>🎓 Formação</button></section>" +
     "<section class='card' style='display:grid;gap:10px;padding:18px'><h2 style='margin:0'>Notificações</h2>" +
     "<p class='mut' style='margin:0'>Escolha que avisos recebe e ative as notificações neste telemóvel.</p>" +
     "<button class='btn p' id='perNotif' style='min-height:48px'>🔔 Preferências de notificações</button>" +
