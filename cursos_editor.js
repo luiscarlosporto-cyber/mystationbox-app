@@ -39,7 +39,7 @@ function fsaCartao(c, ordem) {
   var porPub = c.versao_rascunho > c.versao_publicada;
   return "<div style='border:1px solid var(--bd);border-radius:14px;padding:12px;display:grid;gap:8px'>" +
     "<div style='display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:flex-start'><b style='font-size:15px'>" + (ordem ? ordem + ". " : "") + esc(c.titulo) + "</b><span>" + fsaEstadoCurso(c) + "</span></div>" +
-    "<div class='mut' style='font-size:13px'>" + esc(FS_REGRAS.horasTxt(c.horas)) + " · " + (FSA.nLic[c.id] || 0) + " lições · " + (FSA.nPerg[c.id] || 0) + " perguntas (o teste usa " + c.n_perguntas + ")" +
+    "<div class='mut' style='font-size:13px'>" + esc(FS_REGRAS.horasTxt(c.horas)) + (c.estacao ? " · só " + esc((window.AVARIAS && AVARIAS.ESTACAO_NOME[c.estacao]) || c.estacao) : "") + " · " + (FSA.nLic[c.id] || 0) + " lições · " + (FSA.nPerg[c.id] || 0) + " perguntas (o teste usa " + c.n_perguntas + ")" +
       (c.nota_minima ? " · mínimo " + c.nota_minima + " %" : "") + "</div>" +
     "<div style='display:flex;gap:6px;flex-wrap:wrap'>" +
       "<button class='btn' data-prev='" + c.id + "' style='min-height:42px'>👁 Ver como o colaborador</button>" +
@@ -254,6 +254,13 @@ async function fsaEquipa() {
 async function fsaAtribuir(curso, perc) {
   var box = $("#fsaCorpo"), alvo = curso ? fsaCurso(curso) : FSA.percursos.find(function (p) { return p.id === perc; });
   box.innerHTML = "<section class='card'>A carregar…</section>";
+  if (curso && alvo.estacao && alvo.estacao !== EST) {
+    var so = (window.AVARIAS && AVARIAS.ESTACAO_NOME[alvo.estacao]) || alvo.estacao;
+    box.innerHTML = "<section class='card' style='display:grid;gap:12px;padding:18px'><button class='btn' id='fsaVoltar' style='justify-self:start;min-height:40px'>← Cursos</button>" +
+      "<p style='margin:0'>ℹ️ Este curso é só para " + esc(so) + ". Mude para essa estação para o atribuir.</p></section>";
+    $("#fsaVoltar").onclick = carregarFsa;
+    return;
+  }
   try { FSA.equipa = await fsaEquipa(); } catch (e) { box.innerHTML = "<section class='card'>❌ " + esc(e.message || falhou(e)) + "</section>"; return; }
   var est = (window.AVARIAS && AVARIAS.ESTACAO_NOME[EST]) || EST, int = perc ? (alvo.intervalo_dias || 14) : 0, n = perc ? alvo.cursos.length : 1;
   box.innerHTML = "<section class='card' style='display:grid;gap:12px;padding:18px'><button class='btn' id='fsaVoltar' style='justify-self:start;min-height:40px'>← Cursos</button>" +
